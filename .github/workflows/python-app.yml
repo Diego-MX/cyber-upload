@@ -6,7 +6,7 @@ name: CI-CD Databricks
 on:
   push:
     branches: [ main, qas, dev ]
-    paths: ['**.py']
+  #  paths: ['**.py']
   #push:
   #  branches: [ main ]
 
