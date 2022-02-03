@@ -4,11 +4,11 @@
 name: CI-CD Databricks
 
 on:
-  #push:
-  #  branches: [ main ]
   push:
     branches: [ main, qas, dev ]
     paths: ['**.py']
+  #push:
+  #  branches: [ main ]
 
 jobs:
   dev:
