@@ -38,7 +38,7 @@ jobs:
  
     # Import notebook to Shared
     - name: Import local github directory to Shared
-      run: databricks workspace import_dir --overwrite . /Shared
+      run: databricks workspace import_dir --overwrite ./notebooks '/Shared/Job Notebooks'
 
     # List Shared content
     - name: List workspace with databricks CLI
