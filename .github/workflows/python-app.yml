@@ -18,8 +18,9 @@ jobs:
       name: dev
       
     env:
-      DBKS_HOST:  ${{ secrets.DBKS_HOST }}
-      DBKS_TOKEN: ${{ secrets.DBKS_TOKEN }}
+    
+      DATABRICKS_HOST:  ${{ secrets.DBKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DBKS_TOKEN }}
       
     steps:
     - uses: actions/checkout@v2
