@@ -85,15 +85,15 @@ SPARK_DBKS = {
     },
     "Docker" : {
         "Driver"         : "/opt/simba/spark/lib/64/libsparkodbc_sb64.so",
-        "HOST"           : (1, "dbks-odbc-host"),
         "PORT"           : "443",
         "Schema"         : "default",
         "SparkServerType": "3",
         "AuthMech"       : "3",
         "UID"            : "token",
-        "PWD"            : (1, "dbks-wap-token"),
         "ThriftTransport": "2",
         "SSL"            : "1",
+        "HOST"           : (1, "dbks-odbc-host"),
+        "PWD"            : (1, "dbks-wap-token"),
         "HTTPPath"       : (1, "dbks-odbc-http")
     }
 }
