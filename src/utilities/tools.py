@@ -2,9 +2,10 @@ import sys
 from datetime import datetime as dt
 
 import json 
-from base64 import b64encode as enc64
+import base64
 import re
 
+from urllib.parse import unquote
 from openpyxl import load_workbook, utils as xl_utils
 import pandas as pd
 
@@ -130,7 +131,7 @@ def dict_minus(a_dict, key, copy=True):
 
 
 def encode64(a_str): 
-    encoded = enc64(a_str.encode('ascii')).decode('ascii')
+    encoded = base64.b64encode(a_str.encode('ascii')).decode('ascii')
     return encoded
 
 
