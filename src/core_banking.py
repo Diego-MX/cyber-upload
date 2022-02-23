@@ -58,8 +58,7 @@ class SAPSession(Session):
         select_attrs = attributes_from_column(attrs_indicator)
         loan_params  = {'$select': ','.join(select_attrs)}
 
-        the_resp = self.get(
-            url=f"{self.base_url}/{loan_config['sub-url']}", 
+        the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
             auth=tools.BearerAuth(self.token), 
             params=loan_params)
         loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
@@ -70,16 +69,15 @@ class SAPSession(Session):
 
 
     def get_persons(self): 
-        if not hasattr(self, 'token'):
-            self.set_token()
+        self.set_token()
 
         person_conf = self.config['calls']['person-set']
-        the_resp = rq_get(f"{self.base_url}/{person_conf['sub-url']}", 
+        the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
                 auth=tools.BearerAuth(self.token))
         
         persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
-        rem_keys = ['__metadata', 'Roles', 'TaxNumbers', 'Relation', 'Partner', 'Correspondence']
-        post_persons = [tools.dict_minus(a_loan, rem_keys) for a_loan in persons_ls]
+        rm_keys = ['__metadata', 'Roles', 'TaxNumbers', 'Relation', 'Partner', 'Correspondence']
+        post_persons = [tools.dict_minus(a_person, rm_keys) for a_person in persons_ls]
         persons_df = (pd.DataFrame(post_persons)
             .assign(ID = lambda df: df.ID.str.pad(10, 'left', '0')))
         return persons_df

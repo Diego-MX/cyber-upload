@@ -2,35 +2,28 @@
 import os, sys
 import regex as re
 from pathlib import Path
-from pydantic import SecretStr
 from dotenv import load_dotenv
-load_dotenv(override=True)
-
-## Main configuration 
-SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
-
-DEFAULT_ENV = 'staging'
-AZ_IDENTITY = 'managed'       # managed   service-principal   local
-CALL_DBKS   = 'Docker'     # Docker    Windows
-
-VERSION     = '1.0.40'
-
-## Parameters. 
-PAGE_MAX = 1000
-
+# from pydantic import SecretStr
 
 in_dbks = 'ipykernel' in sys.modules
 ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
+SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
+
+if in_dbks: 
+    from pyspark.sql import SparkSession
+    from pyspark.dbutils import DBUtils
+
+    spark = SparkSession.builder.getOrCreate()
+    dbutils = DBUtils(spark)
 
 
-## Keys, and parameters Values, and mappers. 
+
 URLS = {
     'api-call'  : {
         'local'     : 'http://localhost:80',
         'staging'   : 'https://wap-cx-collections-dev.azurewebsites.net',
         'qa'        : 'https://apim-crosschannel-tech-dev.azure-api.net/data-'},  
-    'crm-call'      : {
-        'sandbox'   : 'https://bineo1633010523.zendesk.com/api'},
+    
     'api-call-pre'  : { 
         # Se quitó el versionamiento del Back End para hacerlo desde API Mgmt. 
         'local'     : 'http://localhost:5000/v1/get-loan-messages', 
@@ -143,36 +136,17 @@ CORE_KEYS = {
 }
 
 
-SPARK_DBKS = {
-    # Se indica como (1, ENV) cuando el valor se guarda en variable de ambiente. 
-    'local': {
-        'DSN': (1, 'DBKS_ODBC_DSN')
-    },
-    'dev' : {
-        'Driver'         : '/opt/simba/spark/lib/64/libsparkodbc_sb64.so',
-        'PORT'           : '443',
-        'Schema'         : 'default',
-        'SparkServerType': '3',
-        'AuthMech'       : '3',
-        'UID'            : 'token',
-        'ThriftTransport': '2',
-        'SSL'            : '1',
-        'HOST'           : (1, 'dbks-odbc-host'),
-        'PWD'            : (1, 'dbks-wap-token'),
-        'HTTPPath'       : (1, 'dbks-odbc-http')
+CRM_KEYS = {
+    'sandbox' : {
+        'url'  : 'https://bineo1633010523.zendesk.com/api',
+        'user' : (1, 'ZNDK_USER_EMAIL'), 
+        'token': (1, 'ZNDK_API_TOKEN')
     }, 
-    'qas' : {        
-        'Driver'         : '/opt/simba/spark/lib/64/libsparkodbc_sb64.so',
-        'PORT'           : '443',
-        'Schema'         : 'default',
-        'SparkServerType': '3',
-        'AuthMech'       : '3',
-        'UID'            : 'token',
-        'ThriftTransport': '2',
-        'SSL'            : '1',
-        'HOST'           : (1, 'dbks-odbc-host'),
-        'PWD'            : (1, 'dbks-wap-token'),
-        'HTTPPath'       : (1, 'dbks-odbc-http')}
+    'qas' : {
+        'url': '', 
+        'user':'',
+        'token': ''
+    }
 }
 
 
@@ -180,6 +154,9 @@ DBKS_TABLAS = {  # NOMBRE_DBKS, COLUMNA_EXCEL
     'contracts'   : 'bronze.loan_contracts', 
     'collections' : 'gold.loan_contracts'
 }
+
+
+PAGE_MAX = 1000
 
 
 class ConfigEnviron():
@@ -198,31 +175,22 @@ class ConfigEnviron():
         self.env = env_type
         self.set_secret_getter()
 
-
     def set_key_converter(self): 
         if self.env == 'local': 
-            def convert_key(a_key: str): 
-                return re.sub('-', '_', a_key.upper())
+            convert_key = lambda a_key: re.sub('-', '_', a_key.upper())
         else: 
-            def convert_key(a_key: str): 
-                return a_key
+            convert_key = lambda a_key: a_key
         self.convert_key = convert_key
 
 
     def set_secret_getter(self): 
         if  self.env == 'local': 
+            load_dotenv('.env', override=True)        
             def get_secret(key): 
-                load_dotenv('.env', override=True)
                 return os.getenv(key)
 
         elif self.env == 'databricks': 
-            from pyspark.sql import SparkSession
-            from pyspark.dbutils import DBUtils
-
-            spark = SparkSession.builder.getOrCreate()
-            dbutils = DBUtils(spark)
             the_scope = 'kv-resource-access-dbks'
-            
             def get_secret(a_key): 
                 mod_key = f"sp-front-{re.sub('_', '-', a_key.lower())}"
                 the_val = dbutils.secrets.get(scope=the_scope, key=mod_key)

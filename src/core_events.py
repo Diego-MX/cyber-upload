@@ -30,9 +30,12 @@ read_confs = {
         'offset' : '-1', 'seqNo' : -1, 
         'enqueuedTime' : None, 
         'isInclusive'  : True }), 
-    'eventhubs.connectionString' : event_encrypt(conn_string)}
+    'eventhubs.connectionString' : event_encrypt(conn_string), 
+    }
 
 raw_stream = spark.readStream.format('eventhubs').options(**read_confs).load()
+# format cloudFiles
+# options: cloudFiles.format (json), clodFiles.schemaLoction, 
 
 stream_meta = raw_stream.select(
     F.lit(event_name).alias('source'), 
@@ -40,11 +43,15 @@ stream_meta = raw_stream.select(
     F.current_timestamp().aliast('ingest_ts'), 
     F.current_timestamp().cast('date').alias('p_ingest_date') )
 
+
 stream_table = ( stream_meta.writeStream.format('delta')
     .outputMode('append').queryName('event_raw_to_bronze')  # 'overwrite'
     .partitionBy('p_ingest_date')
     .options(**{
         'checkpointLocation': check_path, 'mergeSchema': False}))
 
+
 stream_table.start(delta_path)
+
+spark.readStream.format('delta').load(delta_path)
     
