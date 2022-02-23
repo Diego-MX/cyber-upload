@@ -16,21 +16,11 @@ crm_calls = {
     'Whatsapp' : ('8ba5ba29-806c-11ec-b252-43df5e7d5d44', 13), 
     'SMS'      : ('8bc3a1f4-806c-11ec-ab3b-410d32afd7c3', 17)
 }
-an_id = crm_calls['Email'][0]
+an_id = crm_calls['Whatsapp'][0]
 
 # COMMAND ----------
 
-from importlib import reload
-from src import crm_platform
-from src import platform_resources
-import config
-reload(config)
-reload(crm_platform)
-
-
-# COMMAND ----------
-
-from config import ENV, ConfigEnviron
+from config import ConfigEnviron
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
