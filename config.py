@@ -1,3 +1,4 @@
+
 import os, sys
 import re
 from pathlib import Path
@@ -6,7 +7,6 @@ from dotenv import load_dotenv
 
 in_dbks = 'ipykernel' in sys.modules
 ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
-
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 
 if in_dbks: 
@@ -150,7 +150,9 @@ CRM_KEYS = {
             'promises' : {
                 'sub-url' : 'sunshine/objects/records' 
             }, 
-            'filters'  : {}
+            'filters'  : ('sunshine/objects/records',
+                    'services/zis/inbound_webhooks/generic/ingest')
+            
         }
     }, 
     'qas' : {
@@ -203,7 +205,7 @@ class ConfigEnviron():
         elif self.env == 'databricks': 
             the_scope = 'kv-resource-access-dbks'
             def get_secret(a_key): 
-                mod_key = f"sp-front-{re.sub('_', '-', a_key.lower())}"
+                mod_key = re.sub('_', '-', a_key.lower())
                 the_val = dbutils.secrets.get(scope=the_scope, key=mod_key)
                 return the_val
 
@@ -215,6 +217,6 @@ class ConfigEnviron():
             is_tuple = isinstance(a_val, tuple)
             to_pass = self.get_secret(a_val[1]) if is_tuple else a_val
             return to_pass
-        b_dict = {k: pass_val(v) for (k, v) in a_dict.items()}
-        return b_dict
+
+        return {k: pass_val(v) for (k, v) in a_dict.items()}
         
