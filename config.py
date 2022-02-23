@@ -205,13 +205,6 @@ class ConfigEnviron():
         self.env = env_type
         self.set_secret_getter()
 
-    def set_key_converter(self): 
-        if self.env == 'local': 
-            convert_key = lambda a_key: re.sub('-', '_', a_key.upper())
-        else: 
-            convert_key = lambda a_key: a_key
-        self.convert_key = convert_key
-
 
     def set_secret_getter(self): 
         if  self.env == 'local': 
@@ -219,7 +212,7 @@ class ConfigEnviron():
             def get_secret(key): 
                 return os.getenv(key)
 
-        elif self.env == 'databricks': 
+        elif self.env == 'dbks': 
             the_scope = 'kv-resource-access-dbks'
             def get_secret(a_key): 
                 mod_key = re.sub('_', '-', a_key.lower())
