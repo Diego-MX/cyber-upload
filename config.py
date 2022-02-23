@@ -1,7 +1,10 @@
-
 import os, sys
-import regex as re
+import re
 from pathlib import Path
+<<<<<<< HEAD
+=======
+# from pydantic import SecretStr
+>>>>>>> 365315d6aac3973eddaf4bd8ca2a722621a87a1f
 from dotenv import load_dotenv
 # from pydantic import SecretStr
 
@@ -9,6 +12,7 @@ in_dbks = 'ipykernel' in sys.modules
 ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 
+<<<<<<< HEAD
 if in_dbks: 
     from pyspark.sql import SparkSession
     from pyspark.dbutils import DBUtils
@@ -16,6 +20,15 @@ if in_dbks:
     spark = SparkSession.builder.getOrCreate()
     dbutils = DBUtils(spark)
 
+=======
+VERSION     = '1.0.40'
+
+## Parameters. 
+PAGE_MAX = 1000
+
+in_dbks = 'ipykernel' in sys.modules
+ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
+>>>>>>> 365315d6aac3973eddaf4bd8ca2a722621a87a1f
 
 
 URLS = {

@@ -15,6 +15,4 @@ openpyxl
 # Web
 requests
 jsonschema
-
-
-
+pydantic
