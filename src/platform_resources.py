@@ -14,13 +14,12 @@ class AzureResourcer():
 
 
     def set_credential(self):
-        if self.env in ['local', 'databricks']: 
+        if self.env in ['local', 'dbks']: 
             principal = self.config['service-principal']
             the_creds = ClientSecretCredential(**{k: self.pre_secret(v) 
                     for (k, v) in principal.items()})
         elif self.env in ['dev', 'qas']: 
             the_creds = DefaultAzureCredential()
-
         self.credential = the_creds
 
 

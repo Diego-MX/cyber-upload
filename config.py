@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # from pydantic import SecretStr
 
 in_dbks = 'ipykernel' in sys.modules
-ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
+ENV = 'dbks' if in_dbks else os.environ.get('ENV', 'local')
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 
 if in_dbks: 
@@ -44,11 +44,28 @@ PLATFORM_KEYS = {
             'client_secret'   : 'SP_APP_SECRET', 
             'tenant_id'       : 'AZ_TENANT', 
             'subscription_id' : 'AZ_SUBSCRIPTION'}, 
-        'databricks': {
+        'dbks': {
             'client_id'       : 'sp-lakehylia-app-id', 
             'client_secret'   : 'sp-lakehylia-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'aad-subscription-id'}}, 
+    'dbks': {        'key-vault' : {
+            'name'  : 'kv-collections-data-dev', 
+            'url'   : 'https://kv-collections-data-dev.vault.azure.net/'}, 
+        'storage'   : {
+            'name'  : 'lakehylia', 
+            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+        'app-id'    : 'cx-collections-id',
+        'service-principal' : {
+            'client_id'       : 'SP_APP_ID', 
+            'client_secret'   : 'SP_APP_SECRET', 
+            'tenant_id'       : 'AZ_TENANT', 
+            'subscription_id' : 'AZ_SUBSCRIPTION'}, 
+        'dbks': {
+            'client_id'       : 'sp-lakehylia-app-id', 
+            'client_secret'   : 'sp-lakehylia-secret', 
+            'tenant_id'       : 'aad-tenant-id', 
+            'subscription_id' : 'aad-subscription-id'}},
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
