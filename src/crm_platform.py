@@ -24,19 +24,12 @@ class ZendeskSession(Session):
 
     
     def set_main(self): 
-<<<<<<< HEAD
-        main_config = self.call_dict(self.config['main'])       # Next set it as MAIN.  
+        main_config = self.call_dict(self.config['main'])      
         main_config['username'] += '/token'
         self.base = main_config.pop('url')
-        self.auth = HTTPBasicAuth(**main_config)
-=======
-        main_config = self.call_dict(self.config['main'])
-        self.base_url = main_config.pop('url')
-        main_config[]
-        self.auth = HTTPBasicAuth(f"{main_config['user']}/token", main_config['token'])
->>>>>>> 539e21a7936d183ec1e1e4569e3a191ae052d767
-
-
+        self.auth = HTTPBasicAuth(**main_config)        
+        
+    
     def get_promises(self, params=None): 
         promise_params = self.config['calls']['promises']
         promise_url = f"{self.base}/{promise_params['url']}"
@@ -57,17 +50,9 @@ class ZendeskSession(Session):
         pre_data = pre_resp.json()['data']
 
         zis_params = self.call_dict(self.config['zis'])
-<<<<<<< HEAD
         zis_id = zis_params.pop('id')
         zis_kwargs = {
             'url'  : f'{self.base}/{sub_urls[1]}/{zis_id}', 
-=======
-        zis_id  = zis_params.pop('id')
-        zis_url = '/'.join([self.base_url, 'services/zis/inbound_webhooks', 
-                'generic/ingest', zis_id]) 
-        post_params = {
-            'url'  : zis_url, 
->>>>>>> 539e21a7936d183ec1e1e4569e3a191ae052d767
             'auth' : HTTPBasicAuth(**zis_params), 
             'data' : dumps({'data': [pre_data]})}
         return self.post(**zis_kwargs)
@@ -81,4 +66,3 @@ if __name__ == '__main__':
     azurer = AzureResourcer(configurator)
     zendesk = ZendeskSession('sandbox', azurer)
 
-    promises = zendesk.get_promises()
