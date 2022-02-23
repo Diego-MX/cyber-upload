@@ -21,9 +21,11 @@ an_id = crm_calls['Email'][0]
 # COMMAND ----------
 
 from importlib import reload
+from src import crm_platform
+from src import platform_resources
 reload(config)
-import os
-os.environ['ENV'] = 'databricks'
+reload(crm_platform)
+
 
 # COMMAND ----------
 
@@ -31,6 +33,6 @@ from config import ENV, ConfigEnviron
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
-secretter = ConfigEnviron(ENV)
-az_resourcer = AzureResourcer('dev', secretter)
+secretter = ConfigEnviron('databricks')
+az_resourcer = AzureResourcer('databricks', secretter)
 zendesk = ZendeskSession('sandbox', az_resourcer)
