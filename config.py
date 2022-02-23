@@ -137,13 +137,21 @@ CORE_KEYS = {
 
 CRM_KEYS = {
     'sandbox' : {
-        'url'  : 'https://bineo1633010523.zendesk.com/api',
-        'user' : (1, 'crm-api-user'), # ZNDK_USER_EMAIL
-        'token': (1, 'crm-api-token'), # ZNDK_API_TOKEN
+        'main' : {
+            'url'  : 'https://bineo1633010523.zendesk.com/api',
+            'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
+            'password' : (1, 'crm-api-token'),  # ZNDK_API_TOKEN
+        }, 
         'zis'  : {
             'id'      : (1, 'crm-zis-id'), 
             'username': (1, 'crm-zis-user'), 
-            'password': (1, 'crm-zis-pass')}
+            'password': (1, 'crm-zis-pass')}, 
+        'calls' : {
+            'promises' : {
+                'sub-url' : 'sunshine/objects/records' 
+            }, 
+            'filters'  : {}
+        }
     }, 
     'qas' : {
         'url': '', 

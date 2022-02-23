@@ -24,13 +24,15 @@ class ZendeskSession(Session):
 
     
     def set_main(self): 
-        main_config = self.call_dict(self.config['main'])
-        self.base_url = main_config['url']
-        self.auth = HTTPBasicAuth(f"{main_config['user']}/token", main_config['token'])
+        main_config = self.call_dict(self.config['main'])       # Next set it as MAIN.  
+        main_config['username'] += '/token'
+        self.base = main_config.pop('url')
+        self.auth = HTTPBasicAuth(**main_config)
 
 
-    def get_promises(self, params): 
-        promise_url = f'{self.base_url}/sunshine/objects/records'
+    def get_promises(self, params=None): 
+        promise_params = self.config['calls']['promises']
+        promise_url = f"{self.base}/{promise_params['url']}"
         promises = self.get(promise_url, params={'type': 'payment_promise'})
 
         promises_ls = promises.json()['data']
@@ -42,18 +44,26 @@ class ZendeskSession(Session):
         return pd.DataFrame(promises_ls)
 
 
-    def send_filter(self, filter_id): 
-        filter_url = f'{self.base_url}/sunshine/objects/records/{filter_id}'
-        pre_resp = self.get(filter_url)
+    def post_filter(self, filter_id): 
+        sub_urls = self.config['calls']['filters']
+        pre_resp = self.get(f'{self.base}/{sub_urls[0]}/{filter_id}')
         pre_data = pre_resp.json()['data']
 
-        zis_params = self.call_dict(self.config['zis']).copy()
-        zis_id  = zis_params.pop('id')
-        zis_url = '/'.join([self.base_url, 'services/zis/inbound_webhooks', 
-                'generic/ingest', zis_id]) 
-        post_params = {
-            'url'  : zis_url, 
+        zis_params = self.call_dict(self.config['zis'])
+        zis_id = zis_params.pop('id')
+        zis_kwargs = {
+            'url'  : f'{self.base}/{sub_urls[1]}/{zis_id}', 
             'auth' : HTTPBasicAuth(**zis_params), 
             'data' : dumps({'data': [pre_data]})}
-            
-        return self.post(**post_params)
+        return self.post(**zis_kwargs)
+
+
+if __name__ == '__main__': 
+
+    from config import ConfigEnviron
+
+    configurator = ConfigEnviron('local')
+    azurer = AzureResourcer(configurator)
+    zendesk = ZendeskSession('sandbox', azurer)
+
+    promises = zendesk.get_promises()

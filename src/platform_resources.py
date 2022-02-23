@@ -2,7 +2,7 @@ from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 
-from config import ConfigEnviron, PLATFORM_KEYS
+from config import PLATFORM_KEYS, ConfigEnviron
 
 
 
