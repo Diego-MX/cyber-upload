@@ -40,27 +40,10 @@ PLATFORM_KEYS = {
             'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
         'app-id'    : 'cx-collections-id',
         'service-principal' : {
-            'client_id'       : 'SP_APP_ID', 
-            'client_secret'   : 'SP_APP_SECRET', 
-            'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION'}, 
-        'dbks': {
-            'client_id'       : 'sp-lakehylia-app-id', 
-            'client_secret'   : 'sp-lakehylia-secret', 
-            'tenant_id'       : 'aad-tenant-id', 
-            'subscription_id' : 'aad-subscription-id'}}, 
-    'dbks': {        'key-vault' : {
-            'name'  : 'kv-collections-data-dev', 
-            'url'   : 'https://kv-collections-data-dev.vault.azure.net/'}, 
-        'storage'   : {
-            'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : 'SP_APP_ID', 
-            'client_secret'   : 'SP_APP_SECRET', 
-            'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION'}},
+            'client_id'       : 'SP_LAKEHYLIA_APP_ID', 
+            'client_secret'   : 'SP_LAKEHYLIA_SECRET', 
+            'tenant_id'       : 'AAD_TENANT_ID', 
+            'subscription_id' : 'AAD_SUBSCRIPTION_ID'}},
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
