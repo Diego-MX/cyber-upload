@@ -60,12 +60,7 @@ PLATFORM_KEYS = {
             'client_id'       : 'SP_APP_ID', 
             'client_secret'   : 'SP_APP_SECRET', 
             'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION'}, 
-        'dbks': {
-            'client_id'       : 'sp-lakehylia-app-id', 
-            'client_secret'   : 'sp-lakehylia-secret', 
-            'tenant_id'       : 'aad-tenant-id', 
-            'subscription_id' : 'aad-subscription-id'}},
+            'subscription_id' : 'AZ_SUBSCRIPTION'}},
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
@@ -75,15 +70,10 @@ PLATFORM_KEYS = {
             'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
         'app-id'    : 'cx-collections-id',
         'service-principal' : {
-            'client_id'       : 'SP_APP_ID', 
-            'client_secret'   : 'SP_APP_SECRET', 
-            'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION'}, 
-        'databricks': {
-            'client_id'       : 'sp-lakehylia-app-id', 
-            'client_secret'   : 'sp-lakehylia-secret', 
-            'tenant_id'       : 'aad-tenant-id', 
-            'subscription_id' : 'aad-subscription-id'}}, 
+            'client_id'       : 'SP_LAKEHYLIA_APP_ID', 
+            'client_secret'   : 'SP_LAKEHYLIA_SECRET', 
+            'tenant_id'       : 'AAD_TENANT_ID', 
+            'subscription_id' : 'AAD_SUBSCRIPTION_ID'}}, 
     'qas': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
@@ -96,12 +86,8 @@ PLATFORM_KEYS = {
             'client_id'       : 'SP_APP_ID', 
             'client_secret'   : 'SP_APP_SECRET', 
             'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION'}, 
-        'databricks': {
-            'client_id'       : 'sp-lakehylia-app-id', 
-            'client_secret'   : 'sp-lakehylia-secret', 
-            'tenant_id'       : 'aad-tenant-id', 
-            'subscription_id' : 'aad-subscription-id'}}}
+            'subscription_id' : 'AZ_SUBSCRIPTION'}
+}}
 
 
 CORE_KEYS = {
@@ -199,18 +185,10 @@ class ConfigEnviron():
     - local          -> os.getenv(*)
     - databricks     -> dbutils.secrets.get(scope, *)
     - dev, qas, prod -> not needed, as access to keyvault is granted on launch.
-
     '''
     def __init__(self, env_type):
         self.env = env_type
         self.set_secret_getter()
-
-    def set_key_converter(self): 
-        if self.env == 'local': 
-            convert_key = lambda a_key: re.sub('-', '_', a_key.upper())
-        else: 
-            convert_key = lambda a_key: a_key
-        self.convert_key = convert_key
 
 
     def set_secret_getter(self): 
@@ -219,7 +197,7 @@ class ConfigEnviron():
             def get_secret(key): 
                 return os.getenv(key)
 
-        elif self.env == 'databricks': 
+        elif self.env == 'dbks': 
             the_scope = 'kv-resource-access-dbks'
             def get_secret(a_key): 
                 mod_key = re.sub('_', '-', a_key.lower())
