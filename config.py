@@ -40,10 +40,10 @@ PLATFORM_KEYS = {
             'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
         'app-id'    : 'cx-collections-id',
         'service-principal' : {
-            'client_id'       : 'SP_LAKEHYLIA_APP_ID', 
-            'client_secret'   : 'SP_LAKEHYLIA_SECRET', 
-            'tenant_id'       : 'AAD_TENANT_ID', 
-            'subscription_id' : 'AAD_SUBSCRIPTION_ID'}},
+            'client_id'       : (1, 'SP_LAKEHYLIA_APP_ID'), 
+            'client_secret'   : (1, 'SP_LAKEHYLIA_SECRET'), 
+            'tenant_id'       : (1, 'AAD_TENANT_ID'), 
+            'subscription_id' : (1, 'AAD_SUBSCRIPTION_ID')}},
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 

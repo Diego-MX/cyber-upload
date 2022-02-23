@@ -11,13 +11,12 @@ class AzureResourcer():
         self.env = env
         self.config = PLATFORM_KEYS[env]
         self.pre_secret = env_obj.get_secret
-
+        self.pre_dict = env_obj.call_dict
 
     def set_credential(self):
         if self.env in ['local', 'dbks']: 
-            principal = self.config['service-principal']
-            the_creds = ClientSecretCredential(**{k: self.pre_secret(v) 
-                    for (k, v) in principal.items()})
+            principal_keys = self.pre_dict(self.config['service-principal'])
+            the_creds = ClientSecretCredential(**principal_keys)
         elif self.env in ['dev', 'qas']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
