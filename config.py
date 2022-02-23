@@ -1,12 +1,12 @@
-
 import os, sys
-import regex as re
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 # from pydantic import SecretStr
 
 in_dbks = 'ipykernel' in sys.modules
 ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
+
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 
 if in_dbks: 
@@ -215,6 +215,6 @@ class ConfigEnviron():
             is_tuple = isinstance(a_val, tuple)
             to_pass = self.get_secret(a_val[1]) if is_tuple else a_val
             return to_pass
-
-        return {k: pass_val(v) for (k, v) in a_dict.items()}
+        b_dict = {k: pass_val(v) for (k, v) in a_dict.items()}
+        return b_dict
         

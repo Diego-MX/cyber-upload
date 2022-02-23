@@ -7,9 +7,9 @@ from config import PLATFORM_KEYS, ConfigEnviron
 
 
 class AzureResourcer(): 
-    def __init__(self, env_obj: ConfigEnviron): 
-        self.env = env_obj.env
-        self.config = PLATFORM_KEYS[env_obj.env]
+    def __init__(self, env, env_obj: ConfigEnviron): 
+        self.env = env
+        self.config = PLATFORM_KEYS[env]
         self.pre_secret = env_obj.get_secret
 
 
