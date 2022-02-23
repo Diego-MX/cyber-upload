@@ -25,7 +25,8 @@ class ZendeskSession(Session):
     
     def set_main(self): 
         main_config = self.call_dict(self.config['main'])
-        self.base_url = main_config['url']
+        self.base_url = main_config.pop('url')
+        main_config[]
         self.auth = HTTPBasicAuth(f"{main_config['user']}/token", main_config['token'])
 
 
@@ -47,7 +48,7 @@ class ZendeskSession(Session):
         pre_resp = self.get(filter_url)
         pre_data = pre_resp.json()['data']
 
-        zis_params = self.call_dict(self.config['zis']).copy()
+        zis_params = self.call_dict(self.config['zis'])
         zis_id  = zis_params.pop('id')
         zis_url = '/'.join([self.base_url, 'services/zis/inbound_webhooks', 
                 'generic/ingest', zis_id]) 
