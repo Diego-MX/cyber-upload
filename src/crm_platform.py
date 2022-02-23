@@ -30,9 +30,9 @@ class ZendeskSession(Session):
         self.auth = HTTPBasicAuth(**main_config)        
         
     
-    def get_promises(self, params=None): 
+    def get_promises(self): 
         promise_params = self.config['calls']['promises']
-        promise_url = f"{self.base}/{promise_params['url']}"
+        promise_url = f"{self.base}/{promise_params['sub-url']}"
         promises = self.get(promise_url, params={'type': 'payment_promise'})
 
         promises_ls = promises.json()['data']
@@ -58,11 +58,21 @@ class ZendeskSession(Session):
         return self.post(**zis_kwargs)
 
 
+
 if __name__ == '__main__': 
-
+    import config
+    from src import platform_resources
+    
+    from importlib import reload
+    reload(config)
+    reload(platform_resources)
+    
     from config import ConfigEnviron
+    from src.platform_resources import AzureResourcer
 
-    configurator = ConfigEnviron('local')
-    azurer = AzureResourcer(configurator)
-    zendesk = ZendeskSession('sandbox', azurer)
+    secretter = ConfigEnviron('local')
+    azurer_getter = AzureResourcer('local', secretter)
+    zendesk = ZendeskSession('sandbox', azurer_getter)
+
+    promises_df = zendesk.get_promises()
 
