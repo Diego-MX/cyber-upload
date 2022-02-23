@@ -1,10 +1,7 @@
+
 import os, sys
-import re
+import regex as re
 from pathlib import Path
-<<<<<<< HEAD
-=======
-# from pydantic import SecretStr
->>>>>>> 365315d6aac3973eddaf4bd8ca2a722621a87a1f
 from dotenv import load_dotenv
 # from pydantic import SecretStr
 
@@ -12,23 +9,12 @@ in_dbks = 'ipykernel' in sys.modules
 ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 
-<<<<<<< HEAD
 if in_dbks: 
     from pyspark.sql import SparkSession
     from pyspark.dbutils import DBUtils
-
     spark = SparkSession.builder.getOrCreate()
     dbutils = DBUtils(spark)
 
-=======
-VERSION     = '1.0.40'
-
-## Parameters. 
-PAGE_MAX = 1000
-
-in_dbks = 'ipykernel' in sys.modules
-ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')
->>>>>>> 365315d6aac3973eddaf4bd8ca2a722621a87a1f
 
 
 URLS = {
@@ -152,8 +138,12 @@ CORE_KEYS = {
 CRM_KEYS = {
     'sandbox' : {
         'url'  : 'https://bineo1633010523.zendesk.com/api',
-        'user' : (1, 'ZNDK_USER_EMAIL'), 
-        'token': (1, 'ZNDK_API_TOKEN')
+        'user' : (1, 'crm-api-user'), # ZNDK_USER_EMAIL
+        'token': (1, 'crm-api-token'), # ZNDK_API_TOKEN
+        'zis'  : {
+            'id'      : (1, 'crm-zis-id'), 
+            'username': (1, 'crm-zis-user'), 
+            'password': (1, 'crm-zis-pass')}
     }, 
     'qas' : {
         'url': '', 
