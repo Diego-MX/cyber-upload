@@ -5,25 +5,14 @@
 # Utilities
 azure-identity
 azure-keyvault-secrets
-azure-storage-blob
-msrestazure
 python-dotenv
-winshell
 
 # Data 
 pandas
 pyarrow
 openpyxl
-pyodbc
 
 # Web
 requests
 jsonschema
-Flask
-fastapi
-uvicorn
-
-# Lowlevel
-orjson
-
-
+pydantic

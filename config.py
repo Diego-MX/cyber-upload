@@ -1,23 +1,17 @@
-
 import os, sys
-import regex as re
+import re
 from pathlib import Path
-from pydantic import SecretStr
+# from pydantic import SecretStr
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
 ## Main configuration 
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 
-DEFAULT_ENV = 'staging'
-AZ_IDENTITY = 'managed'       # managed   service-principal   local
-CALL_DBKS   = 'Docker'     # Docker    Windows
-
 VERSION     = '1.0.40'
 
 ## Parameters. 
 PAGE_MAX = 1000
-
 
 in_dbks = 'ipykernel' in sys.modules
 ENV = 'databricks' if in_dbks else os.environ.get('ENV', 'local')

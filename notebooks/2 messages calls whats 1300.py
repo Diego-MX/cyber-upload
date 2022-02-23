@@ -7,7 +7,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install azure-identity azure-keyvault-secrets python-dotenv
+# MAGIC %pip install -r ../requirements.txt
 
 # COMMAND ----------
 

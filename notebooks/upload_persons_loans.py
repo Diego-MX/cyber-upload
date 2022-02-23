@@ -117,8 +117,9 @@ CRM_TOKEN = get_secret("crm-api-token")
     the_params   = { "$select" : ",".join(select_attrs) }
 
     the_resp     = rq_get(f"{APIS_URL}/v1/lacovr/ContractSet", 
-        auth=tools.BearerAuth(the_token), headers=the_hdrs, params=the_params)
+        auth=tools.BearerAuth(the_token), headers=the_hdrs)
 
+    print(the_resp.text)
 
 # COMMAND ----------
 
