@@ -52,7 +52,7 @@ class SAPSession(Session):
         loan_params  = {'$select': ','.join(select_attrs)}
 
         the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-            auth=tools.BearerAuth(self.token), 
+            auth=tools.BearerAuth(self.token['access_token']), 
             params=loan_params)
         loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
         for loan in loans_ls: 
@@ -74,20 +74,20 @@ class SAPSession(Session):
                     auth=tools.BearerAuth(self.token['access_token']), params=params_0)
             
             persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
-            post_persons.extend(persons_mod)
+            post_persons.extend(persons_ls)
 
             params_0['$skip'] += how_many
             if len(persons_ls) < how_many: 
                 break
         
         rm_keys = ['__metadata', 'Roles', 'TaxNumbers', 'Relation', 'Partner', 'Correspondence']
-        persons_mod = [tools.dict_minus(a_person, rm_keys) for a_person in persons_ls]
-        persons_df = (pd.DataFrame(post_persons)
+        persons_mod = [tools.dict_minus(a_person, rm_keys) for a_person in post_persons]
+        persons_df = (pd.DataFrame(persons_mod)
             .assign(ID = lambda df: df.ID.str.pad(10, 'left', '0')))
         return persons_df
 
 
-def attributes_from_column(attrs_indicator=None):
+def attributes_from_column(attrs_indicator=None) -> list:
     if attrs_indicator == 'all': 
         the_attrs = ['ID', 'BankAccountID', 'BankRoutingID', 'BankCountryCode', 
           'BorrowerID', 'BorrowerTxt', 'BorrowerName', 'BorrowerAddress', 'ManagerID', 
@@ -128,7 +128,7 @@ def attributes_from_column(attrs_indicator=None):
     else: 
         attr_df = sap_attr.query(f'{attrs_indicator} == 1')
     
-    return attr_df['atributo']
+    return attr_df['atributo'].to_list()
 
 
 def d_results(json_item, api_type): 
