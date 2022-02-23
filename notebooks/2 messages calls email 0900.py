@@ -35,7 +35,7 @@ from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
 secretter = ConfigEnviron('dbks')
-az_resourcer = AzureResourcer('dbks', secretter)
+az_resourcer = AzureResourcer('local', secretter)
 zendesk = ZendeskSession('sandbox', az_resourcer)
 
 zendesk.post_filter(an_id)
