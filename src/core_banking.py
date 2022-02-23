@@ -3,6 +3,7 @@
 # Copy del archivo en el repo DATA-SAP-EVENTS. 
 # No lo hemos importado, sólo copiado-pegado. 
 
+from datetime import datetime as dt
 import re
 from urllib.parse import unquote
 import pandas as pd
@@ -71,7 +72,8 @@ class SAPSession(Session):
         post_persons = []
         while True:    
             the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
-                    auth=tools.BearerAuth(self.token['access_token']), params=params_0)
+                    auth=tools.BearerAuth(self.token['access_token']), 
+                    params=params_0)
             
             persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
             post_persons.extend(persons_ls)
@@ -85,6 +87,23 @@ class SAPSession(Session):
         persons_df = (pd.DataFrame(persons_mod)
             .assign(ID = lambda df: df.ID.str.pad(10, 'left', '0')))
         return persons_df
+
+
+    def get_by_api(self, api_type, type_id=None): 
+        type_ref = 'ContractSet' if type_id is None else f"ContractSet('{type_id}')"
+        sub_url = tools.str_snake_to_camel(api_type, first_word_too=True)
+        the_url = f'{self.base_url}/v1/lacovr/{type_ref}/{sub_url}'
+        self.set_token()
+        the_resp = self.get(the_url, auth=tools.BearerAuth(self.token['access_token']))
+        
+        results_ls = the_resp.json()['d']['results']
+        for each_result in results_ls: 
+            each_result.pop('__metadata')
+        
+        results_df = (pd.DataFrame(results_ls).
+            assign(ts_call = dt.now().strftime('%Y-%m-%d')))
+        return results_df
+
 
 
 def attributes_from_column(attrs_indicator=None) -> list:
@@ -170,7 +189,6 @@ if __name__ == '__main__':
     reload(config)
     reload(tools)
 
-    from src.core_banking import SAPSession
     from src.platform_resources import AzureResourcer
     from config import ConfigEnviron
 
@@ -178,6 +196,4 @@ if __name__ == '__main__':
     azure_getter = AzureResourcer('local', secretter)
     core_session = SAPSession('qas', azure_getter)
 
-    persons_df = core_session.get_persons()
-    print(persons_df.shape)
-
+    abc = core_session.get_by_api(api_type, type_id)
