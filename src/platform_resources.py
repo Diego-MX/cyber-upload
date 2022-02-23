@@ -11,13 +11,13 @@ class AzureResourcer():
         self.env = env
         self.config = PLATFORM_KEYS[env]
         self.pre_secret = env_obj.get_secret
+        self.pre_dict = env_obj.call_dict
 
 
     def set_credential(self):
         if self.env in ['local', 'dbks']: 
-            principal = self.config['service-principal']
-            the_creds = ClientSecretCredential(**{k: self.pre_secret(v) 
-                    for (k, v) in principal.items()})
+            principal_keys = self.pre_dict(self.config['service-principal'])
+            the_creds = ClientSecretCredential(**principal_keys)
         elif self.env in ['dev', 'qas']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
@@ -39,8 +39,8 @@ class AzureResourcer():
 
     def call_dict(self, a_dict: dict):         
         def pass_val(val): 
-            not_tuple = not isinstance(val, tuple)
-            to_pass = val if not_tuple else self.get_secret(val[1])
+            is_tuple = isinstance(val, tuple)
+            to_pass = self.get_secret(val[1]) if is_tuple else val
             return to_pass
         return {k: pass_val(v) for (k, v) in a_dict.items()}
 
