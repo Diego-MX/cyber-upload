@@ -16,7 +16,6 @@ if in_dbks:
     dbutils = DBUtils(spark)
 
 
-
 URLS = {
     'api-call'  : {
         'local'     : 'http://localhost:80',
@@ -31,7 +30,7 @@ URLS = {
 
 
 PLATFORM_KEYS = {
-    'local': {        
+    'local': {
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
             'url'   : 'https://kv-collections-data-dev.vault.azure.net/'}, 
@@ -80,10 +79,10 @@ CORE_KEYS = {
                 'format'          : 'json',
                 'Accept-Encoding' : 'gzip, deflate',
                 'Accept'          : 'application/json' }, 
-            'base-url' : 'https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b'},
+            'base-url' : 'https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b',
             'access' : {
                 'username': (1, 'core-api-key'), 
-                'password': (1, 'core-api-secret')}, 
+                'password': (1, 'core-api-secret') }}, 
         'calls' : {
             'auth' : {
                 'url' : 'https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token', 

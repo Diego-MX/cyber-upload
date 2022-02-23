@@ -124,9 +124,10 @@ def shortcut_target(filename, file_ext=None):
     return a_path[0]
 
 
-def dict_minus(a_dict, key, copy=True): 
+def dict_minus(a_dict, key_ls, copy=True): 
     b_dict = a_dict.copy() if copy else a_dict
-    b_dict.pop(key)
+    for key in key_ls: 
+        b_dict.pop(key, None)
     return b_dict
 
 
