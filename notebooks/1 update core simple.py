@@ -29,17 +29,9 @@ core_session = SAPSession('qas', azure_getter)
 loans_df   = core_session.get_loans("all")
 persons_df = core_session.get_persons()
 
-
-
-# COMMAND ----------
-
 loans_spk   = spark.createDataFrame(loans_df)
 persons_spk = spark.createDataFrame(persons_df)
 
-
-# COMMAND ----------
-
 loans_spk.write.mode("overwrite").saveAsTable("bronze.loan_contracts")
 persons_spk.write.mode("overwrite").saveAsTable("bronze.persons_set")
-
 

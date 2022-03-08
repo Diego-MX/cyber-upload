@@ -5,7 +5,6 @@ from azure.keyvault.secrets import SecretClient
 from config import PLATFORM_KEYS, ConfigEnviron
 
 
-
 class AzureResourcer(): 
     def __init__(self, env, env_obj: ConfigEnviron): 
         self.env = env

@@ -1,13 +1,14 @@
 # Diego Villamil, EPIC
 # CDMX, 4 de noviembre de 2021
-# Copy del archivo en el repo DATA-SAP-EVENTS. 
-# No lo hemos importado, sólo copiado-pegado. 
 
 from datetime import datetime as dt
 import re
 from urllib.parse import unquote
 import pandas as pd
 from requests import Session, auth
+
+#from aiohttp import ClientSession
+#import asyncio
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
@@ -21,13 +22,14 @@ class SAPSession(Session):
         self.get_secret = secret_env.get_secret
         self.call_dict  = secret_env.call_dict
         self.set_main()
+        self.set_token()
 
 
     def set_main(self): 
         main_config = self.config['main']
         self.headers.update(main_config['headers'])
         self.base_url = main_config['base-url']
-
+        
 
     def set_token(self, auth_type=None): 
         access = self.call_dict(self.config['main']['access'])
@@ -41,20 +43,31 @@ class SAPSession(Session):
             params.update({'headers': {
                 'Authorization': f'Basic {auth_enc}', 
                 'Content-Type' : 'application/x-www-form-urlencoded'}})
-
         the_resp = self.post(**params)
         self.token = the_resp.json()
 
 
-    def get_loans(self, attrs_indicator): 
-        self.set_token()
+    def get_loans(self, attrs_indicator, tries=3): 
+        if not hasattr(self, 'token'): 
+            self.set_token()
+        
         loan_config  = self.config['calls']['contract-set']
         select_attrs = attributes_from_column(attrs_indicator)
         loan_params  = {'$select': ','.join(select_attrs)}
 
-        the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-            auth=tools.BearerAuth(self.token['access_token']), 
-            params=loan_params)
+        for _ in range(tries): 
+            the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
+                auth=tools.BearerAuth(self.token['access_token']), 
+                params=loan_params)
+            
+            if the_resp.status_code == 401: 
+                self.set_token()
+                continue
+            elif the_resp.status_code == 200: 
+                break
+        else: 
+            return None   
+
         loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
         for loan in loans_ls: 
             loan.pop('__metadata')
@@ -62,18 +75,26 @@ class SAPSession(Session):
         return pd.DataFrame(loans_ls)
 
 
-    def get_persons(self, params={}, how_many=PAGE_MAX): 
-        self.set_token()
-        
+    def get_persons(self, params={}, how_many=PAGE_MAX, tries=3): 
         person_conf = self.config['calls']['person-set']
         params_0 = {'$top': how_many, '$skip': 0}
         params_0.update(params)
 
         post_persons = []
-        while True:    
-            the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
-                    auth=tools.BearerAuth(self.token['access_token']), 
-                    params=params_0)
+
+        while True:
+            for _ in range(tries): 
+                the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
+                        auth=tools.BearerAuth(self.token['access_token']), 
+                        params=params_0)
+                    
+                if the_resp.status_code == 401: 
+                    self.set_token()
+                    continue
+                if the_resp.status_code == 200: 
+                    break
+            else:
+                raise 'Could not call API.'
             
             persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
             post_persons.extend(persons_ls)
@@ -89,12 +110,21 @@ class SAPSession(Session):
         return persons_df
 
 
-    def get_by_api(self, api_type, type_id=None): 
+    def get_by_api(self, api_type, type_id=None, tries=3): 
         type_ref = 'ContractSet' if type_id is None else f"ContractSet('{type_id}')"
         sub_url = tools.str_snake_to_camel(api_type, first_word_too=True)
         the_url = f'{self.base_url}/v1/lacovr/{type_ref}/{sub_url}'
-        self.set_token()
-        the_resp = self.get(the_url, auth=tools.BearerAuth(self.token['access_token']))
+
+        if not hasattr(self, 'token'): 
+            self.set_token()
+
+        for _ in range(tries): 
+            the_resp = self.get(the_url, auth=tools.BearerAuth(self.token['access_token']))
+            if the_resp.status_code == 200: 
+                break
+            self.set_token()
+        else: 
+            return None
         
         results_ls = the_resp.json()['d']['results']
         for each_result in results_ls: 
@@ -178,7 +208,7 @@ def d_results(json_item, api_type):
 
 
     
-if __name__ == '__main__': 
+if False: 
     from importlib import reload
     from src import core_banking
     from src import platform_resources
@@ -189,6 +219,8 @@ if __name__ == '__main__':
     reload(config)
     reload(tools)
 
+    from time import time
+    from itertools import product
     from src.platform_resources import AzureResourcer
     from config import ConfigEnviron
 
@@ -196,4 +228,47 @@ if __name__ == '__main__':
     azure_getter = AzureResourcer('local', secretter)
     core_session = SAPSession('qas', azure_getter)
 
-    abc = core_session.get_by_api(api_type, type_id)
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+
+    thread_local = threading.local()
+
+    def get_session():
+        if not hasattr(thread_local, 'session'): 
+            thread_local.session = SAPSession('qas', azure_getter)
+        return thread_local.session
+
+    api_types = ['open_items', 'payment_plan', 'balances']
+    
+
+    the_calls = {a_call: {} for a_call in api_types}
+    unserved  = []
+        
+    def call_an_api(in_params): 
+        api_type, type_id = in_params
+        a_session = get_session()
+        global the_calls, unserved
+
+        api_df = a_session.get_by_api(api_type, type_id)
+        if api_df is not None: 
+            the_calls[api_type][type_id] = api_df
+        else: 
+            unserved.append((api_type, type_id))
+
+    def call_all_apis(ids_lists, k_workers=20): 
+        global the_calls, unserved
+
+        with ThreadPoolExecutor(max_workers=k_workers) as executor: 
+            executor.map(call_an_api, product(api_types, ids_lists))
+
+
+    ids = ['10000002999-111-MX', '10000003019-111-MX', '10000003021-111-MX', 
+        '10000003053-111-MX', '10000003080-111-MX', '10000003118-111-MX', 
+        '10000003136-111-MX', '10000003140-111-MX', '10000003188-111-MX', 
+        '10000003226-555-MX']
+    
+    tic = time()
+    call_all_apis(ids)
+    toc = time() - tic
+
+    print(f'Total: {len(ids)*len(api_types)}, Missed: {len(unserved)} in {toc:5.2} seconds')

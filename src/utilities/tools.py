@@ -1,20 +1,15 @@
 import sys 
-from datetime import datetime as dt
-
 import json 
 import base64
 import re
-
+from importlib import reload
 
 from openpyxl import load_workbook, utils as xl_utils
 import pandas as pd
 
 from requests import auth
 from jsonschema import validate, exceptions
-from flask import jsonify
 from fastapi.exceptions import HTTPException
-
-from importlib import reload
 
 
 def reload_from_asterisk(module):
@@ -37,7 +32,7 @@ def str_snake_to_camel(snaked:str, first_word_too=False):
     return cameled
 
 
-def response_validate(payload, input_file, server="flask"):
+def response_validate(payload, input_file):
     try: 
         with open(input_file, 'r') as _f:
             input_schema = json.load(_f)
@@ -46,18 +41,7 @@ def response_validate(payload, input_file, server="flask"):
         status_code = 200
     except exceptions.ValidationError as err:
         status_code = 400
-        response = {
-            "code"          : "0001",
-            "type"          : "validation/input",
-            "instance"      : "input/messages_strategy/invalid_structure",
-            "status_code"   : "400",
-            "timestamp"     : str(dt.now()),
-            "detail"        : str(err) }
-        if server == "flask": 
-            return {"error" : status_code, "output" : (jsonify(response), status_code)}
-        elif server == "fastapi": 
-            raise HTTPException(status_code=status_code, detail="Validation Error")
-
+        raise HTTPException(status_code=status_code, detail=str(err))
     return an_object
         
 
@@ -196,7 +180,6 @@ class BearerAuth(auth.AuthBase):
     def __call__(self, req):
         req.headers["authorization"] = f"Bearer {self.token}"
         return req
-
 
 
 def curlify(resp_request): 

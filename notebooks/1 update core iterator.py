@@ -1,13 +1,8 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC ## Description
+# MAGIC # Requirements and Main Packages
 # MAGIC 
-# MAGIC Place Holder
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC #### Libraries and Basic Functions
+# MAGIC Files in Repos now allows us to import files, and run requirements which are setup for both Databricks Jobs and local development. 
 
 # COMMAND ----------
 
@@ -15,51 +10,80 @@
 
 # COMMAND ----------
 
-from datetime import datetime as dt
+from time import time
+from itertools import product
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron
 
 secretter = ConfigEnviron('dbks')
 azure_getter = AzureResourcer('local', secretter)
-core_session = SAPSession('qas', azure_getter)
 
-# def flatten(t):
-#     return [item for sublist in t for item in sublist]
 
 # COMMAND ----------
 
-loans_ids = spark.table('bronze.loan_contracts').select('ID')
-display(loans_ids)
+# MAGIC %md 
+# MAGIC # Threading Tools
+# MAGIC 
+# MAGIC Following [Real Python's courses](https://realpython.com/python-concurrency/) we setup basic functionality to call the SAP engine with a thread pool executor. 
 
 # COMMAND ----------
 
-core_calls = {
-    "balances"     : dict(), 
-    "open_items"   : dict(), 
-    "payment_plan" : dict()}
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
-unserved = []
+calls_dicts = {}
+failed_calls = []
 
-for ((k, each_id), table_type) in product(enumerate(loans_ids), core_calls.keys()): 
-    if (table_type == "balances") and (k in [5, 10, 15, 20, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700]):
-        print(f"Running {k} out of {len(loans_ids)}")
-    for k in range(3): 
-        try:
-            call_df = core_session.get_by_api()
-            
-            get_sap_api(table_type, each_id)
-            core_calls[table_type][each_id] = call_df
-            break
-        except: 
-            pass
-    else:
-        unserved.append((table_type, each_id))
+thread_local = threading.local()
+
+def get_session():
+    if not hasattr(thread_local, 'session'): 
+        thread_local.session = SAPSession('qas', azure_getter)
+    return thread_local.session
+
+
+def call_an_api(in_params): 
+    global calls_dicts, failed_calls
+    api_type, type_id = in_params
+    a_session = get_session()
     
-print(f"{len(unserved)} calls didn't work.")
+    api_df = a_session.get_by_api(api_type, type_id)
+    if api_df is not None: 
+        calls_dicts[api_type][type_id] = api_df
+    else: 
+        failed_calls.append((api_type, type_id))
+
+        
+def call_all_apis(api_calls, ids_lists, k_workers=20):
+    global calls_dicts, failed_calls
+    calls_dicts = {a_call: {} for a_call in api_types}
+    failed_calls = []
+    
+    with ThreadPoolExecutor(max_workers=k_workers) as executor: 
+        executor.map(call_an_api, product(api_types, ids_lists))
+    
+    return (calls_dicts, failed_calls)
 
 
+api_types = ['open_items', 'payment_plan', 'balances']
+loans_ids = spark.table('bronze.loan_contracts').select('ID').toPandas()['ID'].tolist()
 
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC # Execution
+# MAGIC 
+# MAGIC Run the multithreading, and print the execution time. 
+
+# COMMAND ----------
+
+tic = time()
+(core_calls, unserved) = call_all_apis(api_types, loans_ids, 20)
+toc = time() - tic
+
+print(f'{len(loans_ids)*len(api_types)}, {len(unserved)} in {toc:5.2} seconds')
+print(f"Lengths, open_items: {len(api_dicts['open_items'])}, payment_plans: {len(api_dicts['payment_plan'])}, balances: {len(api_dicts['balances'])}")
 
 # COMMAND ----------
 
