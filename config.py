@@ -5,15 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 # from pydantic import SecretStr
 
-in_dbks = 'ipykernel' in sys.modules
-ENV = 'dbks' if in_dbks else os.environ.get('ENV', 'local')
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
-
-if in_dbks: 
-    from pyspark.sql import SparkSession
-    from pyspark.dbutils import DBUtils
-    spark = SparkSession.builder.getOrCreate()
-    dbutils = DBUtils(spark)
 
 
 URLS = {
@@ -156,6 +148,15 @@ DBKS_TABLAS = {  # NOMBRE_DBKS, COLUMNA_EXCEL
 
 PAGE_MAX = 1000
 
+in_dbks = 'DATABRICKS_RUNTIME_VERSION' in os.environ
+ENV = 'dbks' if in_dbks else os.environ.get('ENV', 'local')
+
+if in_dbks: 
+    from pyspark.sql import SparkSession
+    from pyspark.dbutils import DBUtils
+    spark = SparkSession.builder.getOrCreate()
+    dbutils = DBUtils(spark)
+
 
 class ConfigEnviron():
     '''
@@ -171,6 +172,7 @@ class ConfigEnviron():
     def __init__(self, env_type):
         self.env = env_type
         self.set_secret_getter()
+
 
     def set_secret_getter(self): 
         if  self.env == 'local': 

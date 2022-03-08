@@ -1,7 +1,5 @@
 # Diego Villamil, EPIC
 # CDMX, 4 de noviembre de 2021
-# Copy del archivo en el repo DATA-SAP-EVENTS. 
-# No lo hemos importado, sólo copiado-pegado. 
 
 from datetime import datetime as dt
 import re
@@ -9,8 +7,13 @@ from urllib.parse import unquote
 import pandas as pd
 from requests import Session, auth
 
+<<<<<<< HEAD
 from aiohttp import ClientSession
 import asyncio
+=======
+#from aiohttp import ClientSession
+#import asyncio
+>>>>>>> 8bdb7df75a822885a5b98e0010b5bcd8caa91fa8
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
@@ -210,7 +213,7 @@ def d_results(json_item, api_type):
 
 
     
-if __name__ == '__main__': 
+if False: 
     from importlib import reload
     from src import core_banking
     from src import platform_resources
@@ -271,4 +274,50 @@ if __name__ == '__main__':
     (calls, unserved) = call_all_apis(api_types, ids)
     toc = time() - tic
 
+<<<<<<< HEAD
+=======
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+
+    thread_local = threading.local()
+
+    def get_session():
+        if not hasattr(thread_local, 'session'): 
+            thread_local.session = SAPSession('qas', azure_getter)
+        return thread_local.session
+
+    api_types = ['open_items', 'payment_plan', 'balances']
+    
+
+    the_calls = {a_call: {} for a_call in api_types}
+    unserved  = []
+        
+    def call_an_api(in_params): 
+        api_type, type_id = in_params
+        a_session = get_session()
+        global the_calls, unserved
+
+        api_df = a_session.get_by_api(api_type, type_id)
+        if api_df is not None: 
+            the_calls[api_type][type_id] = api_df
+        else: 
+            unserved.append((api_type, type_id))
+
+    def call_all_apis(ids_lists, k_workers=20): 
+        global the_calls, unserved
+
+        with ThreadPoolExecutor(max_workers=k_workers) as executor: 
+            executor.map(call_an_api, product(api_types, ids_lists))
+
+
+    ids = ['10000002999-111-MX', '10000003019-111-MX', '10000003021-111-MX', 
+        '10000003053-111-MX', '10000003080-111-MX', '10000003118-111-MX', 
+        '10000003136-111-MX', '10000003140-111-MX', '10000003188-111-MX', 
+        '10000003226-555-MX']
+    
+    tic = time()
+    call_all_apis(ids)
+    toc = time() - tic
+
+>>>>>>> 8bdb7df75a822885a5b98e0010b5bcd8caa91fa8
     print(f'Total: {len(ids)*len(api_types)}, Missed: {len(unserved)} in {toc:5.2} seconds')

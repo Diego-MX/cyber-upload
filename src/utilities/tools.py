@@ -12,7 +12,6 @@ from jsonschema import validate, exceptions
 from fastapi.exceptions import HTTPException
 
 
-
 def reload_from_asterisk(module):
     a_mod = reload(sys.modules[module])
     vars().update(a_mod.__dict__)
@@ -181,7 +180,6 @@ class BearerAuth(auth.AuthBase):
     def __call__(self, req):
         req.headers['authorization'] = f'Bearer {self.token}'
         return req
-
 
 
 def curlify(resp_request): 

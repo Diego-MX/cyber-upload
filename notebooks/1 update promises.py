@@ -31,7 +31,7 @@ zendesk = ZendeskSession('sandbox', azurer_getter)
 
 # COMMAND ----------
 
-promises_df = zendesk.get_promises().drop(columns = 'external_id')
+promises_df = zendesk.get_promises().drop(columns='external_id')
 promises_spk = spark.createDataFrame(promises_df)
 promises_spk.write.mode('overwrite').saveAsTable('bronze.crm_payment_promises')
 
