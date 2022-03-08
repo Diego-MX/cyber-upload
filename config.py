@@ -172,7 +172,6 @@ class ConfigEnviron():
         self.env = env_type
         self.set_secret_getter()
 
-
     def set_secret_getter(self): 
         if  self.env == 'local': 
             load_dotenv('.env', override=True)        
@@ -185,7 +184,7 @@ class ConfigEnviron():
                 mod_key = re.sub('_', '-', a_key.lower())
                 the_val = dbutils.secrets.get(scope=the_scope, key=mod_key)
                 return the_val
-
+                
         self.get_secret = get_secret
 
 
