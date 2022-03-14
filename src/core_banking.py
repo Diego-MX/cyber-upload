@@ -25,7 +25,6 @@ class SAPSessionAsync(ClientSession):
         self.set_main()
         self.set_token()
 
-
     def set_main(self): 
         main_config = self.config['main']
         self.headers.update(main_config['headers'])
@@ -57,7 +56,7 @@ class SAPSessionAsync(ClientSession):
         loan_params  = {'$select': ','.join(select_attrs)}
 
         async for _ in range(tries): 
-            with self.get(f"{self.base_url}/{loan_config['sub-url']}", 
+            async with self.get(f"{self.base_url}/{loan_config['sub-url']}", 
                         auth=tools.BearerAuth(self.token['access_token']), 
                         params=loan_params) as the_resp: 
                 if the_resp.status_code == 401: 
@@ -118,11 +117,12 @@ class SAPSessionAsync(ClientSession):
             self.set_token()
 
         async for _ in range(tries): 
-            with self.get(the_url, 
-                    auth=tools.BearerAuth(self.token['access_token'])) as the_resp: 
+            async with self.get(the_url, 
+                        auth=tools.BearerAuth(self.token['access_token'])
+                        ) as the_resp: 
                 if the_resp.status_code == 200: 
                     break
-                self.set_token()
+                await self.set_token()
         else: 
             return None
         
