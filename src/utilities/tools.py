@@ -185,9 +185,7 @@ class BearerAuth(auth.AuthBase):
 def curlify(resp_request): 
     the_items = { 
         'method' : resp_request.method, 
-        'headers' : ' -H '.join(f"'{k}: {v}'" for k, v in resp_request.headers.items()), 
+        'headers' : ' -H '.join(f"'{k}: {v}'" for (k, v) in resp_request.headers.items()), 
         'data'  : resp_request.body, 
-        'uri'   : resp_request.url
-    }
-    the_curl = "curl - X {method} -H {headers} -d '{data}' '{uri}'".format(**the_items)
-    return the_curl
+        'uri'   : resp_request.url }
+    return "curl - X {method} -H {headers} -d '{data}' '{uri}'".format(**the_items)

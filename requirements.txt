@@ -3,6 +3,8 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 # Utilities
+aiohttp
+asyncio
 azure-identity
 azure-keyvault-secrets
 python-dotenv
