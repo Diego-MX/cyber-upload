@@ -6,13 +6,12 @@ import re
 from urllib.parse import unquote
 import pandas as pd
 
-import asyncio
 from requests import Session, auth
 from httpx import AsyncClient, Auth
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron, SITE, CORE_KEYS, PAGE_MAX
+from config import SITE, CORE_KEYS, PAGE_MAX
 
 
 class BearerAuth(auth.AuthBase):
