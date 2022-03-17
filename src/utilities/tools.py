@@ -7,7 +7,6 @@ from importlib import reload
 from openpyxl import load_workbook, utils as xl_utils
 import pandas as pd
 
-from requests import auth
 from jsonschema import validate, exceptions
 from fastapi.exceptions import HTTPException
 
@@ -173,13 +172,6 @@ def set_dataframe_types(a_df, cols_df):
     return df_typed
 
 
-class BearerAuth(auth.AuthBase):
-    def __init__(self, token):
-        self.token = token
-
-    def __call__(self, req):
-        req.headers['authorization'] = f'Bearer {self.token}'
-        return req
 
 
 def curlify(resp_request): 

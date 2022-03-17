@@ -4,7 +4,6 @@
 
 # Utilities
 aiohttp
-asyncio
 azure-identity
 azure-keyvault-secrets
 python-dotenv
