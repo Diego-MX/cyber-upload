@@ -20,11 +20,16 @@
 
 # COMMAND ----------
 
+import os
+os.environ['ENV'] = 'dbks'
+
+# COMMAND ----------
+
 from config import ConfigEnviron
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
-secretter = ConfigEnviron('dbks')
+secretter = ConfigEnviron('dbks', spark=spark)
 azurer_getter = AzureResourcer('local', secretter)
 zendesk = ZendeskSession('sandbox', azurer_getter)
 

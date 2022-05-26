@@ -3,7 +3,6 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 # Utilities
-aiohttp
 azure-identity
 azure-keyvault-secrets
 python-dotenv
@@ -15,6 +14,7 @@ openpyxl
 
 # Web
 requests
+httpx
 jsonschema
 pydantic
 fastapi

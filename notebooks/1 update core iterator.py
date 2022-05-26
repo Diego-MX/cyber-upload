@@ -10,13 +10,20 @@
 
 # COMMAND ----------
 
+import os
+os.environ['ENV'] = 'dbks'
+
+# COMMAND ----------
+
 from time import time
 from itertools import product
+import pandas as pd
+
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron
 
-secretter = ConfigEnviron('dbks')
+secretter = ConfigEnviron('dbks', spark=spark)
 azure_getter = AzureResourcer('local', secretter)
 
 
@@ -32,9 +39,6 @@ azure_getter = AzureResourcer('local', secretter)
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
-calls_dicts = {}
-failed_calls = []
-
 thread_local = threading.local()
 
 def get_session():
@@ -43,9 +47,12 @@ def get_session():
     return thread_local.session
 
 
+calls_dicts = {}
+failed_calls = []
+
 def call_an_api(in_params): 
     global calls_dicts, failed_calls
-    api_type, type_id = in_params
+    type_id, api_type = in_params
     a_session = get_session()
     
     api_df = a_session.get_by_api(api_type, type_id)
@@ -61,7 +68,7 @@ def call_all_apis(api_calls, ids_lists, k_workers=20):
     failed_calls = []
     
     with ThreadPoolExecutor(max_workers=k_workers) as executor: 
-        executor.map(call_an_api, product(api_types, ids_lists))
+        executor.map(call_an_api, product(ids_lists, api_types))
     
     return (calls_dicts, failed_calls)
 
@@ -79,11 +86,11 @@ loans_ids = spark.table('bronze.loan_contracts').select('ID').toPandas()['ID'].t
 # COMMAND ----------
 
 tic = time()
-(core_calls, unserved) = call_all_apis(api_types, loans_ids, 20)
+(core_calls, unserved) = call_all_apis(api_types, loans_ids, 10)
 toc = time() - tic
 
-print(f'{len(loans_ids)*len(api_types)}, {len(unserved)} in {toc:5.2} seconds')
-print(f"Lengths, open_items: {len(api_dicts['open_items'])}, payment_plans: {len(api_dicts['payment_plan'])}, balances: {len(api_dicts['balances'])}")
+print(f'{len(loans_ids)*len(api_types)}, {len(unserved)} in {toc:5.4} seconds')
+print(f"Lengths, open_items: {len(core_calls['open_items'])}, payment_plans: {len(core_calls['payment_plan'])}, balances: {len(core_calls['balances'])}")
 
 # COMMAND ----------
 
@@ -95,7 +102,7 @@ balances_spk = spark.createDataFrame(balances_df)
 openitems_spk = spark.createDataFrame(openitems_df)
 pymntplans_spk = spark.createDataFrame(pymntplans_df)
 
-balances_spk.write.mode("overwrite").saveAsTable("bronze.loan_balances")
-openitems_spk.write.mode("overwrite").saveAsTable("bronze.loan_open_items")
-pymntplans_spk.write.mode("overwrite").saveAsTable("bronze.loan_payment_plans")
+balances_spk.write.mode("append").saveAsTable("bronze.loan_balances")
+openitems_spk.write.mode("append").saveAsTable("bronze.loan_open_items")
+pymntplans_spk.write.mode("append").saveAsTable("bronze.loan_payment_plans")
 
