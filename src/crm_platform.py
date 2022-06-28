@@ -67,10 +67,10 @@ if __name__ == '__main__':
     reload(config)
     reload(platform_resources)
     
-    from config import ConfigEnviron
+    from config import VaultSetter
     from src.platform_resources import AzureResourcer
 
-    secretter = ConfigEnviron('local')
+    secretter = VaultSetter('local')
     azurer_getter = AzureResourcer('local', secretter)
     zendesk = ZendeskSession('sandbox', azurer_getter)
 

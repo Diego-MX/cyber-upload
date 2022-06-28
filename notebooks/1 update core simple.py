@@ -18,9 +18,9 @@
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron
+from config import VaultSetter
 
-secretter = ConfigEnviron('dbks')
+secretter = VaultSetter('dbks')
 azure_getter = AzureResourcer('local', secretter)
 core_session = SAPSession('qas', azure_getter)
 

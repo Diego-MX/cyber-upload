@@ -1,22 +1,12 @@
-
 import os
 import re
 from pathlib import Path
 from dotenv import load_dotenv
-# from pydantic import SecretStr
 
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
+DESTINATION = SITE.parent/'collections-webapp'
 
-
-# URLS = {
-#     'api-call'  : {
-#         'local'     : 'http://localhost:80',
-#         'staging'   : 'https://wap-cx-collections-dev.azurewebsites.net',
-#         'qa'        : 'https://apim-crosschannel-tech-dev.azure-api.net/data-'},  
-#     'api-call-pre'  : { 
-#         'local'     : 'http://localhost:5000/v1/get-loan-messages', 
-#         'staging'   : 'https://wap-cx-collections-dev.azurewebsites.net/v1/get-loan-messages' } }
-
+ENV = os.environ.get('ENV', 'local')  # local, dbks, dev, qas.
 
 SETUP_KEYS = {
     'dev' : {
@@ -45,7 +35,15 @@ PLATFORM_KEYS = {
             'client_id'       : (1, 'SP_LAKEHYLIA_APP_ID'), 
             'client_secret'   : (1, 'SP_LAKEHYLIA_SECRET'), 
             'tenant_id'       : (1, 'AAD_TENANT_ID'), 
-            'subscription_id' : (1, 'AAD_SUBSCRIPTION_ID') } },
+            'subscription_id' : (1, 'AAD_SUBSCRIPTION_ID') }, 
+        'sqls': {
+            'hylia': {
+                'driver': "ODBC Driver 18 for SQL Server", 
+                'user': (1, 'SQL_CATALOGS_USER'), 
+                'password': (1, 'SQL_CATALOGS_PASS'),
+                'host': (1, 'SQL_CATALOGS_HOST'), 
+                'database': (1, 'SQL_CATALOGS_DBASE')}
+        } },
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
@@ -132,23 +130,39 @@ CRM_KEYS = {
                     'services/zis/inbound_webhooks/generic/ingest') } } }
 
 
-DBKS_TABLAS = {  # NOMBRE_DBKS, COLUMNA_EXCEL
-    'contracts'   : 'bronze.loan_contracts', 
-    'collections' : 'gold.loan_contracts'}
+DBKS_KEYS = {
+    'dev': {
+        'connect': {
+            'local': {'DSN' : (1, 'DBKS_ODBC_DSN')},
+            'wap': {
+                'Driver'         : '/opt/simba/spark/lib/64/libsparkodbc_sb64.so',
+                'PORT'           : '443',
+                'Schema'         : 'default',
+                'SparkServerType': '3',
+                'AuthMech'       : '3',
+                'UID'            : 'token',
+                'ThriftTransport': '2',
+                'SSL'            : '1', 
+                'PWD'            : (1, 'dbks-wap-token'),
+                'HOST'           : (1, 'dbks-odbc-host'),
+                'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
+        'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
+            'contracts'   : 'bronze.loan_contracts', 
+            'collections' : 'gold.loan_contracts'} },
+    'qas': {
+    } 
+} 
 
 
 PAGE_MAX = 1000
 
 in_dbks = 'DATABRICKS_RUNTIME_VERSION' in os.environ
-ENV = os.environ['ENV']  # local, dbks-dev, dbks-qas, dev, qas.
 
 
-if in_dbks: 
-    from pyspark.dbutils import DBUtils
+
     
 
-
-class ConfigEnviron():
+class VaultSetter():
     '''
     Depending on ENV_TYPE [local, dbks, dev, qas, prod], this class sets 
     methods to access first-tier secrets from the taylored-made dictionary. 
@@ -159,30 +173,30 @@ class ConfigEnviron():
     - databricks     -> dbutils.secrets.get(a_scope, *)
     - dev, qas, prod -> not needed, as access to keyvault is granted by identity.
     '''
-    def __init__(self, env_type, **kwargs):
+    def __init__(self, env_type, dbutils=None):
         self.env = env_type
-        self.set_secret_getter(**kwargs)
+        self.set_secret_getter()
+        self.dbutils = dbutils
 
 
-    def set_secret_getter(self, **kwargs): 
+    def set_secret_getter(self): 
         if  self.env == 'local': 
-            load_dotenv('.env', override=True)        
-            def get_secret(key): 
-                return os.getenv(key)
-
+            load_dotenv('.env', override=True)
+            get_secret = lambda a_key: os.getenv(a_key) 
+            
         elif self.env == 'dbks': 
-            spk_session = kwargs['spark']
-            dbutils = DBUtils(spk_session)
             the_scope = 'kv-resource-access-dbks'
-            def get_secret(a_key): 
-                mod_key = re.sub('_', '-', a_key.lower())
-                the_val = dbutils.secrets.get(scope=the_scope, key=mod_key)
-                return the_val
+            get_secret = (lambda a_key: self.dbutils.secrets.get(
+                    scope=the_scope, 
+                    key=re.sub('_', '-', a_key.lower()) ))
                 
         self.get_secret = get_secret
 
 
     def call_dict(self, a_dict): 
+        if not hasattr(self, 'get_secret'): 
+            self.set_secret_getter()
+
         def map_val(a_val): 
             is_tuple = isinstance(a_val, tuple)
             return self.get_secret(a_val[1]) if is_tuple else a_val

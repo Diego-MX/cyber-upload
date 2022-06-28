@@ -1,13 +1,19 @@
+from pyodbc import Connection
+
 from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 
-from config import PLATFORM_KEYS, ConfigEnviron
+from config import PLATFORM_KEYS, VaultSetter
 
 
 
 class AzureResourcer(): 
-    def __init__(self, env, env_obj: ConfigEnviron): 
+    """
+    This class sets up a bridge between Azure SDK and its corresponding configurations
+    thar are stored in a config file dictionary named 'PLATFORM_KEYS'. 
+    """
+    def __init__(self, env, env_obj: VaultSetter): 
         self.env = env
         self.config = PLATFORM_KEYS[env]
         self.pre_secret = env_obj.get_secret
@@ -43,4 +49,10 @@ class AzureResourcer():
             to_pass = self.get_secret(val[1]) if is_tuple else val
             return to_pass
         return {k: pass_val(v) for (k, v) in a_dict.items()}
+
+
+    def get_connection(self, conn_name) -> Connection:
+        
+        pass
+
 

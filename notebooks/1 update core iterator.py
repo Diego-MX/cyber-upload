@@ -14,9 +14,9 @@ from time import time
 from itertools import product
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron
+from config import VaultSetter
 
-secretter = ConfigEnviron('dbks')
+secretter = VaultSetter('dbks')
 azure_getter = AzureResourcer('local', secretter)
 
 

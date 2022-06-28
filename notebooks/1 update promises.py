@@ -20,11 +20,11 @@
 
 # COMMAND ----------
 
-from config import ConfigEnviron
+from config import VaultSetter
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
-secretter = ConfigEnviron('dbks')
+secretter = VaultSetter('dbks')
 azurer_getter = AzureResourcer('local', secretter)
 zendesk = ZendeskSession('sandbox', azurer_getter)
 

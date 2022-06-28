@@ -11,7 +11,7 @@ from httpx import AsyncClient, Auth
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
-from config import SITE, CORE_KEYS, PAGE_MAX
+from config import CORE_KEYS, PAGE_MAX
 
 
 class BearerAuth(auth.AuthBase):
@@ -88,6 +88,31 @@ class SAPSession(Session):
         
         return pd.DataFrame(loans_ls)
 
+    def get_loans_qan(self, tries=3): 
+        if not hasattr(self, 'token'): 
+            self.set_token()
+        
+        loan_config  = self.config['calls']['contract-set']
+        
+        for _ in range(tries): 
+            the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
+                auth=tools.BearerAuth(self.token['access_token']))
+            
+            if the_resp.status_code == 401: 
+                self.set_token()
+                continue
+            elif the_resp.status_code == 200: 
+                break
+        else: 
+            return None   
+
+        loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
+        for loan in loans_ls: 
+            loan.pop('__metadata')
+        
+        return pd.DataFrame(loans_ls)
+
+    
 
     def get_persons(self, params={}, how_many=PAGE_MAX, tries=3): 
         person_conf = self.config['calls']['person-set']
@@ -275,46 +300,61 @@ class SAPSessionAsync(AsyncClient):
 
 def attributes_from_column(attrs_indicator=None) -> list:
     if attrs_indicator == 'all': 
+        # Estos son para LACOVR, pero en realidad no se necesitan. 
         the_attrs = ['ID', 'BankAccountID', 'BankRoutingID', 'BankCountryCode', 
-          'BorrowerID', 'BorrowerTxt', 'BorrowerName', 'BorrowerAddress', 'ManagerID', 
-          'ManagerTxt', 'BankPostingArea', 'BankPostingAreaTxt', 'ProductID', 'ProductTxt', 
-          'Purpose', 'ClabeAccount', 'Currency', 'InitialLoanAmount', 'EffectiveCapital', 
-          'StartDate', 'LifeCycleStatus', 'LifeCycleStatusTxt', 'CreationDateTime', 
-          'CreationUserID', 'LastChangeDateTime', 'LastChangeUserID', 'NominalInterestRate', 
-          'RepaymentFrequency', 'RepaymentAmount', 'RepaymentPercentage', 'LimitTotalAmount', 
-          'DirectDebitBankAccountHolder', 'DirectDebitBankAccount', 'DirectDebitBankAccountID', 
-          'DirectDebitBankRoutingID', 'DirectDebitBankCountryCode', 'TermSpecificationStartDate', 
-          'TermSpecificationEndDate', 'TermSpecificationValidityPeriodDuration', 
-          'TermSpecificationValidityPeriodDurationM', 'TermAgreementCommittedCapitalAmount', 
-          'TermAgreementFixingPeriodStartDate', 'TermAgreementFixingPeriodEndDate', 
-          'PaymentPlanStartDate', 'PaymentPlanEndDate', 'PaymentPlanRemainingDebtAmount', 
-          'EffectiveYieldPercentage', 'EffectiveYieldCalculationReason', 
-          'EffectiveYieldCalculationReasonTxt', 'EffectiveYieldCalculationMethod', 
-          'EffectiveYieldCalculationMethodTxt', 'EffectiveYieldValidityStartDate', 
-          'EffectiveYieldCalculationPeriodStartDate', 'EffectiveYieldCalculationPeriodEndDate', 
-          'CurrentPostingDate', 'CurrentOpenItemsAmount', 'OutstandingBalance', 'AccountLocked', 
-          'MasterContractNo', 'MasterContractID', 'CAT', 'PortfolioType', 'PortfolioTypeTxt', 
-          'StageLevel', 'StageLevelTxt', 'OverdueDays', 'PendingPayments', 'EvaluationDate', 
-          'RolloverAccount', 'ObservationKey', 'ObservationKeyTxt', 'PaymentForm', 
-          'PaymentFormTxt', 'EventID']
-        return the_attrs
+            'BorrowerID', 'BorrowerTxt', 'BorrowerName', 'BorrowerAddress', 'ManagerID', 
+            'ManagerTxt', 'BankPostingArea', 'BankPostingAreaTxt', 'ProductID', 'ProductTxt', 
+            'Purpose', 'ClabeAccount', 'Currency', 'InitialLoanAmount', 'EffectiveCapital', 
+            'StartDate', 'LifeCycleStatus', 'LifeCycleStatusTxt', 'CreationDateTime', 
+            'CreationUserID', 'LastChangeDateTime', 'LastChangeUserID', 'NominalInterestRate', 
+            'RepaymentFrequency', 'RepaymentAmount', 'RepaymentPercentage', 'LimitTotalAmount', 
+            'DirectDebitBankAccountHolder', 'DirectDebitBankAccount', 'DirectDebitBankAccountID', 
+            'DirectDebitBankRoutingID', 'DirectDebitBankCountryCode', 'TermSpecificationStartDate', 
+            'TermSpecificationEndDate', 'TermSpecificationValidityPeriodDuration', 
+            'TermSpecificationValidityPeriodDurationM', 'TermAgreementCommittedCapitalAmount', 
+            'TermAgreementFixingPeriodStartDate', 'TermAgreementFixingPeriodEndDate', 
+            'PaymentPlanStartDate', 'PaymentPlanEndDate', 'PaymentPlanRemainingDebtAmount', 
+            'EffectiveYieldPercentage', 'EffectiveYieldCalculationReason', 
+            'EffectiveYieldCalculationReasonTxt', 'EffectiveYieldCalculationMethod', 
+            'EffectiveYieldCalculationMethodTxt', 'EffectiveYieldValidityStartDate', 
+            'EffectiveYieldCalculationPeriodStartDate', 'EffectiveYieldCalculationPeriodEndDate', 
+            'CurrentPostingDate', 'CurrentOpenItemsAmount', 'OutstandingBalance', 'AccountLocked', 
+            'MasterContractNo', 'MasterContractID', 'CAT', 'PortfolioType', 'PortfolioTypeTxt', 
+            'StageLevel', 'StageLevelTxt ', 'OverdueDays', 'PendingPayments', 'EvaluationDate', 
+            'RolloverAccount', 'ObservationKey', 'ObservationKeyTxt', 'PaymentForm', 
+            'PaymentFormTxt', 'EventID']
+    elif attrs_indicator == 'qan': 
+        the_attrs = ["GenerateId", "LoanContractID", "BankAccountID", "BankRoutingID", 
+            "BankCountryCode", "BorrowerID", "BorrowerTxt", "BorrowerName", 
+            "BorrowerCategory", "BorrowerCategoryTxt", "BorrowerCountry", "BorrowerCountryTxt", 
+            "BorrowerRegion", "BorrowerRegionTxt", "BorrowerCity", "ManagerID", 
+            "ManagerTxt", "BankPostingArea", "BankPostingAreaTxt", "ProductID", 
+            "ProductTxt", "Currency", "InitialLoanAmount", "StartDate", "LifeCycleStatus", 
+            "TermSpecificationValidityPeriodDuration", "TermAgreementCommittedCapitalAmount", 
+            "TermAgreementFixingPeriodStartDate", "TermAgreementFixingPeriodEndDate", 
+            "PaymentPlanStartDate", "PaymentPlanEndDate", "EffectiveYieldPercentage", 
+            "EffectiveYieldCalculationReason", "EffectiveYieldCalculationReasonTxt", 
+            "EffectiveYieldCalculationMethod", "EffectiveYieldCalculationMethodTxt", 
+            "EffectiveYieldValidityStartDate", "EffectiveYieldCalculationPeriodStartDate", 
+            "EffectiveYieldCalculationPeriodEndDate", "AccountLocked", "ContractCapital", 
+            "CommitmentCapital", "CurrentContractCapital", "CurrentCommitmentCapital", 
+            "DisbursedCapital", "PlannedCapital", "EffectiveCapital", "OutstandingInterest", 
+            "RemainingCapital", "OutstandingCharges", "DisbursementObligation", 
+            "InterestPaid", "AccruedInterest", "OutstandingBalance", "RedrawBalance", 
+            "CurrentOpenItemsAmount", "CurrentOpenItemsCounter", "CurrentOldestDueDate", 
+            "CurrentOverdueDays", "LiASchemaCluster", "LiASchemaClusterTxt", 
+            "SalesProduct", "SalesProductTxt", "Warehouse", "WarehouseTxt", 
+            "WarehouseValidFrom", "DocumentType", "DocumentTypeTxt", "EmploymentStatus", 
+            "EmploymentStatusTxt", "MonthsTrading", "DefaultJudgements", "HardshipStatus", 
+            "HardshipStatusTxt", "PropertyInPossession", "PropertyInPossessionTxt", 
+            "SplitLoan", "ArrearsHistory", "Counter", "RepaymentAmount", "RepaymentPercentage", 
+            "LimitTotalAmount", "DirectDebitBankAccountHolder", 
+            "DirectDebitBankAccount", "DirectDebitBankAccountID", "DirectDebitBankRoutingID", 
+            "DirectDebitBankCountryCode", "TermSpecificationStartDate", "TermSpecificationEndDate", 
+            "LastChangeUserID", "NominalInterestRate",              
+            "LifeCycleStatusTxt", "CreationDate", "CreationDateTime", "CreationUserID"]
+    return the_attrs
 
-    sap_attr = pd.read_feather(SITE/'refs/catalogs/sap_attributes.feather')
-    possible_columns = list(sap_attr.columns) + ['all']
-
-    # en_cx, ejemplo, default, postman_default. 
-    if attrs_indicator is None: 
-        attrs_indicator = 'postman_default'
-    
-    if attrs_indicator not in possible_columns: 
-        raise("COLUMN INDICATOR must be one in SAP_ATTR or 'all'.")
-
-    if attrs_indicator == 'all':
-        attr_df = sap_attr
-    else: 
-        attr_df = sap_attr.query(f'{attrs_indicator} == 1')
-    
-    return attr_df['atributo'].to_list()
 
 
 def d_results(json_item, api_type): 
@@ -344,3 +384,9 @@ def d_results(json_item, api_type):
     return result_0
 
 
+if __name__ == '__main__': 
+    loans_ids = [
+        '10000002999-111-MX', '10000003019-111-MX', '10000003021-111-MX', 
+        '10000003053-111-MX', '10000003080-111-MX', '10000003118-111-MX', 
+        '10000003136-111-MX', '10000003140-111-MX', '10000003188-111-MX', 
+        '10000003226-555-MX']
