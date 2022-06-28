@@ -29,8 +29,4 @@ class AzureResourcer():
         
 
 
-    def get_connection(self, conn_name) -> Connection:
-        
-        pass
-
 

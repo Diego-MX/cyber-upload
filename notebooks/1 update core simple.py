@@ -15,28 +15,9 @@
 
 # COMMAND ----------
 
-import os
-os.environ['ENV_TYPE'] = 'dev'
-os.environ['SERVER_TYPE'] = 'dbks'
-
-# COMMAND ----------
-
 from importlib import reload
-import config
-reload(config)
-from src import core_banking
-reload(core_banking)
-
-# COMMAND ----------
-
-from config import CORE_KEYS
-the_access = CORE_KEYS['qas-sap']['main']['access']
-the_access.keys()
-
-
-# COMMAND ----------
-
-CORE_KEYS['qas-sap']['main']['access']
+from src import platform_resources
+reload(platform_resources)
 
 # COMMAND ----------
 
@@ -48,10 +29,6 @@ from config import ConfigEnviron, ENV, SERVER
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(app_environ)
 core_session = SAPSession('qas-sap', azure_getter)
-
-# COMMAND ----------
-
-persons_spk.count()
 
 # COMMAND ----------
 
@@ -67,7 +44,7 @@ persons_spk.write.format('delta').mode('overwrite').saveAsTable("din_clients.brz
 
 # COMMAND ----------
 
-loans_df  = core_session.get_loans("all")
+loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
 
 display(loans_spk)
@@ -75,4 +52,4 @@ display(loans_spk)
 
 # COMMAND ----------
 
-loans_spk.write.mode("overwrite").saveAsTable("bronze.loan_contracts")
+loans_spk.write.mode("overwrite").saveAsTable("nayru_accounts.brz_ops_loan_contracts")
