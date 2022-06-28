@@ -71,7 +71,7 @@ class SAPSession(Session):
 
         for _ in range(tries): 
             the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-                auth=tools.BearerAuth(self.token['access_token']), 
+                auth=BearerAuth(self.token['access_token']), 
                 params=loan_params)
             
             if the_resp.status_code == 401: 
@@ -99,7 +99,7 @@ class SAPSession(Session):
         while True:
             for _ in range(tries): 
                 the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
-                        auth=tools.BearerAuth(self.token['access_token']), 
+                        auth=BearerAuth(self.token['access_token']), 
                         params=params_0)
                     
                 if the_resp.status_code == 200: 

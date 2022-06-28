@@ -15,23 +15,64 @@
 
 # COMMAND ----------
 
-from datetime import datetime as dt
-from src.core_banking import SAPSession
-from src.platform_resources import AzureResourcer
-from config import ConfigEnviron
-
-secretter = ConfigEnviron('dbks')
-azure_getter = AzureResourcer('local', secretter)
-core_session = SAPSession('qas', azure_getter)
+import os
+os.environ['ENV_TYPE'] = 'dev'
+os.environ['SERVER_TYPE'] = 'dbks'
 
 # COMMAND ----------
 
-loans_df   = core_session.get_loans("all")
-persons_df = core_session.get_persons()
+from importlib import reload
+import config
+reload(config)
+from src import core_banking
+reload(core_banking)
 
-loans_spk   = spark.createDataFrame(loans_df)
+# COMMAND ----------
+
+from config import CORE_KEYS
+the_access = CORE_KEYS['qas-sap']['main']['access']
+the_access.keys()
+
+
+# COMMAND ----------
+
+CORE_KEYS['qas-sap']['main']['access']
+
+# COMMAND ----------
+
+from datetime import datetime as dt
+from src.core_banking import SAPSession
+from src.platform_resources import AzureResourcer
+from config import ConfigEnviron, ENV, SERVER
+
+app_environ = ConfigEnviron(ENV, SERVER, spark)
+azure_getter = AzureResourcer(app_environ)
+core_session = SAPSession('qas-sap', azure_getter)
+
+# COMMAND ----------
+
+persons_spk.count()
+
+# COMMAND ----------
+
+persons_df = core_session.get_persons()
 persons_spk = spark.createDataFrame(persons_df)
+display(persons_spk)
+
+
+# COMMAND ----------
+
+persons_spk.write.format('delta').mode('overwrite').saveAsTable("din_clients.brz_core_persons_set")
+
+
+# COMMAND ----------
+
+loans_df  = core_session.get_loans("all")
+loans_spk = spark.createDataFrame(loans_df)
+
+display(loans_spk)
+
+
+# COMMAND ----------
 
 loans_spk.write.mode("overwrite").saveAsTable("bronze.loan_contracts")
-persons_spk.write.mode("overwrite").saveAsTable("bronze.persons_set")
-
