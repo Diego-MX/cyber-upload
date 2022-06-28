@@ -6,7 +6,7 @@
 # MAGIC 
 # MAGIC It requires the following accesses:  
 # MAGIC - Keyvault `kv-resource-access-dbks` through its corresponding Databricks scope of the same name.  
-# MAGIC - Access keys in there are set to then accesss a Secret Scope, that has access to secondary keyvault. 
+# MAGIC - Access keys in there are set to then accesss a Secret Scope, that has access to secondary keyvault.  
 # MAGIC   The names are stored in config file:  `./config.py`.
 
 # COMMAND ----------

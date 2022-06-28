@@ -32,6 +32,10 @@ SETUP_KEYS = {
 }
 
 
+OFFICE_KEYS = {
+    
+}
+
 PLATFORM_KEYS = {
     'local' : {
         'key-vault' : {
@@ -100,7 +104,8 @@ CORE_KEYS = {
                     'grant_type' : 'password', 
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
-            'contract-set' : {'sub-url' : 'v1/lacovr/ContractSet'}, 
+            'contract-set' : {'sub-url' : 'v1/lacovr/ContractSet'},
+            'contract-qan' : {'sub-url' : 'v1/lacqan/ContractSet'},
             'person-set'   : {'sub-url' : 'v15/bp/PersonSet'} } }, 
     'qas-sap' : {
         'main' : {
@@ -119,7 +124,8 @@ CORE_KEYS = {
                     'grant_type' : 'password', 
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
-            'contract-set' : {'sub-url' : 'v1/lacovr/ContractSet'}, 
+            'contract-set' : {'sub-url' : 'v1/lacovr/ContractSet'},
+            'contract-qan' : {'sub-url' : 'v1/lacqan/ContractSet'}, 
             'person-set'   : {'sub-url' : 'v15/bp/PersonSet'} } } }
 
 
@@ -137,7 +143,21 @@ CRM_KEYS = {
             'promises' : {
                 'sub-url' : 'sunshine/objects/records'}, 
             'filters'  : ('sunshine/objects/records',
-                    'services/zis/inbound_webhooks/generic/ingest') } } }
+                    'services/zis/inbound_webhooks/generic/ingest') } },
+     'prod' : {
+        'main' : {
+            'url'  : 'https://bineo.zendesk.com/api',
+            'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
+            'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
+        'zis' : {
+            'id'      : (1, 'crm-zis-id'), 
+            'username': (1, 'crm-zis-user'), 
+            'password': (1, 'crm-zis-pass')}, 
+        'calls' : {
+            'promises' : {
+                'sub-url' : 'sunshine/objects/records'}, 
+            'filters'  : ('sunshine/objects/records',
+                    'services/zis/inbound_webhooks/generic/ingest') } }}
 
 
 DBKS_KEYS = {

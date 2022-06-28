@@ -61,12 +61,39 @@ class SAPSession(Session):
         self.token = the_resp.json()
 
 
-    def get_loans(self, attrs_indicator, tries=3): 
+    def get_loans(self, tries=3): 
         if not hasattr(self, 'token'): 
             self.set_token()
         
         loan_config  = self.config['calls']['contract-set']
-        select_attrs = attributes_from_column(attrs_indicator)
+        select_attrs = attributes_from_column('all')
+        loan_params  = {'$select': ','.join(select_attrs)}
+        
+        for _ in range(tries): 
+            the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
+                auth=BearerAuth(self.token['access_token']), 
+                params=loan_params)
+            
+            if the_resp.status_code == 401: 
+                self.set_token()
+                continue
+            elif the_resp.status_code == 200: 
+                break
+        else: 
+            return None   
+
+        loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
+        for loan in loans_ls: 
+            loan.pop('__metadata')
+        
+        return pd.DataFrame(loans_ls)
+
+    def get_loans_qan(self, tries=3): 
+        if not hasattr(self, 'token'): 
+            self.set_token()
+        
+        loan_config  = self.config['calls']['contract-qan']
+        select_attrs = attributes_from_column('qan')
         loan_params  = {'$select': ','.join(select_attrs)}
 
         for _ in range(tries): 
@@ -114,6 +141,7 @@ class SAPSession(Session):
 
     
 
+    
     def get_persons(self, params={}, how_many=PAGE_MAX, tries=3): 
         person_conf = self.config['calls']['person-set']
         params_0 = {'$top': how_many, '$skip': 0}
@@ -149,40 +177,16 @@ class SAPSession(Session):
         return persons_df
 
 
-    def get_by_api(self, api_type, type_id=None, tries=3): 
-        type_ref = 'ContractSet' if type_id is None else f"ContractSet('{type_id}')"
-        sub_url = tools.str_snake_to_camel(api_type, first_word_too=True)
-        the_url = f'{self.base_url}/v1/lacovr/{type_ref}/{sub_url}'
-
-        if not hasattr(self, 'token'): 
-            self.set_token()
-
-        for _ in range(tries): 
-            the_resp = self.get(the_url, auth=tools.BearerAuth(self.token['access_token']))
-            if the_resp.status_code == 200: 
-                break
-            self.set_token()
-        else: 
-            return None
-        
-        results_ls = the_resp.json()['d']['results']
-        for each_result in results_ls: 
-            each_result.pop('__metadata')
-        
-        results_df = (pd.DataFrame(results_ls).
-            assign(ts_call = dt.now().strftime('%Y-%m-%d')))
-        return results_df
-
 
 class SAPSessionAsync(AsyncClient):  
-    def __init__(self, env, secret_env: AzureResourcer): 
-        super().__init__()
+    def __init__(self, env, secret_env: AzureResourcer, **kwargs): 
+        super().__init__(**kwargs)
         self.get_secret = secret_env.get_secret
         self.call_dict  = secret_env.call_dict
         self.config     = CORE_KEYS[env]
         self.set_main()
                 
-
+            
     def set_main(self): 
         main_config = self.config['main']
         self.base_url = main_config['base-url']
@@ -206,67 +210,6 @@ class SAPSessionAsync(AsyncClient):
         self.token = the_resp.json()
 
 
-    async def get_loans(self, attrs_indicator, tries=3): 
-        if not hasattr(self, 'token'): 
-            await self.set_token()
-        
-        loan_config  = self.config['calls']['contract-set']
-        select_attrs = attributes_from_column(attrs_indicator)
-        loan_params  = {'$select': ','.join(select_attrs)}
-
-        for _ in range(tries): 
-            async with self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-                        auth=tools.BearerAuth(self.token['access_token']), 
-                        params=loan_params) as the_resp: 
-                if the_resp.status_code == 401: 
-                    await self.set_token()
-                    continue
-                elif the_resp.status_code == 200: 
-                    break
-        else: 
-            return None   
-
-        loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
-        for loan in loans_ls: 
-            loan.pop('__metadata')
-        
-        return pd.DataFrame(loans_ls)
-
-
-    async def get_persons(self, params={}, how_many=PAGE_MAX, tries=3): 
-        person_conf = self.config['calls']['person-set']
-        params_0 = {'$top': how_many, '$skip': 0}
-        params_0.update(params)
-
-        post_persons = []
-
-        while True:
-            for _ in range(tries): 
-                async with self.get(f"{self.base_url}/{person_conf['sub-url']}", 
-                            auth=tools.BearerAuth(self.token['access_token']), 
-                            params=params_0) as the_resp:     
-                    if the_resp.status_code == 200: 
-                        break
-                    if the_resp.status_code == 401: 
-                        self.set_token()
-                        continue
-            else:
-                raise 'Could not call API.'
-            
-            persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
-            post_persons.extend(persons_ls)
-
-            params_0['$skip'] += how_many
-            if len(persons_ls) < how_many: 
-                break
-        
-        rm_keys = ['__metadata', 'Roles', 'TaxNumbers', 'Relation', 'Partner', 'Correspondence']
-        persons_mod = [tools.dict_minus(a_person, rm_keys) for a_person in post_persons]
-        persons_df = (pd.DataFrame(persons_mod)
-            .assign(ID = lambda df: df.ID.str.pad(10, 'left', '0')))
-        return persons_df
-
-
     async def get_by_api(self, api_type, type_id=None, tries=3): 
         type_ref = 'ContractSet' if type_id is None else f"ContractSet('{type_id}')"
         sub_url  = tools.str_snake_to_camel(api_type, first_word_too=True)
@@ -277,7 +220,6 @@ class SAPSessionAsync(AsyncClient):
         if not hasattr(self, 'token'): 
             await self.set_token()
 
-        print(the_url)
         for _ in range(tries): 
             # the_hdrs['Authorization'] = f"Bearer {self.token['access_token']}"
             the_resp = await self.get(the_url, headers=the_hdrs, #) 
@@ -292,8 +234,8 @@ class SAPSessionAsync(AsyncClient):
         for each_result in results_ls: 
             each_result.pop('__metadata')
         
-        results_df = (pd.DataFrame(results_ls).
-            assign(ts_call = dt.now().strftime('%Y-%m-%d')))
+        results_df = (pd.DataFrame(results_ls)
+            .assign(ts_call = dt.now().strftime('%Y-%m-%d %H:%M:%S')))
         return results_df
 
 
