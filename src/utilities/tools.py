@@ -7,9 +7,6 @@ from importlib import reload
 from openpyxl import load_workbook, utils as xl_utils
 import pandas as pd
 
-from jsonschema import validate, exceptions
-from fastapi.exceptions import HTTPException
-
 
 def reload_from_asterisk(module):
     a_mod = reload(sys.modules[module])
@@ -35,18 +32,6 @@ def snake_2_camel(snake_str):
     first, *others = snake_str.split('_')
     return ''.join([first.lower(), *map(str.title, others)])
 
-
-def response_validate(payload, input_file):
-    try: 
-        with open(input_file, 'r') as _f:
-            input_schema = json.load(_f)
-        validate(instance=payload, schema=input_schema)
-        an_object   = {'error' : False}
-        status_code = 200
-    except exceptions.ValidationError as err:
-        status_code = 400
-        raise HTTPException(status_code=status_code, detail=str(err))
-    return an_object
         
 
 def select_subdict(a_dict, sub_keys):
@@ -170,7 +155,6 @@ def set_dataframe_types(a_df, cols_df):
     df_typed = a_df.astype(dtyped, errors='ignore')
     
     return df_typed
-
 
 
 
