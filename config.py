@@ -28,13 +28,16 @@ SETUP_KEYS = {
             'subscription_id' : (1, 'aad-subscription-id') } , 
         'dbks': {'scope': 'kv-resource-access-dbks'}
     }, 
-    'qas' : {}
+    'qas' : {
+        'service-principal' : {
+            'client_id'       : (1, 'sp-core-events-client'), 
+            'client_secret'   : (1, 'sp-core-events-secret'), 
+            'tenant_id'       : (1, 'aad-tenant-id'), 
+            'subscription_id' : (1, 'sp-core-events-suscription') } , 
+        'dbks': {'scope': 'eh-core-banking'}
+    }
 }
 
-
-OFFICE_KEYS = {
-    
-}
 
 PLATFORM_KEYS = {
     'local' : {
@@ -44,12 +47,7 @@ PLATFORM_KEYS = {
         'storage'   : {
             'name'  : 'lakehylia', 
             'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : (1, 'SP_LAKEHYLIA_APP_ID'), 
-            'client_secret'   : (1, 'SP_LAKEHYLIA_SECRET'), 
-            'tenant_id'       : (1, 'AAD_TENANT_ID'), 
-            'subscription_id' : (1, 'AAD_SUBSCRIPTION_ID') }, 
+        'app-id'    : 'cx-collections-id', 
         'sqls': {
             'hylia': {
                 'driver': "ODBC Driver 18 for SQL Server", 
@@ -65,12 +63,7 @@ PLATFORM_KEYS = {
         'storage'   : {
             'name'  : 'lakehylia', 
             'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : 'SP_LAKEHYLIA_APP_ID', 
-            'client_secret'   : 'SP_LAKEHYLIA_SECRET', 
-            'tenant_id'       : 'AAD_TENANT_ID', 
-            'subscription_id' : 'AAD_SUBSCRIPTION_ID' } }, 
+        'app-id'    : 'cx-collections-id'}, 
     'qas': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
@@ -78,12 +71,7 @@ PLATFORM_KEYS = {
         'storage'   : {
             'name'  : 'lakehylia', 
             'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : 'SP_APP_ID', 
-            'client_secret'   : 'SP_APP_SECRET', 
-            'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION' } } }
+        'app-id'    : 'cx-collections-id'} }
 
 
 CORE_KEYS = {

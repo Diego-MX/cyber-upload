@@ -10,4 +10,4 @@
 
 # MAGIC %sql 
 # MAGIC CREATE TABLE nayru_accounts.brz_ops_loan_balances USING DELTA
-# MAGIC LOCATION 'abfss://brz@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates/loan-balances';
+# MAGIC LOCATION "abfss://bronze@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates/loan-balances";
