@@ -22,6 +22,12 @@
 
 # COMMAND ----------
 
+from importlib import reload
+from src import platform_resources
+reload(platform_resources)
+
+# COMMAND ----------
+
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
@@ -50,6 +56,7 @@ persons_dict = {
     'name'  : "din_clients.brz_ops_persons_set", 
     'stage' : "bronze",
     'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
+
 loans_dict = {
     'name'  : "nayru_accounts.brz_ops_loan_contracts", 
     'stage' : "bronze",
@@ -69,6 +76,7 @@ if first_time:
          .format('delta').mode('overwrite')
          .save(f"abfss://{loans_dict['stage']}@{loans_dict['location']}"))
     spark.sql(loc_2_delta.format(**loans_dict))
+
 else: 
     (persons_spk.write
         .format('delta').mode('overwrite')

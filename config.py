@@ -4,13 +4,13 @@ from pathlib import Path
 from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
 try: 
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-try: 
     from pyspark.dbutils import DBUtils
 except ImportError: 
     DBUtils = None
+try: 
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
 ENV = os.environ.get('ENV_TYPE')        # dev, qas, stg, prod
@@ -50,10 +50,10 @@ PLATFORM_KEYS = {
         'app-id'    : 'cx-collections-id', 
         'sqls': {
             'hylia': {
-                'driver': "ODBC Driver 18 for SQL Server", 
-                'user': (1, 'SQL_CATALOGS_USER'), 
+                'driver'  : "ODBC Driver 18 for SQL Server", 
+                'user'    : (1, 'SQL_CATALOGS_USER'), 
                 'password': (1, 'SQL_CATALOGS_PASS'),
-                'host': (1, 'SQL_CATALOGS_HOST'), 
+                'host'    : (1, 'SQL_CATALOGS_HOST'), 
                 'database': (1, 'SQL_CATALOGS_DBASE')}
         } },
     'dev': {        
