@@ -2,41 +2,29 @@
 # MAGIC %md 
 # MAGIC ## Description
 # MAGIC 
-# MAGIC This notebook is tied to Databricks job that runs every hour.  
+# MAGIC This notebook is tied to Databricks job that runs every hour.   
+# MAGIC 0. Preparation of variables `ENV_TYPE` (`dev`, `qas`, `stg`, ...) and `SERVER_TYPE` (`dbks`, `local`, `wap`).  
+# MAGIC    This is usually done at a server level, but can also be handled in a script or notebook.  
+# MAGIC    `import os; os.environ['ENV_TYPE'] = 'qas'`
 # MAGIC 
-# MAGIC It requires the following accesses:  
-# MAGIC - Keyvault `kv-resource-access-dbks` through its corresponding Databricks scope of the same name.  
-# MAGIC - Access keys in there are set to then accesss a Secret Scope, that has access to secondary keyvault.  
-# MAGIC   The names are stored in config file:  `./config.py`.
+# MAGIC 1. Check `config.py` for configuration options.  As may be anticipated, some depend on `ENV_TYPE` and `SERVER_TYPE`.  
+# MAGIC    One thing to note, the service principal in `SETUP_KEYS` must have been previously given access to the resources in `PLATFORM_KEYS`.  
+# MAGIC    Moreover, specific resource configuration may need to be handled along the way;  
+# MAGIC    Eg.1 Key Vault Access Policies for the service principal to read secrets.  
+# MAGIC    Eg.2 May require fine grained permissions in datalake. 
+# MAGIC 
+# MAGIC 2. Object classes `SAPSession`, `AzureResourcer`, `ConfigEnviron` use `config.py` under the hood.  
+# MAGIC     ... and so does this notebook.  
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../requirements.txt
-
-# COMMAND ----------
-
-import os
-os.environ['ENV_TYPE'] = 'dev'
-os.environ['SERVER_TYPE'] = 'dbks'
+# MAGIC %pip install -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
 from importlib import reload
-import config
-reload(config)
-from src import core_banking
-reload(core_banking)
-
-# COMMAND ----------
-
-from config import CORE_KEYS
-the_access = CORE_KEYS['qas-sap']['main']['access']
-the_access.keys()
-
-
-# COMMAND ----------
-
-CORE_KEYS['qas-sap']['main']['access']
+from src import platform_resources
+reload(platform_resources)
 
 # COMMAND ----------
 
@@ -51,28 +39,53 @@ core_session = SAPSession('qas-sap', azure_getter)
 
 # COMMAND ----------
 
-persons_spk.count()
-
-# COMMAND ----------
-
 persons_df = core_session.get_persons()
 persons_spk = spark.createDataFrame(persons_df)
-display(persons_spk)
 
-
-# COMMAND ----------
-
-persons_spk.write.format('delta').mode('overwrite').saveAsTable("din_clients.brz_core_persons_set")
-
-
-# COMMAND ----------
-
-loans_df  = core_session.get_loans("all")
+loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
 
-display(loans_spk)
+
+# COMMAND ----------
+
+first_time = False 
+
+loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
+
+persons_dict = {
+    'name'  : "din_clients.brz_ops_persons_set", 
+    'stage' : "bronze",
+    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
+
+loans_dict = {
+    'name'  : "nayru_accounts.brz_ops_loan_contracts", 
+    'stage' : "bronze",
+    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts"}
+
 
 
 # COMMAND ----------
 
-loans_spk.write.mode("overwrite").saveAsTable("bronze.loan_contracts")
+if first_time: 
+    (persons_spk.write
+         .format('delta').mode('overwrite')
+         .save(f"abfss://{persons_dict['stage']}@{persons_dict['location']}"))
+    spark.sql(loc_2_delta.format(**persons_dict))
+    
+    (loans_spk.write
+         .format('delta').mode('overwrite')
+         .save(f"abfss://{loans_dict['stage']}@{loans_dict['location']}"))
+    spark.sql(loc_2_delta.format(**loans_dict))
+
+else: 
+    (persons_spk.write
+        .format('delta').mode('overwrite')
+        .saveAsTable(persons_dict['name']))
+              
+    (loans_spk.write
+         .format('delta').mode('overwrite')
+         .saveAsTable(loans_dict['name']))
+
+# COMMAND ----------
+
+

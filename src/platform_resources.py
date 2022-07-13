@@ -27,4 +27,3 @@ class AzureResourcer():
         self.get_secret = get_secret 
         self.call_dict  = call_dict
         
-

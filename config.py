@@ -4,13 +4,13 @@ from pathlib import Path
 from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
 try: 
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-try: 
     from pyspark.dbutils import DBUtils
 except ImportError: 
     DBUtils = None
+try: 
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
 ENV = environ.get('ENV_TYPE', environ.get('ENV', 'qas'))        # dev, qas, stg, prod
@@ -29,13 +29,16 @@ SETUP_KEYS = {
             'subscription_id' : (1, 'aad-subscription-id') } , 
         'dbks': {'scope': 'kv-resource-access-dbks'}
     }, 
-    'qas' : {}
+    'qas' : {
+        'service-principal' : {
+            'client_id'       : (1, 'sp-core-events-client'), 
+            'client_secret'   : (1, 'sp-core-events-secret'), 
+            'tenant_id'       : (1, 'aad-tenant-id'), 
+            'subscription_id' : (1, 'sp-core-events-suscription') } , 
+        'dbks': {'scope': 'eh-core-banking'}
+    }
 }
 
-
-OFFICE_KEYS = {
-    
-}
 
 PLATFORM_KEYS = {
     'local' : {
@@ -44,19 +47,14 @@ PLATFORM_KEYS = {
             'url'   : "https://kv-collections-data-dev.vault.azure.net/"},
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : (1, 'SP_LAKEHYLIA_APP_ID'), 
-            'client_secret'   : (1, 'SP_LAKEHYLIA_SECRET'), 
-            'tenant_id'       : (1, 'AAD_TENANT_ID'), 
-            'subscription_id' : (1, 'AAD_SUBSCRIPTION_ID') }, 
+            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+        'app-id'    : 'cx-collections-id', 
         'sqls': {
             'hylia': {
-                'driver': "ODBC Driver 18 for SQL Server", 
-                'user': (1, 'SQL_CATALOGS_USER'), 
+                'driver'  : "ODBC Driver 18 for SQL Server", 
+                'user'    : (1, 'SQL_CATALOGS_USER'), 
                 'password': (1, 'SQL_CATALOGS_PASS'),
-                'host': (1, 'SQL_CATALOGS_HOST'), 
+                'host'    : (1, 'SQL_CATALOGS_HOST'), 
                 'database': (1, 'SQL_CATALOGS_DBASE')}
         } },
     'dev': {        
@@ -65,26 +63,16 @@ PLATFORM_KEYS = {
             'url'   : "https://kv-collections-data-dev.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : 'SP_LAKEHYLIA_APP_ID', 
-            'client_secret'   : 'SP_LAKEHYLIA_SECRET', 
-            'tenant_id'       : 'AAD_TENANT_ID', 
-            'subscription_id' : 'AAD_SUBSCRIPTION_ID' } }, 
+            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+        'app-id'    : 'cx-collections-id'}, 
     'qas': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
             'url'   : "https://kv-collections-data-dev.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
-        'app-id'    : 'cx-collections-id',
-        'service-principal' : {
-            'client_id'       : 'SP_APP_ID', 
-            'client_secret'   : 'SP_APP_SECRET', 
-            'tenant_id'       : 'AZ_TENANT', 
-            'subscription_id' : 'AZ_SUBSCRIPTION' } } }
+            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+        'app-id'    : 'cx-collections-id'} }
 
 
 CORE_KEYS = {
