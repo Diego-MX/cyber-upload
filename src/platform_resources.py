@@ -28,9 +28,3 @@ class AzureResourcer():
         self.call_dict  = call_dict
         
 
-
-    def get_connection(self, conn_name) -> Connection:
-        
-        pass
-
-

@@ -18,7 +18,7 @@ class BearerAuth(auth.AuthBase):
     def __init__(self, token):
         self.token = token
     def __call__(self, a_request):
-        a_request.headers['Authorization'] = f'Bearer {self.token}'
+        a_request.headers['Authorization'] = f"Bearer {self.token}"
         return a_request
 
 
@@ -26,7 +26,7 @@ class BearerAuthX(Auth):
     def __init__(self, token_str): 
         self.token = token_str 
     def auth_flow(self, a_request): 
-        a_request.headers['Authorization'] = f'Bearer {self.token}'
+        a_request.headers['Authorization'] = f"Bearer {self.token}"
         yield a_request
 
 
@@ -45,6 +45,7 @@ class SAPSession(Session):
         self.headers.update(main_config['headers'])
         self.base_url = main_config['base-url']
 
+
     def set_token(self, auth_type=None): 
         the_access = self.call_dict(self.config['main']['access'])
         params = self.config['calls']['auth'].copy()
@@ -55,8 +56,8 @@ class SAPSession(Session):
         else: 
             auth_enc = tools.encode64("{username}:{password}".format(**the_access))
             params.update({'headers': {
-                'Authorization': f'Basic {auth_enc}', 
-                'Content-Type' : 'application/x-www-form-urlencoded'}})
+                'Authorization': f"Basic {auth_enc}", 
+                'Content-Type' : "application/x-www-form-urlencoded"}})
         the_resp = self.post(**params)
         self.token = the_resp.json()
 
@@ -88,6 +89,7 @@ class SAPSession(Session):
         
         return pd.DataFrame(loans_ls)
 
+
     def get_loans_qan(self, tries=3): 
         if not hasattr(self, 'token'): 
             self.set_token()
@@ -115,37 +117,11 @@ class SAPSession(Session):
         
         return pd.DataFrame(loans_ls)
 
-    def get_loans_qan(self, tries=3): 
-        if not hasattr(self, 'token'): 
-            self.set_token()
-        
-        loan_config  = self.config['calls']['contract-set']
-        
-        for _ in range(tries): 
-            the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-                auth=tools.BearerAuth(self.token['access_token']))
-            
-            if the_resp.status_code == 401: 
-                self.set_token()
-                continue
-            elif the_resp.status_code == 200: 
-                break
-        else: 
-            return None   
-
-        loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
-        for loan in loans_ls: 
-            loan.pop('__metadata')
-        
-        return pd.DataFrame(loans_ls)
-
     
-
-    
-    def get_persons(self, params={}, how_many=PAGE_MAX, tries=3): 
+    def get_persons(self, params_x={}, how_many=PAGE_MAX, tries=3): 
         person_conf = self.config['calls']['person-set']
         params_0 = {'$top': how_many, '$skip': 0}
-        params_0.update(params)
+        params_0.update(params_x)
 
         post_persons = []
 
@@ -161,7 +137,7 @@ class SAPSession(Session):
                     self.set_token()
                     continue
             else:
-                raise 'Could not call API.'
+                raise "Could not call API."
             
             persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
             post_persons.extend(persons_ls)
@@ -204,8 +180,8 @@ class SAPSessionAsync(AsyncClient):
         auth_enc = tools.encode64("{username}:{password}".format(**the_access))
         params.update({
             'headers': {
-            'Authorization': f'Basic {auth_enc}', 
-            'Content-Type' : 'application/x-www-form-urlencoded'}})
+            'Authorization': f"Basic {auth_enc}", 
+            'Content-Type' : "application/x-www-form-urlencoded"}})
         the_resp = await self.post(**params)
         self.token = the_resp.json()
 
@@ -213,7 +189,7 @@ class SAPSessionAsync(AsyncClient):
     async def get_by_api(self, api_type, type_id=None, tries=3): 
         type_ref = 'ContractSet' if type_id is None else f"ContractSet('{type_id}')"
         sub_url  = tools.str_snake_to_camel(api_type, first_word_too=True)
-        the_url  = f'{self.base_url}/v1/lacovr/{type_ref}/{sub_url}'
+        the_url  = f"{self.base_url}/v1/lacovr/{type_ref}/{sub_url}"
         main_conf = self.config['main']
         the_hdrs = main_conf['headers']
         
@@ -235,7 +211,7 @@ class SAPSessionAsync(AsyncClient):
             each_result.pop('__metadata')
         
         results_df = (pd.DataFrame(results_ls)
-            .assign(ts_call = dt.now().strftime('%Y-%m-%d %H:%M:%S')))
+            .assign(ts_call = dt.now().strftime("%Y-%m-%d %H:%M:%S")))
         return results_df
 
 
@@ -266,35 +242,35 @@ def attributes_from_column(attrs_indicator=None) -> list:
             'RolloverAccount', 'ObservationKey', 'ObservationKeyTxt', 'PaymentForm', 
             'PaymentFormTxt', 'EventID']
     elif attrs_indicator == 'qan': 
-        the_attrs = ["GenerateId", "LoanContractID", "BankAccountID", "BankRoutingID", 
-            "BankCountryCode", "BorrowerID", "BorrowerTxt", "BorrowerName", 
-            "BorrowerCategory", "BorrowerCategoryTxt", "BorrowerCountry", "BorrowerCountryTxt", 
-            "BorrowerRegion", "BorrowerRegionTxt", "BorrowerCity", "ManagerID", 
-            "ManagerTxt", "BankPostingArea", "BankPostingAreaTxt", "ProductID", 
-            "ProductTxt", "Currency", "InitialLoanAmount", "StartDate", "LifeCycleStatus", 
-            "TermSpecificationValidityPeriodDuration", "TermAgreementCommittedCapitalAmount", 
-            "TermAgreementFixingPeriodStartDate", "TermAgreementFixingPeriodEndDate", 
-            "PaymentPlanStartDate", "PaymentPlanEndDate", "EffectiveYieldPercentage", 
-            "EffectiveYieldCalculationReason", "EffectiveYieldCalculationReasonTxt", 
-            "EffectiveYieldCalculationMethod", "EffectiveYieldCalculationMethodTxt", 
-            "EffectiveYieldValidityStartDate", "EffectiveYieldCalculationPeriodStartDate", 
-            "EffectiveYieldCalculationPeriodEndDate", "AccountLocked", "ContractCapital", 
-            "CommitmentCapital", "CurrentContractCapital", "CurrentCommitmentCapital", 
-            "DisbursedCapital", "PlannedCapital", "EffectiveCapital", "OutstandingInterest", 
-            "RemainingCapital", "OutstandingCharges", "DisbursementObligation", 
-            "InterestPaid", "AccruedInterest", "OutstandingBalance", "RedrawBalance", 
-            "CurrentOpenItemsAmount", "CurrentOpenItemsCounter", "CurrentOldestDueDate", 
-            "CurrentOverdueDays", "LiASchemaCluster", "LiASchemaClusterTxt", 
-            "SalesProduct", "SalesProductTxt", "Warehouse", "WarehouseTxt", 
-            "WarehouseValidFrom", "DocumentType", "DocumentTypeTxt", "EmploymentStatus", 
-            "EmploymentStatusTxt", "MonthsTrading", "DefaultJudgements", "HardshipStatus", 
-            "HardshipStatusTxt", "PropertyInPossession", "PropertyInPossessionTxt", 
-            "SplitLoan", "ArrearsHistory", "Counter", "RepaymentAmount", "RepaymentPercentage", 
-            "LimitTotalAmount", "DirectDebitBankAccountHolder", 
-            "DirectDebitBankAccount", "DirectDebitBankAccountID", "DirectDebitBankRoutingID", 
-            "DirectDebitBankCountryCode", "TermSpecificationStartDate", "TermSpecificationEndDate", 
-            "LastChangeUserID", "NominalInterestRate",              
-            "LifeCycleStatusTxt", "CreationDate", "CreationDateTime", "CreationUserID"]
+        the_attrs = ['GenerateId', 'LoanContractID', 'BankAccountID', 'BankRoutingID', 
+            'BankCountryCode', 'BorrowerID', 'BorrowerTxt', 'BorrowerName', 
+            'BorrowerCategory', 'BorrowerCategoryTxt', 'BorrowerCountry', 'BorrowerCountryTxt', 
+            'BorrowerRegion', 'BorrowerRegionTxt', 'BorrowerCity', 'ManagerID', 
+            'ManagerTxt', 'BankPostingArea', 'BankPostingAreaTxt', 'ProductID', 
+            'ProductTxt', 'Currency', 'InitialLoanAmount', 'StartDate', 'LifeCycleStatus', 
+            'TermSpecificationValidityPeriodDuration', 'TermAgreementCommittedCapitalAmount', 
+            'TermAgreementFixingPeriodStartDate', 'TermAgreementFixingPeriodEndDate', 
+            'PaymentPlanStartDate', 'PaymentPlanEndDate', 'EffectiveYieldPercentage', 
+            'EffectiveYieldCalculationReason', 'EffectiveYieldCalculationReasonTxt', 
+            'EffectiveYieldCalculationMethod', 'EffectiveYieldCalculationMethodTxt', 
+            'EffectiveYieldValidityStartDate', 'EffectiveYieldCalculationPeriodStartDate', 
+            'EffectiveYieldCalculationPeriodEndDate', 'AccountLocked', 'ContractCapital', 
+            'CommitmentCapital', 'CurrentContractCapital', 'CurrentCommitmentCapital', 
+            'DisbursedCapital', 'PlannedCapital', 'EffectiveCapital', 'OutstandingInterest', 
+            'RemainingCapital', 'OutstandingCharges', 'DisbursementObligation', 
+            'InterestPaid', 'AccruedInterest', 'OutstandingBalance', 'RedrawBalance', 
+            'CurrentOpenItemsAmount', 'CurrentOpenItemsCounter', 'CurrentOldestDueDate', 
+            'CurrentOverdueDays', 'LiASchemaCluster', 'LiASchemaClusterTxt', 
+            'SalesProduct', 'SalesProductTxt', 'Warehouse', 'WarehouseTxt', 
+            'WarehouseValidFrom', 'DocumentType', 'DocumentTypeTxt', 'EmploymentStatus', 
+            'EmploymentStatusTxt', 'MonthsTrading', 'DefaultJudgements', 'HardshipStatus', 
+            'HardshipStatusTxt', 'PropertyInPossession', 'PropertyInPossessionTxt', 
+            'SplitLoan', 'ArrearsHistory', 'Counter', 'RepaymentAmount', 'RepaymentPercentage', 
+            'LimitTotalAmount', 'DirectDebitBankAccountHolder', 
+            'DirectDebitBankAccount', 'DirectDebitBankAccountID', 'DirectDebitBankRoutingID', 
+            'DirectDebitBankCountryCode', 'TermSpecificationStartDate', 'TermSpecificationEndDate', 
+            'LastChangeUserID', 'NominalInterestRate',              
+            'LifeCycleStatusTxt', 'CreationDate', 'CreationDateTime', 'CreationUserID']
     return the_attrs
 
 

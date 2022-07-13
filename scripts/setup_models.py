@@ -10,7 +10,7 @@ load_dotenv(override=True)
 
 sql_keys = PLATFORM_KEYS['local']['sqls']['hylia']
 
-_env     = (lambda key_like: 
+_env = (lambda key_like: 
     os.getenv(key_like[1]) if isinstance(key_like, tuple) else key_like)
 key_dict = (lambda a_dict: 
     {k: _env(v) for (k, v) in a_dict.items()})

@@ -1,4 +1,4 @@
-import os
+from os import environ, getcwd, getenv
 import re
 from pathlib import Path
 from azure.identity import ClientSecretCredential
@@ -12,9 +12,10 @@ try:
 except ImportError: 
     DBUtils = None
 
-SITE = Path(__file__).parent if '__file__' in globals() else Path(os.getcwd())
-ENV = os.environ.get('ENV_TYPE')        # dev, qas, stg, prod
-SERVER = os.environ.get('SERVER_TYPE')  # dbks, local, wap. 
+SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
+ENV = environ.get('ENV_TYPE', environ.get('ENV', 'qas'))        # dev, qas, stg, prod
+SERVER = environ.get('SERVER_TYPE', 'wap')  # dbks, local, wap. 
+
 
 
 PAGE_MAX = 1000
@@ -40,10 +41,10 @@ PLATFORM_KEYS = {
     'local' : {
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
-            'url'   : 'https://kv-collections-data-dev.vault.azure.net/'},
+            'url'   : "https://kv-collections-data-dev.vault.azure.net/"},
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
         'app-id'    : 'cx-collections-id',
         'service-principal' : {
             'client_id'       : (1, 'SP_LAKEHYLIA_APP_ID'), 
@@ -61,10 +62,10 @@ PLATFORM_KEYS = {
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
-            'url'   : 'https://kv-collections-data-dev.vault.azure.net/'}, 
+            'url'   : "https://kv-collections-data-dev.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
         'app-id'    : 'cx-collections-id',
         'service-principal' : {
             'client_id'       : 'SP_LAKEHYLIA_APP_ID', 
@@ -74,10 +75,10 @@ PLATFORM_KEYS = {
     'qas': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
-            'url'   : 'https://kv-collections-data-dev.vault.azure.net/'}, 
+            'url'   : "https://kv-collections-data-dev.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
         'app-id'    : 'cx-collections-id',
         'service-principal' : {
             'client_id'       : 'SP_APP_ID', 
@@ -89,50 +90,50 @@ PLATFORM_KEYS = {
 CORE_KEYS = {
     'dev-sap': {
         'main' : { 
-            'base-url' : 'https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b',
+            'base-url' : "https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b",
             'access' : {
                 'username': (1, 'core-api-key'), 
                 'password': (1, 'core-api-secret') }, 
             'headers' : {
                 'format'          : 'json',
-                'Accept-Encoding' : 'gzip, deflate',
-                'Accept'          : 'application/json'} }, 
+                'Accept-Encoding' : "gzip, deflate",
+                'Accept'          : "application/json"} }, 
         'calls' : {
             'auth' : {
-                'url' : 'https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token', 
+                'url' : "https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token", 
                 'data': {
                     'grant_type' : 'password', 
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
-            'contract-set' : {'sub-url' : 'v1/lacovr/ContractSet'},
-            'contract-qan' : {'sub-url' : 'v1/lacqan/ContractSet'},
-            'person-set'   : {'sub-url' : 'v15/bp/PersonSet'} } }, 
+            'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"},
+            'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } }, 
     'qas-sap' : {
         'main' : {
             'headers' : {
                 'format'          : 'json',
-                'Accept-Encoding' : 'gzip, deflate',
-                'Accept'          : 'application/json' }, 
-            'base-url' : 'https://apiqas.apimanagement.us21.hana.ondemand.com/s4b',
+                'Accept-Encoding' : "gzip, deflate",
+                'Accept'          : "application/json" }, 
+            'base-url' : "https://apiqas.apimanagement.us21.hana.ondemand.com/s4b",
             'access' : {
                 'username': (1, 'core-api-key'), 
                 'password': (1, 'core-api-secret') } }, 
         'calls' : {
             'auth' : {
-                'url' : 'https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token', 
+                'url' : "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
                 'data': {
                     'grant_type' : 'password', 
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
-            'contract-set' : {'sub-url' : 'v1/lacovr/ContractSet'},
-            'contract-qan' : {'sub-url' : 'v1/lacqan/ContractSet'}, 
-            'person-set'   : {'sub-url' : 'v15/bp/PersonSet'} } } }
+            'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"}, 
+            'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } } }
 
 
 CRM_KEYS = {
     'sandbox' : {
         'main' : {
-            'url'  : 'https://bineo1633010523.zendesk.com/api',
+            'url'  : "https://bineo1633010523.zendesk.com/api",
             'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
             'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
         'zis' : {
@@ -141,12 +142,12 @@ CRM_KEYS = {
             'password': (1, 'crm-zis-pass')}, 
         'calls' : {
             'promises' : {
-                'sub-url' : 'sunshine/objects/records'}, 
-            'filters'  : ('sunshine/objects/records',
-                    'services/zis/inbound_webhooks/generic/ingest') } },
+                'sub-url' : "sunshine/objects/records"}, 
+            'filters'  : ("sunshine/objects/records",
+                    "services/zis/inbound_webhooks/generic/ingest") } },
      'prod' : {
         'main' : {
-            'url'  : 'https://bineo.zendesk.com/api',
+            'url'  : "https://bineo.zendesk.com/api",
             'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
             'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
         'zis' : {
@@ -155,9 +156,9 @@ CRM_KEYS = {
             'password': (1, 'crm-zis-pass')}, 
         'calls' : {
             'promises' : {
-                'sub-url' : 'sunshine/objects/records'}, 
-            'filters'  : ('sunshine/objects/records',
-                    'services/zis/inbound_webhooks/generic/ingest') } }}
+                'sub-url' : "sunshine/objects/records"}, 
+            'filters'  : ("sunshine/objects/records",
+                    "services/zis/inbound_webhooks/generic/ingest") } }}
 
 
 DBKS_KEYS = {
@@ -165,7 +166,7 @@ DBKS_KEYS = {
         'connect': {
             'local': {'DSN' : (1, 'DBKS_ODBC_DSN')},
             'wap': {
-                'Driver'         : '/opt/simba/spark/lib/64/libsparkodbc_sb64.so',
+                'Driver'         : "/opt/simba/spark/lib/64/libsparkodbc_sb64.so",
                 'PORT'           : '443',
                 'Schema'         : 'default',
                 'SparkServerType': '3',
@@ -177,8 +178,8 @@ DBKS_KEYS = {
                 'HOST'           : (1, 'dbks-odbc-host'),
                 'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
-            'contracts'   : 'bronze.loan_contracts', 
-            'collections' : 'gold.loan_contracts'} },
+            'contracts'   : "bronze.loan_contracts", 
+            'collections' : "gold.loan_contracts"} },
     'qas': {
     } 
 } 
@@ -208,7 +209,7 @@ class ConfigEnviron():
                 raise("Failed to load library DOTENV.")
             load_dotenv('.env', override=True)        
             def get_secret(key): 
-                return os.getenv(key)
+                return getenv(key)
 
         elif self.server == 'dbks': 
             if self.spark is None: 
