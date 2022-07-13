@@ -66,25 +66,18 @@ loans_dict = {
 
 # COMMAND ----------
 
-if first_time: 
-    (persons_spk.write
+(persons_spk.write
          .format('delta').mode('overwrite')
          .save(f"abfss://{persons_dict['stage']}@{persons_dict['location']}"))
-    spark.sql(loc_2_delta.format(**persons_dict))
-    
-    (loans_spk.write
+
+(loans_spk.write
          .format('delta').mode('overwrite')
          .save(f"abfss://{loans_dict['stage']}@{loans_dict['location']}"))
+
+if first_time: 
+    spark.sql(loc_2_delta.format(**persons_dict))
     spark.sql(loc_2_delta.format(**loans_dict))
 
-else: 
-    (persons_spk.write
-        .format('delta').mode('overwrite')
-        .saveAsTable(persons_dict['name']))
-              
-    (loans_spk.write
-         .format('delta').mode('overwrite')
-         .saveAsTable(loans_dict['name']))
 
 # COMMAND ----------
 
