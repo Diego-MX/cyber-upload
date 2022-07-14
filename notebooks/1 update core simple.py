@@ -22,20 +22,34 @@
 
 # COMMAND ----------
 
-from importlib import reload
-from src import platform_resources
-reload(platform_resources)
-
-# COMMAND ----------
-
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
-azure_getter = AzureResourcer(app_environ)
-core_session = SAPSession('qas-sap', azure_getter)
+az_manager  = AzureResourcer(app_environ)
+core_session = SAPSession('qas-sap', az_manager)
+
+at_storage = az_manager.get_storage()
+az_manager.set_dbks_permissions(at_storage)
+base_location = f"{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
+
+# COMMAND ----------
+
+first_time = False 
+
+persons_dict = {
+    'name'  : "din_clients.brz_ops_persons_set", 
+    'stage' : "bronze",
+    'location' : f"{base_location}/persons-set"}
+
+loans_dict = {
+    'name'  : "nayru_accounts.brz_ops_loan_contracts", 
+    'stage' : "bronze",
+    'location' : f"{base_location}/loan-contracts"}
+
+loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
 
 # COMMAND ----------
 
@@ -44,24 +58,6 @@ persons_spk = spark.createDataFrame(persons_df)
 
 loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
-
-
-# COMMAND ----------
-
-first_time = False 
-
-loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
-
-persons_dict = {
-    'name'  : "din_clients.brz_ops_persons_set", 
-    'stage' : "bronze",
-    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
-
-loans_dict = {
-    'name'  : "nayru_accounts.brz_ops_loan_contracts", 
-    'stage' : "bronze",
-    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts"}
-
 
 
 # COMMAND ----------
@@ -77,8 +73,4 @@ loans_dict = {
 if first_time: 
     spark.sql(loc_2_delta.format(**persons_dict))
     spark.sql(loc_2_delta.format(**loans_dict))
-
-
-# COMMAND ----------
-
 

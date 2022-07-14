@@ -42,22 +42,6 @@ SETUP_KEYS = {
 
 
 PLATFORM_KEYS = {
-    'local' : {
-        'key-vault' : {
-            'name'  : 'kv-collections-data-dev', 
-            'url'   : "https://kv-collections-data-dev.vault.azure.net/"},
-        'storage'   : {
-            'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
-        'app-id'    : 'cx-collections-id', 
-        'sqls': {
-            'hylia': {
-                'driver'  : "ODBC Driver 18 for SQL Server", 
-                'user'    : (1, 'SQL_CATALOGS_USER'), 
-                'password': (1, 'SQL_CATALOGS_PASS'),
-                'host'    : (1, 'SQL_CATALOGS_HOST'), 
-                'database': (1, 'SQL_CATALOGS_DBASE')}
-        } },
     'dev': {        
         'key-vault' : {
             'name'  : 'kv-collections-data-dev', 
@@ -243,6 +227,9 @@ class ConfigEnviron():
         elif self.server in ['wap']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
+    
+    
+    
 
         
         

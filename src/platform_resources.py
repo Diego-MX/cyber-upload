@@ -26,4 +26,43 @@ class AzureResourcer():
         
         self.get_secret = get_secret 
         self.call_dict  = call_dict
+    
+    def get_storage(self, account=None): 
+        if ('storage' in self.config) and ('name' in self.config['storage']):
+            return self.config['storage']['name']
+    
+    
+    def set_dbks_permissions(self, blob_key):
+        # Assume account corresponding to BLOB_KEY is GEN2.  
+        # and permissions are unlocked directly via CONFIG.SETUP_KEYS
         
+        sp_items = self.env.config['service-principal']
+        secretter = self.env.get_secret
+        gen_value = 'gen2'
+        
+        tenant_id = secretter(sp_items['tenant_id'][1]) 
+        oauth2_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+        if gen_value == 'gen2':
+            pre_confs = {
+                f"fs.azure.account.auth.type.{blob_key}.dfs.core.windows.net"           : 'OAuth',
+                f"fs.azure.account.oauth.provider.type.{blob_key}.dfs.core.windows.net" : "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+                f"fs.azure.account.oauth2.endpoint.{blob_key}.dfs.core.windows.net"     : oauth2_endpoint,
+                f"fs.azure.account.oauth2.client.id.{blob_key}.dfs.core.windows.net"    : sp_items['client_id'],
+                f"fs.azure.account.oauth2.client.secret.{blob_key}.dfs.core.windows.net": sp_items['client_secret']}
+        elif gen_value == 'gen1': 
+            pre_confs = {
+                f"fs.adl.oauth2.access.token.provider.type"    : 'ClientCredential', 
+                f"fs.adl.account.{blob_key}.oauth2.client.id"  : sp_items['client_id'],     # aplication-id
+                f"fs.adl.account.{blob_key}.oauth2.credential" : sp_items['client_secret'], # service-credential
+                f"fs.adl.account.{blob_key}.oauth2.refresh.url": oauth2_endpoint}
+        elif gen_value == 'v2': 
+            pre_confs = {f"fs.azure.account.key.{blob_key}.blob.core.windows.net" : sp_items['sas_string']}
+        
+        for a_conf, its_val in self.env.call_dict(pre_confs).items():
+            print(f"{a_conf} = {its_val}")
+            self.env.spark.conf.set(a_conf, its_val)
+        
+              
+        
+
+
