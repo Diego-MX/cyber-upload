@@ -1,10 +1,12 @@
 # Diego Villamil, EPIC
 # CDMX, 4 de noviembre de 2021
 
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as delta
 import re
+from itertools import product
 from urllib.parse import unquote
 import pandas as pd
+from deepdiff import DeepDiff
 
 from requests import Session, auth
 from httpx import AsyncClient, Auth
@@ -37,13 +39,13 @@ class SAPSession(Session):
         self.get_secret = secret_env.get_secret
         self.call_dict  = secret_env.call_dict
         self.set_main()
-        self.set_token()
 
 
     def set_main(self): 
         main_config = self.config['main']
         self.headers.update(main_config['headers'])
         self.base_url = main_config['base-url']
+        self.set_token()
 
 
     def set_token(self, auth_type=None): 
@@ -61,6 +63,73 @@ class SAPSession(Session):
         the_resp = self.post(**params)
         self.token = the_resp.json()
 
+
+    def get_events(self, event_type=None, date_from: dt=None, tries=3): 
+        if not hasattr(self, 'token'): 
+            self.set_token()
+        
+        if date_from is None: 
+            date_from = dt.now() - delta()
+            
+        from_str = date_from.strftime('%Y-%m-%dT%H:%M:%S')
+        event_config = self.config['calls']['event-set']
+
+        data_from = {
+            'person'        : ['dataOld', 'dataNew'], 
+            'account'       : ['dataOld', 'dataNew'], 
+            'transaction'   : ['dataNew'], 
+            'prenote'       : ['dataNew']}
+
+        to_expand = {
+            'person' :      ['', '/Person', '/Person/Relation', '/Person/Correspondence'],
+            'account' :     ['', '/Party'],
+            'transaction':  ['', '/PaymentNotes'], 
+            'prenote' :     ['', '/PaymentNotes'] }
+
+        # Notice the order of iteration of PRODUCT(LIST1, LIST2) as 
+        # [(a1, b1), (a1, b2), ..., (a1, bn), (a2, b1), ..., (a2, bn), ..., (am, b1), ..., (am, bn)]
+        # for LIST1 = [a1, a2, ..., am] and LIST2 = [b1, b2, ..., bn]
+        # Then we use REVERSED since the order of iteration is different than 
+        # that of concatenation.  
+        exp_params = [''.join(data_key)  
+            for data_key in product(data_from[event_type], to_expand[event_type])]
+        
+        event_params = {
+            '$expand' : ','.join(exp_params), 
+            '$filter' : f"EventDateTime ge datetime'{from_str}'"}
+
+        for _ in range(tries): 
+            the_resp = self.get(f"{self.base_url}/{event_config[event_type]}", 
+                auth=BearerAuth(self.token['access_token']), 
+                params=event_params)
+            
+            if the_resp.status_code == 401: 
+                self.set_token()
+                continue
+            elif the_resp.status_code == 200: 
+                break
+        else: 
+            return None
+
+        events_ls = the_resp.json()['d']['results']
+
+        # Probablemente igual que TO_EXPAND. 
+        data_poppers = {
+            'transaction' : ['__metadata', 'PaymentNotes']
+        }
+        if event_type == 'person': 
+            events_df = events_ls
+        elif event_type == 'account': 
+            events_df = events_ls
+        elif event_type == 'transaction': 
+            txn_data  = [an_event.pop('dataNew')   for an_event in events_ls]
+            txn_meta  = [a_txn.pop('__metadata')   for a_txn    in txn_data ]
+            txn_notes = [a_txn.pop('PaymentNotes') for a_txn    in txn_data ]
+            events_df = pd.DataFrame(txn_data)
+        elif event_type == 'prenote': 
+            events_df = events_ls
+        return events_df
+        
 
     def get_loans(self, tries=3): 
         if not hasattr(self, 'token'): 
@@ -166,6 +235,7 @@ class SAPSessionAsync(AsyncClient):
     def set_main(self): 
         main_config = self.config['main']
         self.base_url = main_config['base-url']
+        # await self.set_token() no aplica por temas del AWAIT ASYNC  
 
 
     async def set_token(self): 
@@ -241,6 +311,7 @@ def attributes_from_column(attrs_indicator=None) -> list:
             'StageLevel', 'StageLevelTxt ', 'OverdueDays', 'PendingPayments', 'EvaluationDate', 
             'RolloverAccount', 'ObservationKey', 'ObservationKeyTxt', 'PaymentForm', 
             'PaymentFormTxt', 'EventID']
+
     elif attrs_indicator == 'qan': 
         the_attrs = ['GenerateId', 'LoanContractID', 'BankAccountID', 'BankRoutingID', 
             'BankCountryCode', 'BorrowerID', 'BorrowerTxt', 'BorrowerName', 
@@ -303,8 +374,36 @@ def d_results(json_item, api_type):
 
 
 if __name__ == '__main__': 
+    from config import ENV, SERVER, ConfigEnviron
+    from collections import defaultdict
+
     loans_ids = [
         '10000002999-111-MX', '10000003019-111-MX', '10000003021-111-MX', 
         '10000003053-111-MX', '10000003080-111-MX', '10000003118-111-MX', 
         '10000003136-111-MX', '10000003140-111-MX', '10000003188-111-MX', 
         '10000003226-555-MX']
+    
+    pre_setup = ConfigEnviron(ENV, SERVER)
+    az_manager = AzureResourcer(pre_setup)
+    core_runner = SAPSession('qas-sap', az_manager)
+
+    which = 'transaction'
+    response_ls = core_runner.get_events(which)
+    event_meta  = [entry.pop('__metadata') for entry in response_ls]
+    event_old   = [entry.pop('dataOld') for entry in response_ls]
+    txn_data    = [entry.pop('dataNew') for entry in response_ls]
+    txn_meta    = [entry.pop('__metadata') for entry in txn_data]
+    txn_notes   = [entry.pop('PaymentNotes') for entry in txn_data]
+
+    data_ls = list()
+    for each_result in response_ls: 
+        data_old = each_result.pop('dataOld')
+        data_new = each_result.pop('dataNew')
+        each_result['data-diff'] = DeepDiff(data_old, data_new)
+
+    diff_keys = defaultdict(list)
+    for i, each_result in enumerate(response_ls): 
+        for k in each_result['data-diff'].keys(): 
+            diff_keys[k].append(i) 
+
+    

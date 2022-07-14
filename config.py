@@ -9,6 +9,7 @@ except ImportError:
     DBUtils = None
 try: 
     from dotenv import load_dotenv
+    load_dotenv(override=True)
 except ImportError:
     load_dotenv = None
 
@@ -93,9 +94,14 @@ CORE_KEYS = {
                     'grant_type' : 'password', 
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
+            'event-set'    : {
+                'person'      : "v15/bp/EventSet", 
+                'account'     : "v1/cac/EventSet", 
+                'transaction' : "v1/bape/EventSet", 
+                'prenonte'    : "v1/bapre/EventSet"}, 
+            'person-set'   : {'sub-url' : "v15/bp/PersonSet"},
             'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
-            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"},
-            'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } }, 
+            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"} } }, 
     'qas-sap' : {
         'main' : {
             'headers' : {
@@ -113,6 +119,11 @@ CORE_KEYS = {
                     'grant_type' : 'password', 
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
+            'event-set'    : {
+                'person'      : "v15/bp/EventSet", 
+                'account'     : "v1/cac/EventSet", 
+                'transaction' : "v1/bape/EventSet", 
+                'prenonte'    : "v1/bapre/EventSet"},
             'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"}, 
             'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } } }
@@ -197,7 +208,8 @@ class ConfigEnviron():
                 raise("Failed to load library DOTENV.")
             load_dotenv('.env', override=True)        
             def get_secret(key): 
-                return getenv(key)
+                mod_key = re.sub('-', '_', key.upper())
+                return getenv(mod_key)
 
         elif self.server == 'dbks': 
             if self.spark is None: 
