@@ -22,7 +22,15 @@
 
 # COMMAND ----------
 
+from importlib import reload
+from src import core_banking
+reload(core_banking)
+
+# COMMAND ----------
+
 from datetime import datetime as dt, timedelta as delta
+from delta.tables import DeltaTable
+
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER
@@ -39,6 +47,11 @@ base_location = f"{at_storage}.dfs.core.windows.net/ops/core-banking-batch-event
 
 first_time = False 
 
+events_dict = {
+    'name'  : "farore_transactions.brz_ops_events_inc", 
+    'stage' : "bronze",
+    'location' : f"{base_location}/events"}
+
 persons_dict = {
     'name'  : "din_clients.brz_ops_persons_inc", 
     'stage' : "bronze",
@@ -50,32 +63,68 @@ accounts_dict = {
     'location' : f"{base_location}/accounts"}
 
 txns_dict = {
-    'name'  : "farore_transactions.brz_ops_transactions_inc", 
-    'stage' : "bronze",
+    'name'     : "farore_transactions.brz_ops_transactions_inc", 
+    'stage'    : "bronze",
     'location' : f"{base_location}/transactions"}
 
-loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
+loc_2_delta = (lambda a_dict: 
+    """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";""".format(**a_dict))
 
 # COMMAND ----------
 
-month_ago = dt.now() - delta(days=30)
-
-transactions_df = core_session.get_events(event_type='transaction', date_from=month_ago)
-
-
-
-# COMMAND ----------
-
-transactions_spk = spark.createDataFrame(transactions_df)
+(data_df, events_df) = core_session.get_events(event_type='transactions', date_from=prev_update, output='WithMetadata')
 
 
 # COMMAND ----------
 
-(transactions_spk.write
-         .format('delta').mode('overwrite')
-         .save(f"abfss://{txns_dict['stage']}@{txns_dict['location']}"))
+event_date = events_df['EventDateTime'].str.extract(r"/Date\(([0-9]*)\)/")
+type(event_date)
 
+# COMMAND ----------
+
+events_df
+
+# COMMAND ----------
+
+mod_time = (events_df
+    .assign(EventDateTime2 = lambda df: df['EventDateTime'].str.extract(r"/Date\(([0-9]*)\)/"))
+    .assign(EventDateTime3 = lambda df: pd.to_datetime(df['EventDateTime2'], unit='ms')) )
+mod_time
+
+# COMMAND ----------
+
+prev_update = dt.now() - delta(days=2)
+
+transactions_df = core_session.get_events(event_type='transactions', date_from=prev_update)
+
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
+new_data = spark.createDataFrame(data_df)
+
+prev_data = DeltaTable.forPath(spark, f"abfss://{txns_dict['stage']}@{txns_dict['location']}")
+tbl_cols = {a_col : f'updates.{a_col}' for a_col in new_data.columns}
+
+# Confirmar que sí escribe la tabla de regreso:  todo pinta bien con el EXECUTE. 
+# Sólo aplica para transacciones por la columna 'TransactionID'
+(prev_data.alias('prev')
+    .merge(new_data.alias('new'), 'prev.TransactionID = new.TransactionID')
+    .whenMatchedUpdate(set = tbl_cols)
+    .whenNotMatchedInsert(values = tbl_cols)
+    .execute())
+
+# COMMAND ----------
+
+if False: 
+    txn_df = spark.read.load(f"abfss://{txns_dict['stage']}@{txns_dict['location']}")
+    display(txn_df)
+
+# COMMAND ----------
+
+first_time = True  # Create Table
 if first_time: 
-    spark.sql(loc_2_delta.format(**txns_dict))
-    
-
+    spark.sql(loc_2_delta(events_dict))

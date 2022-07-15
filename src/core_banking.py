@@ -2,18 +2,25 @@
 # CDMX, 4 de noviembre de 2021
 
 from datetime import datetime as dt, timedelta as delta
-import re
 from itertools import product
-from urllib.parse import unquote
 import pandas as pd
-from deepdiff import DeepDiff
+import re
+from urllib.parse import unquote
 
+from deepdiff import DeepDiff
 from requests import Session, auth
 from httpx import AsyncClient, Auth
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
 from config import CORE_KEYS, PAGE_MAX
+
+
+def sap_date_2_pandas(sap_srs: pd.Series) -> pd.Series:
+    dt_regex  = r"/Date\(([0-9]*)\)/"
+    epoch_srs = sap_srs.str.extract(dt_regex)
+    pd_date   = pd.to_datetime(epoch_srs, unit='ms') 
+    return pd_date
 
 
 class BearerAuth(auth.AuthBase):
@@ -64,33 +71,31 @@ class SAPSession(Session):
         self.token = the_resp.json()
 
 
-    def get_events(self, event_type=None, date_from: dt=None, tries=3): 
+    def get_events(self, event_type=None, date_from: dt=None, output=None, tries=3): 
         if not hasattr(self, 'token'): 
             self.set_token()
         
         if date_from is None: 
             date_from = dt.now() - delta()
-            
+        
+        if output is None: 
+            output = 'DataFrame'
+        
         from_str = date_from.strftime('%Y-%m-%dT%H:%M:%S')
         event_config = self.config['calls']['event-set']
 
         data_from = {
-            'person'        : ['dataOld', 'dataNew'], 
-            'account'       : ['dataOld', 'dataNew'], 
-            'transaction'   : ['dataNew'], 
-            'prenote'       : ['dataNew']}
+            'persons'      : ['dataOld', 'dataNew'], 
+            'accounts'     : ['dataOld', 'dataNew'], 
+            'transactions' : ['dataNew'], 
+            'prenotes'     : ['dataNew']}
 
         to_expand = {
-            'person' :      ['', '/Person', '/Person/Relation', '/Person/Correspondence'],
-            'account' :     ['', '/Party'],
-            'transaction':  ['', '/PaymentNotes'], 
-            'prenote' :     ['', '/PaymentNotes'] }
+            'persons'      : ['', '/Person', '/Person/Relation', '/Person/Correspondence'],
+            'accounts'     : ['', '/Party'],
+            'transactions' : ['', '/PaymentNotes'], 
+            'prenotes'     : ['', '/PaymentNotes'] }
 
-        # Notice the order of iteration of PRODUCT(LIST1, LIST2) as 
-        # [(a1, b1), (a1, b2), ..., (a1, bn), (a2, b1), ..., (a2, bn), ..., (am, b1), ..., (am, bn)]
-        # for LIST1 = [a1, a2, ..., am] and LIST2 = [b1, b2, ..., bn]
-        # Then we use REVERSED since the order of iteration is different than 
-        # that of concatenation.  
         exp_params = [''.join(data_key)  
             for data_key in product(data_from[event_type], to_expand[event_type])]
         
@@ -103,32 +108,59 @@ class SAPSession(Session):
                 auth=BearerAuth(self.token['access_token']), 
                 params=event_params)
             
-            if the_resp.status_code == 401: 
+            if the_resp.status_code == 200: 
+                break
+            elif the_resp.status_code == 401: 
                 self.set_token()
                 continue
-            elif the_resp.status_code == 200: 
-                break
+            else: 
+                print(the_resp.text)
+                return None
         else: 
+            print(f'Number of tries ({tries}) reached.')
             return None
-
+        
+        # From here, there is a response. 
+        if output == 'Response':
+            return the_resp
+        
         events_ls = the_resp.json()['d']['results']
-
-        # Probablemente igual que TO_EXPAND. 
+        
         data_poppers = {
-            'transaction' : ['__metadata', 'PaymentNotes']
-        }
-        if event_type == 'person': 
-            events_df = events_ls
-        elif event_type == 'account': 
-            events_df = events_ls
-        elif event_type == 'transaction': 
-            txn_data  = [an_event.pop('dataNew')   for an_event in events_ls]
-            txn_meta  = [a_txn.pop('__metadata')   for a_txn    in txn_data ]
-            txn_notes = [a_txn.pop('PaymentNotes') for a_txn    in txn_data ]
-            events_df = pd.DataFrame(txn_data)
-        elif event_type == 'prenote': 
-            events_df = events_ls
-        return events_df
+            'persons'      : {'': []}, 
+            'accounts'     : [], 
+            'transactions' : {
+                'root': ('__metadata', 'dataOld'),
+                'dataNew': ('__metadata', 'PaymentNotes')}}
+        if event_type == 'persons': 
+            data_df = events_ls
+        elif event_type == 'accounts': 
+            data_df = events_ls
+        elif event_type == 'transactions': 
+            txn_data   = [an_event.pop('dataNew')   for an_event in events_ls]
+            to_discard = [a_txn.pop('__metadata')   for a_txn    in txn_data ]
+            to_discard = [a_txn.pop('PaymentNotes') for a_txn    in txn_data ]
+            data_df = pd.DataFrame(txn_data)
+        elif event_type == 'prenotes': 
+            data_df = events_ls
+        
+        if output == 'DataFrame': 
+            return data_df
+        
+        if output == 'WithMetadata': 
+            to_discard = [an_event.pop('__metadata') for an_event in events_ls]
+            if event_type == 'persons': 
+                pass
+            if event_type == 'accounts': 
+                pass
+            if event_type == 'transactions': 
+                to_discard = [an_event.pop('dataOld')    for an_event in events_ls]
+            if event_type == 'prenotes': 
+                pass
+            
+            meta_df = (pd.DataFrame(events_ls)
+                .assign(EventDateTime = lambda df: sap_date_2_pandas(df['EventDateTime'])))
+            return (data_df, meta_df)
         
 
     def get_loans(self, tries=3): 
