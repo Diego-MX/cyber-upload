@@ -61,6 +61,21 @@ PLATFORM_KEYS = {
 
 
 CORE_KEYS = {
+    'default': {
+        'main': {
+            'headers' : {
+                'format'          : 'json',
+                'Accept-Encoding' : "gzip, deflate",
+                'Accept'          : "application/json"} }, 
+        'calls': {
+            'event-set'    : {
+                'persons'      : "v15/bp/EventSet", 
+                'accounts'     : "v1/cac/EventSet", 
+                'transactions' : "v1/bape/EventSet", 
+                'prenotes'    : "v1/bapre/EventSet"}, 
+            'person-set'   : {'sub-url' : "v15/bp/PersonSet"},
+            'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"} } }, 
     'dev-sap': {
         'main' : { 
             'base-url' : "https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b",
@@ -79,10 +94,10 @@ CORE_KEYS = {
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
             'event-set'    : {
-                'person'      : "v15/bp/EventSet", 
-                'account'     : "v1/cac/EventSet", 
-                'transaction' : "v1/bape/EventSet", 
-                'prenonte'    : "v1/bapre/EventSet"}, 
+                'persons'      : "v15/bp/EventSet", 
+                'accounts'     : "v1/cac/EventSet", 
+                'transactions' : "v1/bape/EventSet", 
+                'prenotes'     : "v1/bapre/EventSet"}, 
             'person-set'   : {'sub-url' : "v15/bp/PersonSet"},
             'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"} } }, 
@@ -104,10 +119,10 @@ CORE_KEYS = {
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
             'event-set'    : {
-                'person'      : "v15/bp/EventSet", 
-                'account'     : "v1/cac/EventSet", 
-                'transaction' : "v1/bape/EventSet", 
-                'prenonte'    : "v1/bapre/EventSet"},
+                'persons'      : "v15/bp/EventSet", 
+                'accounts'     : "v1/cac/EventSet", 
+                'transactions' : "v1/bape/EventSet", 
+                'prenotes'    : "v1/bapre/EventSet"},
             'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"}, 
             'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } } }

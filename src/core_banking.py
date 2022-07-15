@@ -75,16 +75,16 @@ class SAPSession(Session):
         event_config = self.config['calls']['event-set']
 
         data_from = {
-            'person'        : ['dataOld', 'dataNew'], 
-            'account'       : ['dataOld', 'dataNew'], 
-            'transaction'   : ['dataNew'], 
-            'prenote'       : ['dataNew']}
+            'persons'        : ['dataOld', 'dataNew'], 
+            'accounts'       : ['dataOld', 'dataNew'], 
+            'transactions'   : ['dataNew'], 
+            'prenotes'       : ['dataNew']}
 
         to_expand = {
-            'person' :      ['', '/Person', '/Person/Relation', '/Person/Correspondence'],
-            'account' :     ['', '/Party'],
-            'transaction':  ['', '/PaymentNotes'], 
-            'prenote' :     ['', '/PaymentNotes'] }
+            'persons' :      ['', '/Person', '/Person/Relation', '/Person/Correspondence'],
+            'accounts' :     ['', '/Party'],
+            'transactions':  ['', '/PaymentNotes'], 
+            'prenotes' :     ['', '/PaymentNotes'] }
 
         # Notice the order of iteration of PRODUCT(LIST1, LIST2) as 
         # [(a1, b1), (a1, b2), ..., (a1, bn), (a2, b1), ..., (a2, bn), ..., (am, b1), ..., (am, bn)]
@@ -101,12 +101,14 @@ class SAPSession(Session):
         for _ in range(tries): 
             the_resp = self.get(f"{self.base_url}/{event_config[event_type]}", 
                 auth=BearerAuth(self.token['access_token']), 
-                params=event_params)
-            
-            if the_resp.status_code == 401: 
+                params=event_params)            
+            if the_resp.status_code == 200: 
+                break
+            elif the_resp.status_code == 401: 
                 self.set_token()
                 continue
-            elif the_resp.status_code == 200: 
+            else: 
+                print(the_resp.text)
                 break
         else: 
             return None
@@ -117,19 +119,19 @@ class SAPSession(Session):
         data_poppers = {
             'transaction' : ['__metadata', 'PaymentNotes']
         }
-        if event_type == 'person': 
+        if event_type == 'persons': 
             events_df = events_ls
-        elif event_type == 'account': 
+        elif event_type == 'accounts': 
             events_df = events_ls
-        elif event_type == 'transaction': 
+        elif event_type == 'transactions': 
             txn_data  = [an_event.pop('dataNew')   for an_event in events_ls]
             txn_meta  = [a_txn.pop('__metadata')   for a_txn    in txn_data ]
             txn_notes = [a_txn.pop('PaymentNotes') for a_txn    in txn_data ]
             events_df = pd.DataFrame(txn_data)
-        elif event_type == 'prenote': 
+        elif event_type == 'prenotes': 
             events_df = events_ls
         return events_df
-        
+
 
     def get_loans(self, tries=3): 
         if not hasattr(self, 'token'): 
@@ -375,8 +377,7 @@ def d_results(json_item, api_type):
 
 if __name__ == '__main__': 
     from config import ENV, SERVER, ConfigEnviron
-    from collections import defaultdict
-
+    
     loans_ids = [
         '10000002999-111-MX', '10000003019-111-MX', '10000003021-111-MX', 
         '10000003053-111-MX', '10000003080-111-MX', '10000003118-111-MX', 
@@ -387,23 +388,11 @@ if __name__ == '__main__':
     az_manager = AzureResourcer(pre_setup)
     core_runner = SAPSession('qas-sap', az_manager)
 
-    which = 'transaction'
-    response_ls = core_runner.get_events(which)
-    event_meta  = [entry.pop('__metadata') for entry in response_ls]
-    event_old   = [entry.pop('dataOld') for entry in response_ls]
-    txn_data    = [entry.pop('dataNew') for entry in response_ls]
-    txn_meta    = [entry.pop('__metadata') for entry in txn_data]
-    txn_notes   = [entry.pop('PaymentNotes') for entry in txn_data]
-
-    data_ls = list()
-    for each_result in response_ls: 
-        data_old = each_result.pop('dataOld')
-        data_new = each_result.pop('dataNew')
-        each_result['data-diff'] = DeepDiff(data_old, data_new)
-
-    diff_keys = defaultdict(list)
-    for i, each_result in enumerate(response_ls): 
-        for k in each_result['data-diff'].keys(): 
-            diff_keys[k].append(i) 
-
+    which = 'transactions'
+    date_from = dt.now() - delta(days=7)
+    response_df = core_runner.get_events(which, date_from)
+    
+    
+    
+    
     
