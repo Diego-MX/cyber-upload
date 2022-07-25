@@ -1,12 +1,15 @@
 # Diego Villamil, EPIC
 # CDMX, 4 de noviembre de 2021
 
-from datetime import datetime as dt, timedelta as delta
+from datetime import datetime as dt, timedelta as delta, date
 from itertools import product
+from json import dumps
 import pandas as pd
 import re
 from urllib.parse import unquote
 
+from delta.tables import DeltaTable
+from typing import Union
 from deepdiff import DeepDiff
 from requests import Session, auth
 from httpx import AsyncClient, Auth
@@ -16,12 +19,54 @@ from src.platform_resources import AzureResourcer
 from config import CORE_KEYS, PAGE_MAX
 
 
-def sap_date_2_pandas(sap_srs: pd.Series) -> pd.Series:
+def str_error(an_error): 
+    try: 
+        a_json = an_error.json()
+        return dumps(a_json, indent=2)
+    except Exception: 
+        return str(an_error)
+
+    
+def date_2_pandas(sap_srs: pd.Series) -> pd.Series:
     dt_regex  = r"/Date\(([0-9]*)\)/"
-    epoch_srs = sap_srs.str.extract(dt_regex)
+    epoch_srs = sap_srs.str.extract(dt_regex, expand=False)
     pd_date   = pd.to_datetime(epoch_srs, unit='ms') 
     return pd_date
 
+
+def datetime_2_filter(sap_dt, range_how=None) -> str: 
+    dt_string = (lambda a_dt: 
+            "datetime'{}'".format(a_dt.strftime('%Y-%m-%dT%H:%M:%S')))
+    if range_how == 'functions': 
+        dt_clause = lambda cmp_dt : "{}(EventDateTime,{})".format(*cmp_dt)
+    else: 
+        dt_clause = lambda cmp_dt : "EventDateTime {} {}".format(*cmp_dt)
+        
+    if isinstance(sap_dt, (dt, date)):
+        sap_filter = dt_clause(['ge', dt_string(sap_dt)])
+        return sap_filter
+    
+    two_cond = (isinstance(sap_dt, (list, tuple)) 
+            and (len(sap_dt) == 2) 
+            and (sap_dt[0] < sap_dt[1]))
+    if not two_cond: 
+        raise Exception("SAP_DT may be DATETIME or LIST[DT1, DT2] with DT1 < DT2")
+    
+    into_clauses = zip(['ge', 'lt'], map(dt_string, sap_dt))
+    # ... = (['ge', dtime_string(sap_dt[0])], 
+    #        ['lt', dtime_string(sap_dt[1])])
+    map_clauses = map(dt_clause, into_clauses)
+    if range_how in [None, 'and']: 
+        sap_filter = ' and '.join(map_clauses)
+    elif range_how == 'expand_list':  
+        sap_filter = list(map_clauses)
+    elif range_how == 'between':
+        sap_filter = ("EventDateTime between datetime'{}' and datetime'{}'"
+            .format(*map_clauses))
+    elif range_how == 'functions': 
+        sap_filter = 'and({},{})'.format(*map_clauses)
+    return sap_filter
+        
 
 class BearerAuth(auth.AuthBase):
     def __init__(self, token):
@@ -37,7 +82,7 @@ class BearerAuthX(Auth):
     def auth_flow(self, a_request): 
         a_request.headers['Authorization'] = f"Bearer {self.token}"
         yield a_request
-
+        
 
 class SAPSession(Session): 
     def __init__(self, env, secret_env: AzureResourcer): 
@@ -71,17 +116,24 @@ class SAPSession(Session):
         self.token = the_resp.json()
 
 
-    def get_events(self, event_type=None, date_from: dt=None, output=None, tries=3): 
+    def get_events(self, event_type=None, date_lim: dt=None, output=None, tries=3): 
+        """
+        EVENT_TYPE: [persons, accounts, transactions, prenotes]
+        DATE_FROM:  (as datetime.datetime) for recent events
+        OUTPUT:     [Response, DataFrame, WithMetadata]
+        TRIES:      (not really useful, but included anyway)
+        
+        """
+        
         if not hasattr(self, 'token'): 
             self.set_token()
         
-        if date_from is None: 
-            date_from = dt.now() - delta()
+        if date_lim is None: 
+            date_lim = dt.now() - delta(days=1)
         
         if output is None: 
             output = 'DataFrame'
         
-        from_str = date_from.strftime('%Y-%m-%dT%H:%M:%S')
         event_config = self.config['calls']['event-set']
 
         data_from = {
@@ -100,9 +152,10 @@ class SAPSession(Session):
             for data_key in product(data_from[event_type], to_expand[event_type])]
         
         event_params = {
-            '$expand' : ','.join(exp_params), 
-            '$filter' : f"EventDateTime ge datetime'{from_str}'"}
-
+            '$filter' : datetime_2_filter(date_lim, 'and'), 
+            '$expand' : ','.join(exp_params)}
+        print(event_params['$filter'])
+            
         for _ in range(tries): 
             the_resp = self.get(f"{self.base_url}/{event_config[event_type]}", 
                 auth=BearerAuth(self.token['access_token']), 
@@ -154,12 +207,12 @@ class SAPSession(Session):
             if event_type == 'accounts': 
                 pass
             if event_type == 'transactions': 
-                to_discard = [an_event.pop('dataOld')    for an_event in events_ls]
+                to_discard = [an_event.pop('dataOld') for an_event in events_ls]
             if event_type == 'prenotes': 
                 pass
             
             meta_df = (pd.DataFrame(events_ls)
-                .assign(EventDateTime = lambda df: sap_date_2_pandas(df['EventDateTime'])))
+                .assign(EventDateTime = lambda df: date_2_pandas(df['EventDateTime'])))
             return (data_df, meta_df)
         
 
@@ -317,6 +370,18 @@ class SAPSessionAsync(AsyncClient):
         return results_df
 
 
+def update_dataframe(spark, new_df: pd.DataFrame, df_location: str, id_column: str): 
+    new_data = spark.createDataFrame(new_df)
+    
+    prev_data = DeltaTable.forPath(spark, df_location)
+    tbl_cols = {a_col : f'new.{a_col}' for a_col in new_data.columns}
+
+    (prev_data.alias('prev')
+        .merge(new_data.alias('new'), f"prev.{id_column} = new.{id_column}")
+        .whenMatchedUpdate(set = tbl_cols)
+        .whenNotMatchedInsert(values = tbl_cols)
+        .execute())
+    
 
 def attributes_from_column(attrs_indicator=None) -> list:
     if attrs_indicator == 'all': 
