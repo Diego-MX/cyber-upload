@@ -123,7 +123,7 @@ CRM_KEYS = {
             'url'  : 'https://bineo1633010523.zendesk.com/api',
             'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
             'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
-        'zis' : {
+        'zis' : {     # Zendesk Integration Services. 
             'id'      : (1, 'crm-zis-id'), 
             'username': (1, 'crm-zis-user'), 
             'password': (1, 'crm-zis-pass')}, 
@@ -135,7 +135,7 @@ CRM_KEYS = {
      'prod' : {
         'main' : {
             'url'  : 'https://bineo.zendesk.com/api',
-            'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
+            'username' : (1, 'crm-api-user'),     # ZNDK_USER_EMAIL
             'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
         'zis' : {
             'id'      : (1, 'crm-zis-id'), 
@@ -170,7 +170,6 @@ DBKS_KEYS = {
     'qas': {
     } 
 } 
-
 
     
 

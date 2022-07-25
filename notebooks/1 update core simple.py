@@ -22,9 +22,15 @@
 
 # COMMAND ----------
 
-from importlib import reload
-from src import platform_resources
-reload(platform_resources)
+persons_dict = {
+    'name'  : "din_clients.brz_ops_persons_set", 
+    'stage' : "bronze",
+    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
+
+loans_dict = {
+    'name'  : "nayru_accounts.brz_ops_loan_contracts", 
+    'stage' : "bronze",
+    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts"}
 
 # COMMAND ----------
 
@@ -49,22 +55,7 @@ loans_spk = spark.createDataFrame(loans_df)
 # COMMAND ----------
 
 first_time = False 
-
 loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
-
-persons_dict = {
-    'name'  : "din_clients.brz_ops_persons_set", 
-    'stage' : "bronze",
-    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
-
-loans_dict = {
-    'name'  : "nayru_accounts.brz_ops_loan_contracts", 
-    'stage' : "bronze",
-    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts"}
-
-
-
-# COMMAND ----------
 
 if first_time: 
     (persons_spk.write
@@ -85,7 +76,3 @@ else:
     (loans_spk.write
          .format('delta').mode('overwrite')
          .saveAsTable(loans_dict['name']))
-
-# COMMAND ----------
-
-
