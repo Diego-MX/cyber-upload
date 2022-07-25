@@ -16,18 +16,31 @@
 
 # COMMAND ----------
 
-# MAGIC  %pip install -r ../requirements.txt
+# MAGIC  %pip install -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
-from config import VaultSetter
+# MAGIC %md 
+# MAGIC # Descripción
+# MAGIC ... 
+
+# COMMAND ----------
+
+from config import ConfigEnviron, ENV, SERVER
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
-secretter = VaultSetter('dbks')
-azurer_getter = AzureResourcer('local', secretter)
+secretter = ConfigEnviron(ENV, SERVER, spark)
+azurer_getter = AzureResourcer(secretter)
 zendesk = ZendeskSession('sandbox', azurer_getter)
 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # ToDo
+# MAGIC 1. Hacer el query incremental. 
+# MAGIC 2. Poner la tabla en Datalake. 
 
 # COMMAND ----------
 
@@ -35,3 +48,8 @@ promises_df = zendesk.get_promises().drop(columns='external_id')
 promises_spk = spark.createDataFrame(promises_df)
 promises_spk.write.mode('overwrite').saveAsTable('bronze.crm_payment_promises')
 
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC DESCRIBE TABLE EXTENDED bronze.crm_payment_promises

@@ -22,6 +22,18 @@
 
 # COMMAND ----------
 
+persons_dict = {
+    'name'  : "din_clients.brz_ops_persons_set", 
+    'stage' : "bronze",
+    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
+
+loans_dict = {
+    'name'  : "nayru_accounts.brz_ops_loan_contracts", 
+    'stage' : "bronze",
+    'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts"}
+
+# COMMAND ----------
+
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
@@ -62,7 +74,11 @@ loans_spk = spark.createDataFrame(loans_df)
 
 # COMMAND ----------
 
-(persons_spk.write
+first_time = False 
+loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
+
+if first_time: 
+    (persons_spk.write
          .format('delta').mode('overwrite')
          .save(f"abfss://{persons_dict['stage']}@{persons_dict['location']}"))
 
@@ -74,3 +90,11 @@ if first_time:
     spark.sql(loc_2_delta.format(**persons_dict))
     spark.sql(loc_2_delta.format(**loans_dict))
 
+else: 
+    (persons_spk.write
+        .format('delta').mode('overwrite')
+        .saveAsTable(persons_dict['name']))
+              
+    (loans_spk.write
+         .format('delta').mode('overwrite')
+         .saveAsTable(loans_dict['name']))

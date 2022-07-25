@@ -7,15 +7,13 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../requirements.txt
+# MAGIC %pip install -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
-import os
 from pytz import timezone as tz
 from datetime import datetime as dt
 
-os.environ['ENV'] = 'dbks'
 this_hour = dt.now(tz('America/Mexico_City')).hour
 
 # COMMAND ----------
@@ -32,12 +30,12 @@ for (call_name, (call_id, call_hr)) in crm_calls.items():
 
 # COMMAND ----------
 
-from config import ConfigEnviron
+from config import ConfigEnviron, ENV, SERVER
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
-secretter = ConfigEnviron('dbks', spark=spark)
-az_resourcer = AzureResourcer('local', secretter)
+secretter = ConfigEnviron(ENV, SERVER, spark=spark)
+az_resourcer = AzureResourcer(secretter)
 zendesk = ZendeskSession('sandbox', az_resourcer)
 
 for an_id in hourly_calls[this_hour]: 

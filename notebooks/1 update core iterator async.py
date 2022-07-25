@@ -6,11 +6,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../requirements.txt
-
-# COMMAND ----------
-
-import os; os.environ['ENV'] = 'dbks'
+# MAGIC %pip install -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
@@ -23,12 +19,12 @@ from pyspark.sql.window import Window
 
 import asyncio
 from httpx import Limits, Timeout
-from config import ConfigEnviron
+from config import ConfigEnviron, ENV, SERVER
 from src.platform_resources import AzureResourcer
 from src.core_banking import SAPSessionAsync
    
-secretter = ConfigEnviron('dbks', spark=spark)
-azure_getter = AzureResourcer('local', secretter)
+secretter = ConfigEnviron(ENV, SERVER, spark=spark)
+azure_getter = AzureResourcer(secretter)
 
 api_types = ['open_items', 'payment_plan', 'balances']
 loans_ids = spark.table('bronze.loan_contracts').select('ID').toPandas()['ID'].tolist()
@@ -52,7 +48,7 @@ async def call_all_apis(api_calls, ids_lists):
     sap_limits = Limits(max_keepalive_connections=10, max_connections=50)
     sap_timeouts = Timeout(10, pool=50, read=50)
     
-    async with SAPSessionAsync('qas', azure_getter, limits=sap_limits, timeout=sap_timeouts) as core_client: 
+    async with SAPSessionAsync('qas-sap', azure_getter, limits=sap_limits, timeout=sap_timeouts) as core_client: 
         tasks = []
         for rev_params in product(ids_lists, api_calls): 
             params = rev_params[::-1]
@@ -93,7 +89,6 @@ print(f'''
 
 print(dumps(not_okay))
 
-# print(dumps(not_okay))
 
 # COMMAND ----------
 
