@@ -9,6 +9,7 @@ azure-identity
 azure-keyvault-secrets
 httpx
 python-dotenv
+deepdiff
 
 # Data 
 pandas

@@ -22,22 +22,24 @@
 
 # COMMAND ----------
 
+### Erase on working code. 
 from importlib import reload
 from src import core_banking
+import config
+reload(config)
 reload(core_banking)
-
-# COMMAND ----------
+### End of erase section. 
 
 from datetime import datetime as dt, timedelta as delta
-from delta.tables import DeltaTable
-
-from src.core_banking import SAPSession
+from src.core_banking import SAPSession, update_dataframe
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
 core_session = SAPSession('qas-sap', az_manager)
+
+# COMMAND ----------
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
@@ -72,59 +74,40 @@ loc_2_delta = (lambda a_dict:
 
 # COMMAND ----------
 
-(data_df, events_df) = core_session.get_events(event_type='transactions', date_from=prev_update, output='WithMetadata')
+# It's run every hour, but give we give it some room. 
+prev_update = dt.now() - delta(hours=3)
+
+(data_df, events_df) = core_session.get_events(event_type='transactions', date_lim=prev_update, output='WithMetadata')
+
+# COMMAND ----------
+
+txns_path = f"abfss://{txns_dict['stage']}@{txns_dict['location']}"
+events_path = f"abfss://{events_dict['stage']}@{events_dict['location']}"
+
+update_dataframe(spark, data_df, txns_path, 'TransactionID')
+update_dataframe(spark, events_df, events_path, 'EventID')
 
 
 # COMMAND ----------
 
-event_date = events_df['EventDateTime'].str.extract(r"/Date\(([0-9]*)\)/")
-type(event_date)
-
-# COMMAND ----------
-
-events_df
-
-# COMMAND ----------
-
-mod_time = (events_df
-    .assign(EventDateTime2 = lambda df: df['EventDateTime'].str.extract(r"/Date\(([0-9]*)\)/"))
-    .assign(EventDateTime3 = lambda df: pd.to_datetime(df['EventDateTime2'], unit='ms')) )
-mod_time
-
-# COMMAND ----------
-
-prev_update = dt.now() - delta(days=2)
-
-transactions_df = core_session.get_events(event_type='transactions', date_from=prev_update)
-
-
-# COMMAND ----------
-
-
-
-# COMMAND ----------
-
-new_data = spark.createDataFrame(data_df)
-
-prev_data = DeltaTable.forPath(spark, f"abfss://{txns_dict['stage']}@{txns_dict['location']}")
-tbl_cols = {a_col : f'updates.{a_col}' for a_col in new_data.columns}
-
-# Confirmar que sí escribe la tabla de regreso:  todo pinta bien con el EXECUTE. 
-# Sólo aplica para transacciones por la columna 'TransactionID'
-(prev_data.alias('prev')
-    .merge(new_data.alias('new'), 'prev.TransactionID = new.TransactionID')
-    .whenMatchedUpdate(set = tbl_cols)
-    .whenNotMatchedInsert(values = tbl_cols)
-    .execute())
-
-# COMMAND ----------
-
-if False: 
-    txn_df = spark.read.load(f"abfss://{txns_dict['stage']}@{txns_dict['location']}")
-    display(txn_df)
-
-# COMMAND ----------
-
-first_time = True  # Create Table
+first_time = False  # Create Table
 if first_time: 
+    data_spk = spark.createDataFrame(events_df)
+    
+    (data_spk.write
+         .format('delta').mode('overwrite')
+         .save(f"abfss://{events_dict['stage']}@{events_dict['location']}"))
+    
     spark.sql(loc_2_delta(events_dict))
+    
+
+# COMMAND ----------
+
+# No need to run this every time. 
+if False:  
+    from pyspark.sql import functions as F
+    from datetime import date, datetime as dt, timedelta as delta
+    txns_set = (spark.read.table('farore_transactions.brz_ops_events_inc')
+        .filter(F.col('EventDateTime') < date(2022, 6, 30)))
+    display(txns_set)
+
