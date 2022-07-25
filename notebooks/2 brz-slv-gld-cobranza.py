@@ -13,6 +13,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -r ../reqs_dbks.txt
+
+# COMMAND ----------
+
 from pyspark.sql import functions as F, types as T, Window as W
 from datetime import datetime as dt
 import re
@@ -82,10 +86,10 @@ def overwrite_dataframe(spk_df, tbl_name):
         .saveAsTable(tbl_name))
     return None
       
-segregate_udf   = udf(segregate_lastNames, T.StringType())
-date_format_udf = udf(date_format, T.DateType())
-sum_codes_udf   = udf(sum_codes,   T.DoubleType())
-udf_ra          = udf(real_amount, T.DoubleType())
+segregate_udf   = F.udf(segregate_lastNames, T.StringType())
+date_format_udf = F.udf(date_format, T.DateType())
+sum_codes_udf   = F.udf(sum_codes,   T.DoubleType())
+udf_ra          = F.udf(real_amount, T.DoubleType())
 
 
 # COMMAND ----------
@@ -173,7 +177,7 @@ ord_comisiones = (ord_interes_df
     .join(other=comisiones_df, how='inner', on=ord_interes_df.ID == comisiones_df.ID)
     .select(ord_interes_df.ID, ord_interes_df.ord_interes, comisiones_df.comisiones))
 
-loan_balance_df = (ord_comisiones
+loan_balance_1 = (ord_comisiones
     .join(other=monto_principal_df, how='inner',
           on=ord_comisiones.ID == monto_principal_df.ID)
     .select(ord_comisiones.ID, ord_comisiones.ord_interes,
@@ -181,9 +185,9 @@ loan_balance_df = (ord_comisiones
 
 two_columns = ['ord_interes', 'comisiones']
 
-loan_balance_1 = loan_balance_0
+loan_balance_2 = loan_balance_1
 for a_col in two_columns:
-    loan_balance_1 = loan_balance_1.withColumn(a_col, F.abs(F.col(a_col)))
+    loan_balance_2 = loan_balance_2.withColumn(a_col, F.abs(F.col(a_col)))
     
 loan_balance_df = (loan_balance_1
     .withColumn('monto_liquidacion', F.col('comisiones') + F.col('ord_interes') + F.col('monto_principal')))

@@ -20,11 +20,6 @@
 
 # MAGIC %pip install -r ../reqs_dbks.txt
 
-# COMMAND ----------
-
-from importlib import reload
-import config
-reload(config)
 
 # COMMAND ----------
 
@@ -71,13 +66,11 @@ if first_time:
     (persons_spk.write
          .format('delta').mode('overwrite')
          .save(f"abfss://bronze@{persons_dict['location']}"))
-
+    spark.sql(loc_2_delta.format(**persons_dict))
+    
     (loans_spk.write
          .format('delta').mode('overwrite')
-         .save(f"abfss://bronze@{az_storage}.dfs.core.windows.net/{loans_dict['location']}"))
-
-if first_time: 
-    spark.sql(loc_2_delta.format(**persons_dict))
+         .save(f"abfss://bronze@{loans_dict['location']}"))
     spark.sql(loc_2_delta.format(**loans_dict))
 
 else: 
@@ -91,10 +84,3 @@ else:
         .option('overwriteSchema', True)
         .save(f"abfss://bronze@{az_storage}.dfs.core.windows.net/{loans_dict['location']}"))
 
-# COMMAND ----------
-
-loans_dict['location']
-
-# COMMAND ----------
-
-dbutils.fs.ls(f"abfss://bronze@{az_storage}.dfs.core.windows.net/{loans_dict['location']}")
