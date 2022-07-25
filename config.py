@@ -122,7 +122,7 @@ CORE_KEYS = {
                 'persons'      : "v15/bp/EventSet", 
                 'accounts'     : "v1/cac/EventSet", 
                 'transactions' : "v1/bape/EventSet", 
-                'prenotes'    : "v1/bapre/EventSet"},
+                'prenotes'     : "v1/bapre/EventSet"},
             'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"}, 
             'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } } }
