@@ -28,8 +28,7 @@ SETUP_KEYS = {
             'client_secret'   : (1, 'sp-lakehylia-secret'), 
             'tenant_id'       : (1, 'aad-tenant-id'), 
             'subscription_id' : (1, 'aad-subscription-id') } , 
-        'dbks': {'scope': 'kv-resource-access-dbks'}
-    }, 
+        'dbks': {'scope': 'kv-resource-access-dbks'} }, 
     'qas' : {
         'service-principal' : {
             'client_id'       : (1, 'sp-core-events-client'), 
@@ -145,13 +144,8 @@ CRM_KEYS = {
                     "services/zis/inbound_webhooks/generic/ingest") } },
      'prod' : {
         'main' : {
-<<<<<<< HEAD
             'url'  : "https://bineo.zendesk.com/api",
             'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
-=======
-            'url'  : 'https://bineo.zendesk.com/api',
-            'username' : (1, 'crm-api-user'),     # ZNDK_USER_EMAIL
->>>>>>> 9c8ffcc0d6ff3fbf00133000f14ab5ba80b8bca6
             'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
         'zis' : {
             'id'      : (1, 'crm-zis-id'), 
@@ -183,11 +177,40 @@ DBKS_KEYS = {
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
             'contracts'   : "bronze.loan_contracts", 
             'collections' : "gold.loan_contracts"} },
-    'qas': {
-    } 
+    'qas': { 
+    }  
 } 
+                                    
+DBKS_TABLES = {          
+    'dev': {
+        'brz_persons' : {
+            'name'  : 'din_clients.brz_ops_persons_set', 
+            'location' : "ops/core-banking/batch-updates/persons-set"},                       
+        'brz_loans' : {
+            'name'  : 'nayru_accounts.brz_ops_loan_contracts', 
+            'location' : "ops/core-banking/batch-updates/loan-contracts"}, 
+        'names' : {
+            'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
+            'brz_persons'         : 'din_clients.brz_ops_persons_set',        
+            'brz_loan_balances'   : 'bronze.loan_balances', 
+            'brz_loan_open_items' : 'bronze.loan_open_items',  
+            'brz_loan_payments'   : 'bronze.loan_payment_plans',
+            'slv_persons'         : 'silver.persons_set',
+            'slv_loan_payments'   : 'silver.loan_payment_plans',
+            'slv_loan_balances'   : 'silver.loan_balances',
+            'slv_loans'           : 'silver.loan_contracts',
+            'slv_loan_open_items' : 'silver.loan_open_items',
+            'slv_promises'        : 'silver.zendesk_promises', 
+            'gld_loans'           : 'gold.loan_contracts'} }, 
+    'qas': {
+        'brz_persons' : {
+            'name'  : "din_clients.brz_ops_persons_set", 
+            'location' : "ops/core-banking/batch-updates/persons-set"},
+        'brz_loans' : {
+            'name'  : "nayru_accounts.brz_ops_loan_contracts", 
+            'location' : "ops/core-banking/batch-updates/loan-contracts"}
+} }
 
-    
 
 class ConfigEnviron():
     '''
@@ -246,9 +269,3 @@ class ConfigEnviron():
         elif self.server in ['wap']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
-    
-    
-    
-
-        
-        

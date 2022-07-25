@@ -46,7 +46,7 @@ class AzureResourcer():
             pre_confs = {
                 f"fs.azure.account.auth.type.{blob_key}.dfs.core.windows.net"           : 'OAuth',
                 f"fs.azure.account.oauth.provider.type.{blob_key}.dfs.core.windows.net" : "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
-                f"fs.azure.account.oauth2.endpoint.{blob_key}.dfs.core.windows.net"     : oauth2_endpoint,
+                f"fs.azure.account.oauth2.client.endpoint.{blob_key}.dfs.core.windows.net"     : oauth2_endpoint,
                 f"fs.azure.account.oauth2.client.id.{blob_key}.dfs.core.windows.net"    : sp_items['client_id'],
                 f"fs.azure.account.oauth2.client.secret.{blob_key}.dfs.core.windows.net": sp_items['client_secret']}
         elif gen_value == 'gen1': 

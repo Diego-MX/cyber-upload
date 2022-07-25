@@ -1,11 +1,15 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC ## Acerca de
+# MAGIC ## Acerca de:
 # MAGIC Este _notebook_ fue escrito originalmente por Jacob.  
 # MAGIC Para llevarlo de DEV a QAs, se le hicieron algunas factorizaciones:  
 # MAGIC - Indicar tablas en un diccionario inicial.  
 # MAGIC - Agrupar el código por celdas de acuerdo a las tablas que se procesan.
-# MAGIC - Continuar 
+# MAGIC - Encadenar las instrucciones de las tablas en una sola, cuando es posible. 
+
+# COMMAND ----------
+
+# MAGIC %pip install -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
@@ -13,22 +17,18 @@ from pyspark.sql import functions as F, types as T, Window as W
 from datetime import datetime as dt
 import re
 
-# COMMAND ----------
+from src.platform_resources import AzureResourcer
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 
-tables = {
-    'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
-    'brz_persons'         : 'din_clients.brz_ops_persons_set',        
-    'brz_loan_balances'   : 'bronze.loan_balances', 
-    'brz_loan_open_items' : 'bronze.loan_open_items',  
-    'brz_loan_payments'   : 'bronze.loan_payment_plans',
-    'slv_persons'         : 'silver.persons_set',
-    'slv_loan_payments'   : 'silver.loan_payment_plans',
-    'slv_loan_balances'   : 'silver.loan_balances',
-    'slv_loans'           : 'silver.loan_contracts',
-    'slv_loan_open_items' : 'silver.loan_open_items',
-    'slv_promises'        : 'silver.zendesk_promises', 
-    'gld_loans'           : 'gold.loan_contracts'
-} 
+
+tables = DBKS_TABLES[ENV]['names']
+app_environ = ConfigEnviron(ENV, SERVER, spark)
+az_manager  = AzureResourcer(app_environ)
+
+at_storage = az_manager.get_storage()
+az_manager.set_dbks_permissions(at_storage)
+base_location = f"abfss://{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
+
 
 # COMMAND ----------
 
@@ -98,7 +98,8 @@ udf_ra          = udf(real_amount, T.DoubleType())
 # Person Set
 
 person_cols = ['FirstName', 'LastName', 'LastName2', 
-    'AddressRegion', 'AddressCity', 'AddressDistrictName', 'AddressStreet', 'AddressHouseID', 'AddressPostalCode', 
+    'AddressRegion', 'AddressCity', 'AddressDistrictName', 
+    'AddressStreet', 'AddressHouseID', 'AddressPostalCode', 
     'Gender', 'PhoneNumber', 'ID']
 
 person_silver = spark.read.table(tables['slv_persons'])
@@ -290,7 +291,7 @@ payment_cols = ['ItemID', 'ContractID', 'Date', 'Category', 'Amount', 'PaymentPl
 loan_payment_0 = (spark.read.table(tables['brz_loan_payments'])
     .select(*payment_cols)
     .filter(F.col('Category') == 1)
-    .withColumn('Date', date_format_udf(F.col('Date')))
+    .withColumn('Date',  date_format_udf(F.col('Date')))
     .withColumn('PaymentPlanTS', F.col('PaymentPlanTS').cast(T.DateType()))
     .withColumn('Amount',        F.col('Amount'  ).cast(T.DoubleType()))
     .withColumn('Category',      F.col('Category').cast(T.IntegerType()))

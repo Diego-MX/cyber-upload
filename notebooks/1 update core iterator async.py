@@ -14,20 +14,22 @@ from time import time
 import pandas as pd
 from itertools import product
 from collections import Counter
-from pyspark.sql import functions as F, types as T
-from pyspark.sql.window import Window
+from pyspark.sql import functions as F, types as T, Window as W
 
 import asyncio
 from httpx import Limits, Timeout
-from config import ConfigEnviron, ENV, SERVER
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 from src.platform_resources import AzureResourcer
 from src.core_banking import SAPSessionAsync
+
    
 secretter = ConfigEnviron(ENV, SERVER, spark=spark)
 azure_getter = AzureResourcer(secretter)
 
 api_types = ['open_items', 'payment_plan', 'balances']
 loans_ids = spark.table('bronze.loan_contracts').select('ID').toPandas()['ID'].tolist()
+
+tables = DBKS_TABLES[ENV]['names']
 
 
 # COMMAND ----------
@@ -114,37 +116,37 @@ balances_spk = spark.createDataFrame(balances_df)
 openitems_spk = spark.createDataFrame(openitems_df)
 pymntplans_spk = spark.createDataFrame(pymntplans_df)
 
-balances_spk.write.mode("append").saveAsTable("bronze.loan_balances_history")
-openitems_spk.write.mode("append").saveAsTable("bronze.loan_open_items_history")
-pymntplans_spk.write.mode("append").saveAsTable("bronze.loan_payment_plans_history")
+balances_spk.write.mode("append").saveAsTable(f"{tables['brz_loan_balances']}_history")
+openitems_spk.write.mode("append").saveAsTable(f"{tables['brz_loan_open_items']}_history")
+pymntplans_spk.write.mode("append").saveAsTable(f"{tables['brz_loan_payments']}_history")
 
 
 # COMMAND ----------
 
 # ID, CODE
 balances_user = (balances_spk
-    .withColumn('maxTS', F.max('balancesTS').over(Window.partitionBy(['ID', 'code'])))
+    .withColumn('maxTS', F.max('balancesTS').over(W.partitionBy(['ID', 'code'])))
     .filter(F.col('BalancesTS') == F.col('maxTS'))
     .withColumn('balancesTS', F.substring('balancesTS', 0, 10))
     .drop('maxTS'))
 
 # ContractID, DueDate, ReceivableType
 openitems_user = (openitems_spk
-    .withColumn('maxTS', F.max('OpenItemTS').over(Window.partitionBy(['ContractID', 'DueDate', 'ReceivableType'])))
+    .withColumn('maxTS', F.max('OpenItemTS').over(W.partitionBy(['ContractID', 'DueDate', 'ReceivableType'])))
     .filter(F.col('OpenItemTS') == F.col('maxTS'))
     .withColumn('OpenItemTS', F.substring('OpenItemTS', 0, 10))
     .drop('maxTS'))
 
 # ContractID, Category
 pymntplans_user = (pymntplans_spk
-    .withColumn('maxTS', F.max('PaymentPlanTS').over(Window.partitionBy(['ContractID', 'Category'])))
+    .withColumn('maxTS', F.max('PaymentPlanTS').over(W.partitionBy(['ContractID', 'Category'])))
     .filter(F.col('PaymentPlanTS') == F.col('maxTS'))
     .withColumn('PaymentPlanTS', F.substring('PaymentPlanTS', 0, 10))
     .drop('maxTS'))
 
 # COMMAND ----------
 
-balances_user.write.mode("overwrite").saveAsTable("bronze.loan_balances")
-openitems_user.write.mode("overwrite").saveAsTable("bronze.loan_open_items")
-pymntplans_user.write.mode("overwrite").saveAsTable("bronze.loan_payment_plans")
+balances_user.write.mode('overwrite').saveAsTable(tables['brz_loan_balances'])
+openitems_user.write.mode('overwrite').saveAsTable(tables['brz_loan_open_items'])
+pymntplans_user.write.mode('overwrite').saveAsTable(tables['brz_loan_payments'])
 
