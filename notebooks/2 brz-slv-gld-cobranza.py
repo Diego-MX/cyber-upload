@@ -9,26 +9,25 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -r ../reqs_dbks.txt
+
+# COMMAND ----------
+
 from pyspark.sql import functions as F, types as T, Window as W
 from datetime import datetime as dt
 import re
 
-# COMMAND ----------
+from src.platform_resources import AzureResourcer
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 
-tables = {
-    'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
-    'brz_persons'         : 'din_clients.brz_ops_persons_set',        
-    'brz_loan_balances'   : 'bronze.loan_balances', 
-    'brz_loan_open_items' : 'bronze.loan_open_items',  
-    'brz_loan_payments'   : 'bronze.loan_payment_plans',
-    'slv_persons'         : 'silver.persons_set',
-    'slv_loan_payments'   : 'silver.loan_payment_plans',
-    'slv_loan_balances'   : 'silver.loan_balances',
-    'slv_loans'           : 'silver.loan_contracts',
-    'slv_loan_open_items' : 'silver.loan_open_items',
-    'slv_promises'        : 'silver.zendesk_promises', 
-    'gld_loans'           : 'gold.loan_contracts'
-} 
+
+tables = DBKS_TABLES[ENV]['names']
+app_environ = ConfigEnviron(ENV, SERVER, spark)
+az_manager  = AzureResourcer(app_environ)
+
+at_storage = az_manager.get_storage()
+az_manager.set_dbks_permissions(at_storage)
+base_location = f"abfss://{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
 
 # COMMAND ----------
 
@@ -172,7 +171,7 @@ ord_comisiones = (ord_interes_df
     .join(other=comisiones_df, how='inner', on=ord_interes_df.ID == comisiones_df.ID)
     .select(ord_interes_df.ID, ord_interes_df.ord_interes, comisiones_df.comisiones))
 
-loan_balance_df = (ord_comisiones
+loan_balance_1 = (ord_comisiones
     .join(other=monto_principal_df, how='inner',
           on=ord_comisiones.ID == monto_principal_df.ID)
     .select(ord_comisiones.ID, ord_comisiones.ord_interes,
@@ -180,9 +179,9 @@ loan_balance_df = (ord_comisiones
 
 two_columns = ['ord_interes', 'comisiones']
 
-loan_balance_1 = loan_balance_0
+loan_balance_2 = loan_balance_1
 for a_col in two_columns:
-    loan_balance_1 = loan_balance_1.withColumn(a_col, F.abs(F.col(a_col)))
+    loan_balance_2 = loan_balance_2.withColumn(a_col, F.abs(F.col(a_col)))
     
 loan_balance_df = (loan_balance_1
     .withColumn('monto_liquidacion', F.col('comisiones') + F.col('ord_interes') + F.col('monto_principal')))

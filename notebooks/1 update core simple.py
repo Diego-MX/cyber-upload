@@ -24,12 +24,10 @@
 
 persons_dict = {
     'name'  : "din_clients.brz_ops_persons_set", 
-    'stage' : "bronze",
     'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/persons-set"}
 
 loans_dict = {
     'name'  : "nayru_accounts.brz_ops_loan_contracts", 
-    'stage' : "bronze",
     'location' : "stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts"}
 
 # COMMAND ----------
@@ -55,17 +53,17 @@ loans_spk = spark.createDataFrame(loans_df)
 # COMMAND ----------
 
 first_time = False 
-loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";"""
+loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://bronze@{location}";"""
 
 if first_time: 
     (persons_spk.write
          .format('delta').mode('overwrite')
-         .save(f"abfss://{persons_dict['stage']}@{persons_dict['location']}"))
+         .save(f"abfss://bronze@{persons_dict['location']}"))
     spark.sql(loc_2_delta.format(**persons_dict))
     
     (loans_spk.write
          .format('delta').mode('overwrite')
-         .save(f"abfss://{loans_dict['stage']}@{loans_dict['location']}"))
+         .save(f"abfss://bronze@{loans_dict['location']}"))
     spark.sql(loc_2_delta.format(**loans_dict))
 
 else: 
