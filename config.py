@@ -211,40 +211,6 @@ DBKS_TABLES = {
             'location' : "ops/core-banking/batch-updates/loan-contracts"}
 } }
 
-<<<<<<< HEAD
-=======
-    
-DBKS_TABLES = {          
-    'dev': {
-        'brz_persons' : {
-            'name'  : 'din_clients.brz_ops_persons_set', 
-            'location' : "ops/core-banking/batch-updates/persons-set"},                       
-        'brz_loans' : {
-            'name'  : 'nayru_accounts.brz_ops_loan_contracts', 
-            'location' : "ops/core-banking/batch-updates/loan-contracts"}, 
-        'names' : {
-            'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
-            'brz_persons'         : 'din_clients.brz_ops_persons_set',        
-            'brz_loan_balances'   : 'bronze.loan_balances', 
-            'brz_loan_open_items' : 'bronze.loan_open_items',  
-            'brz_loan_payments'   : 'bronze.loan_payment_plans',
-            'slv_persons'         : 'silver.persons_set',
-            'slv_loan_payments'   : 'silver.loan_payment_plans',
-            'slv_loan_balances'   : 'silver.loan_balances',
-            'slv_loans'           : 'silver.loan_contracts',
-            'slv_loan_open_items' : 'silver.loan_open_items',
-            'slv_promises'        : 'silver.zendesk_promises', 
-            'gld_loans'           : 'gold.loan_contracts'} }, 
-    'qas': {
-        'brz_persons' : {
-            'name'  : "din_clients.brz_ops_persons_set", 
-            'location' : "ops/core-banking/batch-updates/persons-set"},
-        'brz_loans' : {
-            'name'  : "nayru_accounts.brz_ops_loan_contracts", 
-            'location' : "ops/core-banking/batch-updates/loan-contracts"}
-} }
-
->>>>>>> c33affa886675e08863d4e126ea17bc7e6e51bd6
 
 class ConfigEnviron():
     '''
