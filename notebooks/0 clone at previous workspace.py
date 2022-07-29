@@ -49,11 +49,8 @@ for tbl_key in set(tbl_items).difference(exclude_tbls):
     tbl_loctn = f"{abfss_dir}/{delta}"
     sql_clause = create_clause.format(tbl_loctn, old_name) 
     print(sql_clause)
-    spark.sql(sql_clause)
-
+    try: 
+        spark.sql(sql_clause)
+    except Exception: 
+        pass
     
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC ALTER TABLE gold.loan_contracts SET LOCATION 'abfss://gold@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts';

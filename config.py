@@ -203,8 +203,8 @@ DBKS_TABLES = {
                 ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
             'slv_promises'        : 
                 ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
-            'gld_loans'           : 
-                ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
+            'gld_loans'           : # Esta no se puede cambiar, porque es donde apunta el WEBAPP. 
+                ('gold.loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
         'names' : {
             'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
             'brz_persons'         : 'din_clients.brz_ops_persons_set',        

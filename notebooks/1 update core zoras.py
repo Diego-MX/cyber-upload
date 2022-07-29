@@ -2,19 +2,14 @@
 # MAGIC %md 
 # MAGIC ## Description
 # MAGIC 
-# MAGIC This notebook is tied to Databricks job that runs every hour.   
-# MAGIC 0. Preparation of variables `ENV_TYPE` (`dev`, `qas`, `stg`, ...) and `SERVER_TYPE` (`dbks`, `local`, `wap`).  
-# MAGIC    This is usually done at a server level, but can also be handled in a script or notebook.  
-# MAGIC    `import os; os.environ['ENV_TYPE'] = 'qas'`
+# MAGIC This is a copy of notebook `1 update core simple`.  
+# MAGIC Due to technical consistency (unfortunately) and can only be executed in the original Zoras workspace in its corresponding cluster. 
 # MAGIC 
-# MAGIC 1. Check `config.py` for configuration options.  As may be anticipated, some depend on `ENV_TYPE` and `SERVER_TYPE`.  
-# MAGIC    One thing to note, the service principal in `SETUP_KEYS` must have been previously given access to the resources in `PLATFORM_KEYS`.  
-# MAGIC    Moreover, specific resource configuration may need to be handled along the way;  
-# MAGIC    Eg.1 Key Vault Access Policies for the service principal to read secrets.  
-# MAGIC    Eg.2 May require fine grained permissions in datalake. 
-# MAGIC 
-# MAGIC 2. Object classes `SAPSession`, `AzureResourcer`, `ConfigEnviron` use `config.py` under the hood.  
-# MAGIC     ... and so does this notebook.  
+# MAGIC After moving `Person Set` and `Loan Contract` to both metastore/datalake and QAs, there was rupture in the data tables.  
+# MAGIC The purpose of this notebook is to allow us to temporarily set back the previous changes, for the big event of Collections Testing.  
+# MAGIC The only difference between this and its original, is the writing location of the tables.  
+# MAGIC That is to say, this writes them as tables persé and in the cluster corresponding to DBFS;  
+# MAGIC whereas the newer modified one writes them directly in their delta location in the datalake.   
 
 # COMMAND ----------
 
@@ -34,7 +29,7 @@ core_session = SAPSession('qas-sap', az_manager)
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
 
-at_base = DBKS_TABLES[ENV]['base']
+at_base     = DBKS_TABLES[ENV]['base']
 table_items = DBKS_TABLES[ENV]['items'] 
 
 
@@ -66,12 +61,12 @@ loans_spk = spark.createDataFrame(loans_df)
 (persons_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
-    .save(f"{abfss_loc}/{table_items['brz_persons'][1]}"))
+    .saveAsTable(table_items['brz_persons'][2]")
 
 (loans_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
-    .save(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
+    .save(f"{abfss_loc}/{table_items['brz_loans'][2]}"))
 
 if first_time: 
     set_table_delta(persons_dict, spark)
