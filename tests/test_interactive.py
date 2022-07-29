@@ -4,11 +4,6 @@ from pyspark.sql import functions as F, types as T, Window as W
 
 # COMMAND ----------
 
-# MAGIC %sql 
-# MAGIC DESCRIBE TABLE EXTENDED gold.loan_contracts
-
-# COMMAND ----------
-
 gold_loans  = spark.read.table('gold.loan_contracts')
 display(gold_loans)
  
