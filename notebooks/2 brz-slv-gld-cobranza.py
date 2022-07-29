@@ -352,6 +352,15 @@ overwrite_dataframe(loan_open_df,     tables['slv_loan_open_items'])
 
 # COMMAND ----------
 
+tables['slv_persons']
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC DESCRIBE TABLE EXTENDED silver.persons_set
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC 
 # MAGIC # Silver 🥈 to Gold 🥇
