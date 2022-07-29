@@ -1,15 +1,11 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC ## Acerca de:
-# MAGIC Este _notebook_ fue escrito originalmente por Jacob.  
-# MAGIC Para llevarlo de DEV a QAs, se le hicieron algunas factorizaciones:  
-# MAGIC - Indicar tablas en un diccionario inicial.  
+# MAGIC Este _notebook_ fue escrito originalmente por Jacobo.  
+# MAGIC Para llevarlo de DEV a QAs, le hice (Diego) algunas factorizaciones:  
+# MAGIC - Indicar tablas a partir de un diccionario en `CONFIG.PY`.  
 # MAGIC - Agrupar el código por celdas de acuerdo a las tablas que se procesan.
 # MAGIC - Encadenar las instrucciones de las tablas en una sola, cuando es posible. 
-
-# COMMAND ----------
-
-# MAGIC %pip install -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
@@ -31,7 +27,9 @@ az_manager  = AzureResourcer(app_environ)
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
-base_location = f"abfss://{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
+
+# Sustituye el placeholder AT_STORAGE, aunque mantiene STAGE para sustituirse después. 
+base_location = f"abfss://{{stage}}@{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
 
 
 # COMMAND ----------
@@ -112,7 +110,7 @@ person_set_0 = (spark.read.table(tables['brz_persons'])
     .select(*person_cols)
     .withColumnRenamed('PhoneNumber', 'phone_number')
     .withColumn('LastName2', segregate_udf(F.col('LastName'), F.lit(1)))
-    .withColumn('LastName', segregate_udf(F.col('LastName'), F.lit(0)))
+    .withColumn('LastName', segregate_udf(F.col('LastName'),  F.lit(0)))
     .withColumn('phone_number', F.col('phone_number').cast(T.LongType()))
     .dropDuplicates())
 

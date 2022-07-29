@@ -8,6 +8,12 @@
 
 # COMMAND ----------
 
+from importlib import reload
+import config
+reload(config)
+
+# COMMAND ----------
+
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
@@ -22,17 +28,14 @@ az_manager.set_dbks_permissions(at_storage)
 
 # COMMAND ----------
 
-from importlib import reload
-import config
-reload(config)
-
-# COMMAND ----------
-
-exclude_tbls = set('slv_promises')
+exclude_tbls = set(['slv_promises', 'brz_persons'])
 
 base_dir = DBKS_TABLES[ENV]['base']  # {stage} : checkout placeholder. 
 
-create_clause = 'CREATE TABLE IF NOT EXISTS delta.`{}` CLONE {}'
+
+# ... IF NOT EXISTS ... no funciona con tablas (datalake + metastore)
+create_clause = "CREATE TABLE IF NOT EXISTS delta.`{}` CLONE {}"
+alter_clause = "ALTER TABLE {} SET LOCATION '{}'"
 
 stage_keys = {
     'brz': 'bronze',
@@ -47,10 +50,12 @@ for tbl_key in set(tbl_items).difference(exclude_tbls):
     name, delta, old_name = tbl_items[tbl_key]
     abfss_dir = base_dir.format(stage=stage_keys[tbl_key[0:3]])
     tbl_loctn = f"{abfss_dir}/{delta}"
-    sql_clause = create_clause.format(tbl_loctn, old_name) 
-    print(sql_clause)
+    sql_create = create_clause.format(tbl_loctn, old_name) 
+    sql_alter = alter_clause.format(old_name, tbl_loctn)
+    print(sql_alter)
     try: 
-        spark.sql(sql_clause)
+        spark.sql(sql_alter)
     except Exception: 
         pass
+
     
