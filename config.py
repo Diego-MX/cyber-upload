@@ -223,8 +223,8 @@ class ConfigEnviron():
     def __init__(self, env_type, server, spark=None):
         self.env = env_type
         self.spark = spark
-        self.config = SETUP_KEYS[env_type]
         self.server = server
+        self.config = SETUP_KEYS[env_type]
         self.set_secret_getter()
         self.set_credential()
 
