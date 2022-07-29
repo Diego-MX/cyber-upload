@@ -18,7 +18,6 @@ ENV = environ.get('ENV_TYPE', environ.get('ENV', 'qas'))        # dev, qas, stg,
 SERVER = environ.get('SERVER_TYPE', 'wap')  # dbks, local, wap. 
 
 
-
 PAGE_MAX = 1000
 
 SETUP_KEYS = {
@@ -157,7 +156,6 @@ CRM_KEYS = {
             'filters'  : ("sunshine/objects/records",
                     "services/zis/inbound_webhooks/generic/ingest") } }}
 
-
 DBKS_KEYS = {
     'dev': {
         'connect': {
@@ -183,12 +181,30 @@ DBKS_KEYS = {
                                     
 DBKS_TABLES = {          
     'dev': {
-        'brz_persons' : {
-            'name'  : 'din_clients.brz_ops_persons_set', 
-            'location' : "ops/core-banking/batch-updates/persons-set"},                       
-        'brz_loans' : {
-            'name'  : 'nayru_accounts.brz_ops_loan_contracts', 
-            'location' : "ops/core-banking/batch-updates/loan-contracts"}, 
+        'base' : 'abfss://{stage}@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates',
+        'items': {  # table, location, old
+            'brz_persons'         : 
+                ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),
+            'brz_loans'           : 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts', 'bronze.loan_contracts'), 
+            'brz_loan_balances'   : 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances',  'bronze.loan_balances'), 
+            'brz_loan_open_items' : 
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items', 'bronze.loan_open_items'),  
+            'brz_loan_payments'   : 
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
+            'slv_persons'         : 
+                ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
+            'slv_loan_balances'   : 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances',  'silver.loan_balances'), 
+            'slv_loan_open_items' : 
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items', 'silver.loan_open_items'),  
+            'slv_loan_payments'   : 
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
+            'slv_promises'        : 
+                ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
+            'gld_loans'           : 
+                ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
         'names' : {
             'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
             'brz_persons'         : 'din_clients.brz_ops_persons_set',        
@@ -215,7 +231,7 @@ DBKS_TABLES = {
 class ConfigEnviron():
     '''
     This class sets up the initial authentication object.  It reads its 
-    ENV_TYPE (or stage) [dev,qas,prod] and SERVER(_TYPE) (local,dbks,wap). 
+    ENV_TYPE or cycle [dev,qas,prod] and SERVER(_TYPE) (local,dbks,wap). 
     And from then establishes its first secret-getter in order to later 
     establish its identity wether by a managed identity or service principal.  
     From then on, use PlatformResourcer to access other resources. 
