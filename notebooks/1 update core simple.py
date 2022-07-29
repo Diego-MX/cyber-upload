@@ -20,7 +20,6 @@
 
 # MAGIC %pip install -r ../reqs_dbks.txt
 
-
 # COMMAND ----------
 
 from datetime import datetime as dt
@@ -34,17 +33,24 @@ core_session = SAPSession('qas-sap', az_manager)
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
-base_location = f"abfss://{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
+
+base_location = f"abfss://bronze@{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
 
 
 # COMMAND ----------
+
+at_storage = az_manager.get_storage() # Just ... again. 
 
 first_time = False 
 
 persons_dict = DBKS_TABLES[ENV]['brz_persons']
 loans_dict   = DBKS_TABLES[ENV]['brz_loans']
 
-loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://bronze@{location}";"""
+def set_table_delta(a_dict, spk_session):
+    abfss_loc = f"abfss://bronze@{at_storage}.dfs.core.windows.net/{a_dict['location']}"
+    the_clause = f"CREATE TABLE {a_dict['name']} USING DELTA LOCATION \"{abfss_loc}\";"
+    spk_session.sql(the_clause)
+
 
 # COMMAND ----------
 
@@ -57,30 +63,18 @@ loans_spk = spark.createDataFrame(loans_df)
 
 # COMMAND ----------
 
-first_time = False 
-az_storage = az_manager.get_storage()
+(persons_spk.write
+    .format('delta').mode('overwrite')
+    .option('overwriteSchema', True)
+    .save(f"abfss://bronze@{at_storage}.dfs.core.windows.net/{persons_dict['location']}"))
 
-loc_2_delta = """CREATE TABLE {name} USING DELTA LOCATION "abfss://bronze@{az_storage}.dfs.core.windows.net/{location}";"""
+(loans_spk.write
+    .format('delta').mode('overwrite')
+    .option('overwriteSchema', True)
+    .save(f"abfss://bronze@{at_storage}.dfs.core.windows.net/{loans_dict['location']}"))
 
 if first_time: 
-    (persons_spk.write
-         .format('delta').mode('overwrite')
-         .save(f"abfss://bronze@{persons_dict['location']}"))
-    spark.sql(loc_2_delta.format(**persons_dict))
-    
-    (loans_spk.write
-         .format('delta').mode('overwrite')
-         .save(f"abfss://bronze@{loans_dict['location']}"))
-    spark.sql(loc_2_delta.format(**loans_dict))
-
-else: 
-    (persons_spk.write
-        .format('delta').mode('overwrite')
-        .option('overwriteSchema', True)
-        .save(f"abfss://bronze@{az_storage}.dfs.core.windows.net/{persons_dict['location']}"))
-              
-    (loans_spk.write
-        .format('delta').mode('overwrite')
-        .option('overwriteSchema', True)
-        .save(f"abfss://bronze@{az_storage}.dfs.core.windows.net/{loans_dict['location']}"))
+    set_table_delta(persons_dict)
+    set_table_delta(loans_dict  )
+ 
 
