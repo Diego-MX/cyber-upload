@@ -61,6 +61,12 @@ loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
 
 
+
+
+# COMMAND ----------
+
+f"{abfss_loc}/{table_items['brz_persons'][1]}"
+
 # COMMAND ----------
 
 (persons_spk.write

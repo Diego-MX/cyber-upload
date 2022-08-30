@@ -22,22 +22,20 @@
 
 # COMMAND ----------
 
-### Erase on working code. 
 from importlib import reload
 from src import core_banking
-import config
-reload(config)
 reload(core_banking)
-### End of erase section. 
 
 from datetime import datetime as dt, timedelta as delta
-from src.core_banking import SAPSession, update_dataframe
+from src.core_banking import SAPSession, update_dataframe, create_delta
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
-az_manager  = AzureResourcer(app_environ)
+az_manager = AzureResourcer(app_environ)
 core_session = SAPSession('qas-sap', az_manager)
+
+spark.conf.set('spark.databricks.delta.schema.autoMerge.enabled', 'true')
 
 # COMMAND ----------
 
@@ -69,41 +67,52 @@ txns_dict = {
     'stage'    : "bronze",
     'location' : f"{base_location}/transactions"}
 
-loc_2_delta = (lambda a_dict: 
-    """CREATE TABLE {name} USING DELTA LOCATION "abfss://{stage}@{location}";""".format(**a_dict))
-
-# COMMAND ----------
-
-# It's run every hour, but give we give it some room. 
-prev_update = dt.now() - delta(hours=3)
-
-# , events_df
-(data_df, meta_df) = core_session.get_events(
-    event_type='transactions', date_lim=prev_update, output='WithMetadata')
-
-# COMMAND ----------
-
-display(meta_df)
-        
-
-# COMMAND ----------
-
-txns_path   = f"abfss://{txns_dict['stage']}@{txns_dict['location']}"
 events_path = f"abfss://{events_dict['stage']}@{events_dict['location']}"
 
+# It's run every hour, but give we give it some room. 
+prev_update = dt.now() - delta(days=10)
+
+# COMMAND ----------
+
+print(data_df.text)
+
+# COMMAND ----------
+
+accounts_path   = f"abfss://{accounts_dict['stage']}@{accounts_dict['location']}"
+
+data_df = core_session.get_events(
+    event_type='accounts', date_lim=prev_update, output='Response')
+
+
+
+# COMMAND ----------
+
+persons_path   = f"abfss://{persons_dict['stage']}@{persons_dict['location']}"
+
+(data_df, events_df) = core_session.get_events(
+    event_type='persons', date_lim=prev_update, output='WithMetadata')
+
+update_dataframe(spark, data_df, persons_path, 'ID')
+
+update_dataframe(spark, events_df, events_path, 'EventID')
+
+# COMMAND ----------
+
+print(data_df.columns)
+print(older.columns)
+
+# COMMAND ----------
+
+txns_path = f"abfss://{txns_dict['stage']}@{txns_dict['location']}"
+
+(data_df, events_df) = core_session.get_events(
+    event_type='transactions', date_lim=prev_update, output='WithMetadata')
+
 update_dataframe(spark, data_df, txns_path, 'TransactionID')
+
 update_dataframe(spark, events_df, events_path, 'EventID')
 
 
 # COMMAND ----------
 
-first_time = False  # Create Table
-if first_time: 
-    data_spk = spark.createDataFrame(events_df)
-    
-    (data_spk.write
-         .format('delta').mode('overwrite')
-         .save(f"abfss://{events_dict['stage']}@{events_dict['location']}"))
-    
-    spark.sql(loc_2_delta(events_dict))
-    
+data_df

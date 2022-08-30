@@ -4,7 +4,7 @@
 # MAGIC 
 # MAGIC Al crear las tablas Δ, no se había puesto atención en la ubicación física... (que no es tan física, pero es lo más físico a lo que aspiran las ubicaciones de tablas).  
 # MAGIC Después de algunos meses se descubrió que tienen que estar en cierta ubicación.  
-# MAGIC En este _notebook_ movemos las tablas al Lake Hylia. 
+# MAGIC En este _notebook_ movemos las tablas al Lago Hylia. 
 
 # COMMAND ----------
 

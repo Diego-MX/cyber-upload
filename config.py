@@ -203,11 +203,11 @@ DBKS_TABLES = {
                 ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
             'slv_promises'        : 
                 ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
-            'gld_loans'           : # Esta no se puede cambiar, porque es donde apunta el WEBAPP. 
-                ('gold.loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
+            'gld_loans'           : 
+                ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
         'names' : {
-            'brz_loans'           : 'nayru_accounts.brz_ops_loan_contracts', 
-            'brz_persons'         : 'din_clients.brz_ops_persons_set',        
+            'brz_persons'         : 'bronze.persons_set', 
+            'brz_loans'           : 'bronze.loan_contracts',        
             'brz_loan_balances'   : 'bronze.loan_balances', 
             'brz_loan_open_items' : 'bronze.loan_open_items',  
             'brz_loan_payments'   : 'bronze.loan_payment_plans',
@@ -247,7 +247,7 @@ class ConfigEnviron():
     def set_secret_getter(self): 
         if  self.server == 'local':
             if load_dotenv is None: 
-                raise("Failed to load library DOTENV.")
+                raise Exception("Failed to load library DOTENV.")
             load_dotenv('.env', override=True)        
             def get_secret(key): 
                 mod_key = re.sub('-', '_', key.upper())

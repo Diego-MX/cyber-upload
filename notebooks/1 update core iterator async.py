@@ -10,6 +10,7 @@
 
 # COMMAND ----------
 
+from datetime import datetime as dt
 from time import time
 import pandas as pd
 from itertools import product
@@ -23,13 +24,19 @@ from src.platform_resources import AzureResourcer
 from src.core_banking import SAPSessionAsync
 
    
-secretter = ConfigEnviron(ENV, SERVER, spark=spark)
+secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
 
 api_types = ['open_items', 'payment_plan', 'balances']
 loans_ids = spark.table('bronze.loan_contracts').select('ID').toPandas()['ID'].tolist()
 
-tables = DBKS_TABLES[ENV]['names']
+
+at_storage = azure_getter.get_storage()
+azure_getter.set_dbks_permissions(at_storage)
+
+at_base     = DBKS_TABLES[ENV]['base']
+table_items = DBKS_TABLES[ENV]['items'] 
+tables      = DBKS_TABLES[ENV]['names']
 
 
 # COMMAND ----------
