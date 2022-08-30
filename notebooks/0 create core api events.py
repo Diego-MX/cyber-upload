@@ -8,7 +8,6 @@
 
 # COMMAND ----------
 
-from json import dumps
 from importlib import reload
 from src import core_banking
 import config
@@ -20,7 +19,7 @@ reload(config)
 import pandas as pd
 from datetime import datetime as dt, timedelta as delta, date
 from delta.tables import DeltaTable
-
+from json import dumps
 from src.core_banking import SAPSession, update_dataframe, str_error
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER

@@ -13,6 +13,7 @@
 
 # COMMAND ----------
 
+import pandas as pd
 from pyspark.sql import functions as F, types as T, Window as W
 from datetime import datetime as dt
 import re
@@ -30,6 +31,11 @@ az_manager.set_dbks_permissions(at_storage)
 # Sustituye el placeholder AT_STORAGE, aunque mantiene STAGE para sustituirse después. 
 base_location = f"abfss://{{stage}}@{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
 
+
+# COMMAND ----------
+
+sap_cols = pd.read_feather("../refs/catalogs/cyber_columns.feather")
+sap_cols
 
 # COMMAND ----------
 

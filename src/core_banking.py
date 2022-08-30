@@ -11,7 +11,7 @@ from urllib.parse import unquote
 from typing import Union
 from deepdiff import DeepDiff
 from requests import Session, auth
-from httpx import AsyncClient, Auth
+from httpx import AsyncClient, Auth as AuthX
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
@@ -30,10 +30,13 @@ def str_error(an_error):
         return str(an_error)
 
     
-def date_2_pandas(sap_srs: pd.Series) -> pd.Series:
-    dt_regex  = r"/Date\(([0-9]*)\)/"
-    epoch_srs = sap_srs.str.extract(dt_regex, expand=False)
-    pd_date   = pd.to_datetime(epoch_srs, unit='ms') 
+def date_2_pandas(sap_srs: pd.Series, mode='/Date') -> pd.Series:
+    if mode == '/Date': 
+        dt_regex  = r"/Date\(([0-9]*)\)/"
+        epoch_srs = sap_srs.str.extract(dt_regex, expand=False)
+        pd_date   = pd.to_datetime(epoch_srs, unit='ms')
+    elif mode == 'yyyymmdd': 
+        pd_date = pd.to_datetime(sap_srs, format='%Y%m%d')
     return pd_date
 
 
@@ -71,15 +74,29 @@ def datetime_2_filter(sap_dt, range_how=None) -> str:
     return sap_filter
         
 
+class BearerAuth2(auth.AuthBase, AuthX): 
+    def __init__(self, token_str): 
+        self.token = token_str 
+    
+    def auth_flow(self, a_request): 
+        a_request.headers['Authorization'] = f"Bearer {self.token}"
+        yield a_request
+        
+    def __call__(self, a_request):
+        a_request.headers['Authorization'] = f"Bearer {self.token}"
+        return a_request
+
+    
 class BearerAuth(auth.AuthBase):
     def __init__(self, token):
         self.token = token
+    
     def __call__(self, a_request):
         a_request.headers['Authorization'] = f"Bearer {self.token}"
         return a_request
 
 
-class BearerAuthX(Auth): 
+class BearerAuthX(AuthX): 
     def __init__(self, token_str): 
         self.token = token_str 
     def auth_flow(self, a_request): 
@@ -174,7 +191,7 @@ class SAPSession(Session):
                 return None
         else: 
             print(f'Number of tries ({tries}) reached.')
-            return None
+            return the_resp
         
         # From here, there is a response. 
         if output == 'Response':
@@ -182,23 +199,37 @@ class SAPSession(Session):
         
         events_ls = the_resp.json()['d']['results']
         
+        if len(events_ls) == 0: 
+            raise Exception("Response data is empty.")
+            
         data_poppers = {
-            'persons'      : {'': []}, 
+            'persons'      : {
+                'root'   : ('__metadata', 'dataOld'), 
+                'dataNew': ('__metadata', 'Correspondence', 'Relation', 
+                            'Person', 'Organisation', 'Group', 'TaxNumbers')}, 
             'accounts'     : [], 
             'transactions' : {
-                'root': ('__metadata', 'dataOld'),
+                'root'   : ('__metadata', 'dataOld'),
                 'dataNew': ('__metadata', 'PaymentNotes')}}
-        if event_type == 'persons': 
-            data_df = events_ls
-        elif event_type == 'accounts': 
-            data_df = events_ls
-        elif event_type == 'transactions': 
-            txn_data   = [an_event.pop('dataNew')   for an_event in events_ls]
-            to_discard = [a_txn.pop('__metadata')   for a_txn    in txn_data ]
-            to_discard = [a_txn.pop('PaymentNotes') for a_txn    in txn_data ]
-            data_df = pd.DataFrame(txn_data)
-        elif event_type == 'prenotes': 
-            data_df = events_ls
+        
+        
+        
+        data_ls = [an_event.pop('dataNew') for an_event in events_ls]
+        for pop_field in data_poppers[event_type]['dataNew']: 
+            to_discard = [a_data.pop(pop_field) for a_data in data_ls]
+        
+        date_cols = {
+            'persons' : {
+                '/Date': ['CreatedAtDateTime', 'LastModifyDateTime']},
+            'transactions' : {
+                'yyyymmdd': ['PostingDate', 'ValueDate']}
+        }
+        
+        data_df = (pd.DataFrame(data_ls)
+            .assign(**{dt_col: lambda df: date_2_pandas(df[dt_col], '/Date') 
+                        for dt_col in date_cols[event_type].get('/Date'   , [])})
+            .assign(**{dt_col: lambda df: date_2_pandas(df[dt_col], 'yyyymmdd') 
+                        for dt_col in date_cols[event_type].get('yyyymmdd', [])}))
         
         if output == 'DataFrame': 
             return data_df
@@ -372,18 +403,40 @@ class SAPSessionAsync(AsyncClient):
             .assign(ts_call = dt.now().strftime("%Y-%m-%d %H:%M:%S")))
         return results_df
 
-
-def update_dataframe(spark, new_df: pd.DataFrame, df_location: str, id_column: str): 
+    
+def create_delta(spark, data_df: pd.DataFrame, df_location: str, tbl_name: str): 
+    create_clause =  f"CREATE TABLE {tbl_name} USING DELTA LOCATION \"{df_location}\""
+    data_spk = spark.createDataFrame(data_df)
+    (data_spk.write
+         .format('delta')
+         .save(df_location))
+    
+    spark.sql(create_clause)
+    
+    
+def update_dataframe(spark, new_df: pd.DataFrame, df_location: str, id_column: str, dev=False): 
     new_data = spark.createDataFrame(new_df)
     
     prev_data = DeltaTable.forPath(spark, df_location)
-    tbl_cols = {a_col : f'new.{a_col}' for a_col in new_data.columns}
-
-    (prev_data.alias('prev')
-        .merge(new_data.alias('new'), f"prev.{id_column} = new.{id_column}")
-        .whenMatchedUpdate(set = tbl_cols)
-        .whenNotMatchedInsert(values = tbl_cols)
-        .execute())
+    tbl_cols = {a_col: f'new.{a_col}' for a_col in new_data.columns}
+    
+    if not dev: 
+        (prev_data.alias('prev')
+            .merge(source=new_data.alias('new'), condition=f"prev.{id_column} = new.{id_column}")
+            .whenMatchedUpdate(set=tbl_cols)
+            .whenNotMatchedInsert(values=tbl_cols)
+            .execute())
+    else: 
+        tbl_cols = {a_col: F.coalesce(f'new.{a_col}', f'prev.{a_col}')
+                for a_col in new_data.columns}
+        tbl_values = {a_col: f'new.{a_col}' for a_col in new_data.columns}
+        (prev_data.alias('prev')
+            .merge(source=new_data.alias('new'), condition=f"prev.{id_column} = new.{id_column}")
+            .whenMatchedUpdate(set=tbl_cols)
+            .whenNotMatchedInsert(values=tbl_cols)
+            .execute())
+    return True
+        
     
 
 def attributes_from_column(attrs_indicator=None) -> list:

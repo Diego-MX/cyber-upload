@@ -61,12 +61,12 @@ loans_spk = spark.createDataFrame(loans_df)
 (persons_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
-    .saveAsTable(table_items['brz_persons'][2]")
+    .saveAsTable(table_items['brz_persons'][2]))
 
 (loans_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
-    .save(f"{abfss_loc}/{table_items['brz_loans'][2]}"))
+    .saveAsTable(table_items['brz_loans'][2]))
 
 if first_time: 
     set_table_delta(persons_dict, spark)
