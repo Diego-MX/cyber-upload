@@ -8,7 +8,6 @@ import pandas as pd
 import re
 from urllib.parse import unquote
 
-from delta.tables import DeltaTable
 from typing import Union
 from deepdiff import DeepDiff
 from requests import Session, auth
@@ -18,6 +17,10 @@ from src.utilities import tools
 from src.platform_resources import AzureResourcer
 from config import CORE_KEYS, PAGE_MAX
 
+try: 
+    from delta.tables import DeltaTable
+except ImportError: 
+    DeltaTable = None
 
 def str_error(an_error): 
     try: 
@@ -483,9 +486,9 @@ if __name__ == '__main__':
     az_manager = AzureResourcer(pre_setup)
     core_runner = SAPSession('qas-sap', az_manager)
 
-    which = 'transactions'
+    which = 'accounts'
     date_from = dt.now() - delta(days=7)
-    event_resp = core_runner.get_events(which, date_from, output='Response')
+    event_resp = core_runner.get_events(which, date_from, output='Response')  # L. 123
     # (data_df, events_df) = core_runner.get_events(which, date_from, output='WithMetadata')
     
     

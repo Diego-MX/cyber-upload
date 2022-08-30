@@ -1,11 +1,38 @@
-import sys 
-import json 
 import base64
-import re
-from importlib import reload
-
-from openpyxl import load_workbook, utils as xl_utils
+import json 
 import pandas as pd
+from pathlib import WindowsPath
+import re
+import sys 
+
+#%% Optional packages. 
+try: 
+    from importlib import reload
+except ImportError:
+    reload = None
+
+try: 
+    from openpyxl import load_workbook
+    from openpyxl.utils.exceptions import InvalidFileException
+except ImportError: 
+    load_workbook = InvalidFileException = None
+
+
+#%% Define tools functions. 
+#  36 RELOAD_FROM_ASTERISK
+#  42 STR_CAMEL_TO_SNAKE
+#  49 STR_SNAKE_TO_CAMEL
+#  56 SNAKE_2_CAMEL
+#  61 SELECT_SUBDICT
+#  68 CAMELIZE_DICT
+#  85 READ_EXCEL_TABLE
+#  98 SHORTCUT_TARGET
+# 119 DICT_MINUS
+# 126 ENCODE64
+# 131 DATECOLS_TO_STR
+# 137 DATAFRAME_TO_LIST
+# 171 SET_DATAFRAME_TYPES
+# 184 CURLIFY
 
 
 def reload_from_asterisk(module):
@@ -31,8 +58,7 @@ def str_snake_to_camel(snaked:str, first_word_too=False):
 def snake_2_camel(snake_str):
     first, *others = snake_str.split('_')
     return ''.join([first.lower(), *map(str.title, others)])
-
-        
+      
 
 def select_subdict(a_dict, sub_keys):
     if not sub_keys.is_subset(a_dict.keys()):
@@ -58,37 +84,37 @@ def camelize_dict(snake_dict):
     return new_dict
 
 
-def read_excel_table(file, sheet, table): 
+def read_excel_table(file, sheet:str, table:str=None, **kwargs): 
+    if table is None: 
+        table = sheet.lower().replace(' ', '_')
+
     try:
         a_wb = load_workbook(file, data_only=True)
-    except xl_utils.exceptions.InvalidFileException: 
+    except InvalidFileException: 
         a_wb = load_workbook(shortcut_target(file), data_only=True)
     a_ws  = a_wb[sheet]
     a_tbl = a_ws.tables[table]
     
     rows_ls = [[ cell.value for cell in row ] for row in a_ws[a_tbl.ref]]
-    tbl_df  = pd.DataFrame(data=rows_ls[1:], index=None, columns=rows_ls[0])
+    tbl_df  = pd.DataFrame(data=rows_ls[1:], index=None, columns=rows_ls[0], **kwargs)
     return tbl_df
 
 
-def shortcut_target(filename, file_ext=None):
-    def ext_regex(file_ext):
-        if file_ext is None: 
-            file_ext = 'xlsx'
-        if isinstance(file_ext, str):
-            ext_reg = file_ext
-        elif isinstance(file_ext, list):
-            ext_reg = f"{'|'.join(file_ext)}"
-        else:
-            raise 'FILE_EXT format is not supported.'
-        return ext_reg
+def shortcut_target(filename, file_ext:str=None):
     
-    file_regex = fr'C:\\.*\.{ ext_regex(file_ext) }'
+    if file_ext is None: 
+        if isinstance(filename, WindowsPath): 
+            file_ext = re.findall(r"\.([A-Za-z]{3,4})\.lnk", filename.name)[0]
+        else: 
+            raise "Couldn't determine file extension."
+
+    file_regex = fr'(C:\\.*\.{file_ext})'
+
     with open(filename, 'r', encoding='ISO-8859-1') as _f: 
-        a_path = a_path = re.findall(file_regex, _f.read(), flags=re.DOTALL)
+        a_path = re.findall(file_regex, _f.read(), flags=re.DOTALL)
 
     if len(a_path) != 1: 
-        raise 'Not unique or No shortcut targets found in link.'
+        raise 'Not unique or no shortcut targets found in link.'
     return a_path[0]
 
 
@@ -155,7 +181,6 @@ def set_dataframe_types(a_df, cols_df):
     df_typed = a_df.astype(dtyped, errors='ignore')
     
     return df_typed
-
 
 
 def curlify(resp_request): 
