@@ -36,9 +36,10 @@ sap_attributes = (pre_attributes[sap_cols['columnas']]
     .replace({'tabla_origen': tables_dict}))
 
 #%% Checks
+use_rows = sap_attributes['tabla_origen'].notnull() | sap_attributes['valor_fijo'].notnull()
 non_checks = (sap_attributes
     .assign(**{'check_mandatorio': lambda df: 
-            ~df['Mandatorio'] | df['tabla_origen'].notnull()})
+            ~df['Mandatorio'] | use_rows})
     .filter(like='check', axis=1)
     .apply(lambda lgl_srs: sum(~lgl_srs), axis=0))
 
@@ -46,10 +47,9 @@ print(non_checks)
 
 #%% And print. 
 sub_columns = ['nombre', 'Posición inicial', 'longitud2', 'decimales', 'valor_fijo', 'Tipo de dato', 'tabla_origen', ]
-sub_rows = sap_attributes['tabla_origen'].notnull() | sap_attributes['valor_fijo'].notnull()
 
 post_attributes = (sap_attributes
-    .loc[sub_rows, sub_columns]
+    .loc[use_rows, sub_columns]
     .reset_index())
 post_attributes.to_feather("refs/catalogs/cyber_columns.feather")
 
