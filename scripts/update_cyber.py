@@ -46,7 +46,8 @@ non_checks = (sap_attributes
 print(non_checks)
 
 #%% And print. 
-sub_columns = ['nombre', 'Posición inicial', 'longitud2', 'decimales', 'valor_fijo', 'Tipo de dato', 'tabla_origen', ]
+sub_columns = ['nombre', 'Posición inicial', 'longitud2', 'decimales', 'valor_fijo', 
+    'Tipo de dato', 'tabla_origen', 'campo', 'calc']
 
 post_attributes = (sap_attributes
     .loc[use_rows, sub_columns]
