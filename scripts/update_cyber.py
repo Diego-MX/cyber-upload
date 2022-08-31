@@ -46,8 +46,10 @@ print(non_checks)
 
 #%% And print. 
 sub_columns = ['nombre', 'Posición inicial', 'longitud2', 'decimales', 'valor_fijo', 'Tipo de dato', 'tabla_origen', ]
+sub_rows = sap_attributes['tabla_origen'].notnull() | sap_attributes['valor_fijo'].notnull()
+
 post_attributes = (sap_attributes
-    .loc[sap_attributes['tabla_origen'].notnull(), sub_columns]
+    .loc[sub_rows, sub_columns]
     .reset_index())
 post_attributes.to_feather("refs/catalogs/cyber_columns.feather")
 
