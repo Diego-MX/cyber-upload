@@ -96,9 +96,12 @@ CORE_KEYS = {
                 'accounts'     : "v1/cac/EventSet", 
                 'transactions' : "v1/bape/EventSet", 
                 'prenotes'     : "v1/bapre/EventSet"}, 
-            'person-set'   : {'sub-url' : "v15/bp/PersonSet"},
-            'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
-            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"} } }, 
+            'person-set'       : {'sub-url' : "v15/bp/PersonSet"},
+            'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
+            'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
+        } }, 
     'qas-sap' : {
         'main' : {
             'headers' : {
@@ -121,9 +124,12 @@ CORE_KEYS = {
                 'accounts'     : "v1/cac/EventSet", 
                 'transactions' : "v1/bape/EventSet", 
                 'prenotes'     : "v1/bapre/EventSet"},
-            'contract-set' : {'sub-url' : "v1/lacovr/ContractSet"},
-            'contract-qan' : {'sub-url' : "v1/lacqan/ContractSet"}, 
-            'person-set'   : {'sub-url' : "v15/bp/PersonSet"} } } }
+            'person-set'       : {'sub-url' : "v15/bp/PersonSet"},
+            'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
+            'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
+        } } } 
 
 
 CRM_KEYS = {

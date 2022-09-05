@@ -211,15 +211,22 @@ loan_open_0 = (spark.read.table(tables['brz_loan_open_items'])
     .withColumn('OpenItemTS', F.col('OpenItemTS').cast(T.DateType()))
     .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
     .dropDuplicates()
-    .withColumn('Amount', udf_ra(F.col('Amount'), F.col('ReceivableDescription'))))
+    .withColumn('Amount', udf_ra(F.col('Amount'), F.col('ReceivableDescription'))))  # Uncleared
 
 all_loans_open = loan_open_0.select(F.col('ContractID')).distinct()
 
+# PARCIALIDADES_PAGADA:   511010, 1
+# PARCIALIDADES_VENCIDAS: 511010, 2
+# MONTO_VENCIDO:   (511100, 991100, 511010, 990004, 511200, 990006), (2, 3), (Due < timestamp)
+# PRINCIPAL_VENCIDO:      511010, (2, 3), (Due < timestamp)
+# INTERES_ORD_VENCIDO: (511100, 991100, 990004), (2, 3), (Due < timestamp)
+ 
 parcialidades_pagadas = (loan_open_0
     .filter((F.col('ReceivableType') == 511010) & (F.col('StatusCategory') == 1))
     .groupBy(F.col('ContractID'))
     .agg(F.countDistinct(F.col('OpenItemID')).alias('parcialidades_pagadas')))
 
+# 511010, 2
 parcialidades_vencidas = (loan_open_0
     .filter((F.col('ReceivableType') == 511010) 
             & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
@@ -227,6 +234,7 @@ parcialidades_vencidas = (loan_open_0
     .groupBy(F.col('ContractID'))
     .agg(F.countDistinct(F.col('OpenItemID')).alias('parcialidades_vencidas')))
 
+# (511100, 991100, 511010, 990004, 511200, 990006), (2, 3), (Due < timestamp)
 monto_vencido = (loan_open_0
     .filter((F.col('ReceivableType').isin(rec_types_mv)) 
             & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
@@ -235,14 +243,16 @@ monto_vencido = (loan_open_0
     .agg(F.sum(F.col('Amount')).alias('monto_vencido'))
     .withColumn('monto_vencido', F.round(F.col('monto_vencido'),2)))
 
+# 511010, (2, 3), (Due < timestamp)
 principal_vencido = (loan_open_0
     .filter((F.col('ReceivableType') == 511010) 
             & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
             & (F.col('DueDate') < F.col('OpenItemTS')))
     .groupBy(F.col('ContractID'))
     .agg(F.sum(F.col('Amount')).alias('principal_vencido'))
-    .withColumn('principal_vencido', F.round(F.col('principal_vencido'),2)))
+    .withColumn('principal_vencido', F.round(F.col('principal_vencido'), 2)))
 
+# (511100, 991100, 990004), (2, 3), (Due < timestamp)
 interes_ord_vencido = (loan_open_0
     .filter((F.col('ReceivableType').isin(rec_types_iov)) 
             & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 

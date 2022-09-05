@@ -1,6 +1,7 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC ## Descripción
+# MAGIC 
+# MAGIC # Descripción
 # MAGIC Este _notebook_ fue escrito originalmente por Jacobo.  
 # MAGIC Para llevarlo de DEV a QAs, le hice (Diego) algunas factorizaciones:  
 # MAGIC - Indicar tablas a partir de un diccionario en `CONFIG.PY`.  
@@ -13,6 +14,7 @@
 
 # COMMAND ----------
 
+import numpy as np
 import pandas as pd
 from pyspark.sql import functions as F, types as T, Window as W
 from datetime import datetime as dt
@@ -34,393 +36,311 @@ base_location = f"abfss://{{stage}}@{at_storage}.dfs.core.windows.net/ops/core-b
 
 # COMMAND ----------
 
-sap_cols = pd.read_feather("../refs/catalogs/cyber_columns.feather")
-sap_cols
-
-# COMMAND ----------
-
-def segregate_lastNames(s, pos):
-    if len(s.split(' ')) > 1:
-        return s.split(' ')[pos]
-    else:
-        if pos == 1:
-            return ''
-        else:
-            return s
-
-def date_format(s):
-    if s != '':
-        return dt.strptime(s, '%Y%m%d').date()
-    else:
-        return dt.strptime('20000101', '%Y%m%d').date()
-
-def sum_codes(l):
-    return sum(l)
-
-def real_amount(am, am_desc):
-    if am_desc == '':
-        return am
-    else:
-        expr = r'[0-9\.]+'
-        match = re.search(expr, am_desc).group(0)
-        return round(float(am) - float(match),2)
-
-def write_dataframe(spk_df, tbl_name, write_mode='overwrite'): 
-    (spk_df.write.mode(write_mode)
-        .option('overwriteSchema', True)
-        .format('delta')
-        .saveAsTable(tbl_name))
-    return None
-      
-    
-segregate_udf   = F.udf(segregate_lastNames, T.StringType())
-date_format_udf = F.udf(date_format, T.DateType())
-sum_codes_udf   = F.udf(sum_codes,   T.DoubleType())
-udf_ra          = F.udf(real_amount, T.DoubleType())
-
-
-# COMMAND ----------
-
 # MAGIC %md 
-# MAGIC ## Bronze 🥉 to Silver 🥈
+# MAGIC # Modificaciones Silver 🥈
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC The flow is as follows: 
-# MAGIC 1. Setup Persons Set.  
-# MAGIC 2. Continue with Loans (Contracts), and then:  
-# MAGIC    2.a) Balances  
-# MAGIC    2.b) Open Items  
-# MAGIC    2.c) Payment Plans  
-# MAGIC 3. Write the tables  
+# MAGIC ## Solo 3 requieren modificación 
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### Person Set
+# MAGIC ### Person Set 
 
 # COMMAND ----------
 
 # Person Set
 
-person_cols = ['FirstName', 'LastName', 'LastName2', 
-    'AddressRegion', 'AddressCity', 'AddressDistrictName', 
-    'AddressStreet', 'AddressHouseID', 'AddressPostalCode', 
-    'Gender', 'PhoneNumber', 'ID']
+persons = (spark.read.table(tables['brz_persons'])
+    .withColumn('split'    , F.split('LastName', ' ', 2))
+    .withColumn('LastNameP', F.col('split').getItem(0))
+    .withColumn('LastNameM', F.col('split').getItem(1))
+    .withColumnRenamed('Address', 'Address2')
+    .withColumn('address' , F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID')))
 
-person_silver = spark.read.table(tables['slv_persons'])
-
-person_set_0 = (spark.read.table(tables['brz_persons'])
-    .select(*person_cols)
-    .withColumnRenamed('PhoneNumber', 'phone_number')
-    .withColumn('LastName2', segregate_udf(F.col('LastName'), F.lit(1)))
-    .withColumn('LastName', segregate_udf(F.col('LastName'),  F.lit(0)))
-    .withColumn('phone_number', F.col('phone_number').cast(T.LongType()))
-    .dropDuplicates())
-
-person_set_df = (person_set_0
-    .join(person_silver[['ID']], how='left', on=person_silver.ID == person_set_0.ID)
-    .filter(person_silver.ID.isNull())
-    .drop(person_silver.ID))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Loan Contracts
-
-# COMMAND ----------
-
-# Loan Contracts
-
-loan_cols = ['ID', 'BankAccountID', 'InitialLoanAmount',
-      'TermSpecificationStartDate', 'ClabeAccount',
-      'RepaymentFrequency', 'TermSpecificationValidityPeriodDurationM',
-      'NominalInterestRate', 'BorrowerID', 'OverdueDays', 'LifeCycleStatusTxt']
-
-loan_contract_df = (spark.read.table(tables['brz_loans'])
-    .select(*loan_cols)
-    .withColumn('InitialLoanAmount', F.col('InitialLoanAmount').cast(T.DoubleType()))
-    .withColumn('TermSpecificationValidityPeriodDurationM', F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()))
-    .withColumn('NominalInterestRate', F.round(F.col('NominalInterestRate').cast(T.DoubleType()), 2))
-    .withColumn('TermSpecificationStartDate', date_format_udf(F.col('TermSpecificationStartDate')))
-    .dropDuplicates())
+display(persons)
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC #### Balances
+# MAGIC ### Balances
 
 # COMMAND ----------
 
-# Loan Balances
+# Agrupar por ID, Currency, BalancesTS;
+# Pivotear por Code: sum(Amount)
 
-loan_balance_0 = (spark.read.table(tables['brz_loan_balances'])
-    .select(*['Amount', 'Code', 'ID'])
-    .filter(F.col('Code').isin(['3', '4', '5']))
+balances = (spark.read.table('bronze.loan_balances')
+    # Set types
+    .withColumn('Code', F.col('Code').cast(T.IntegerType()))
     .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
-    .dropDuplicates())
+    .withColumn('BalancesTS', F.col('BalancesTS').cast(T.DateType()))
+    # Pivot Code/Amount
+    .groupBy(['ID', 'Currency', 'BalancesTS']).pivot('Code')
+        .agg(F.round(F.sum(F.col('Amount')), 2)))
+
+display(balances)
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### Open Items
+
+# COMMAND ----------
+
+### ReceivableType
+# 511080  Reemb.parcial.créd.(esp.)
+# 511200  Comisión
+# 990004  IVA Interés
+# 990006  IVA Comisión
+# 991100  Int. No Gravado
+# 511100  Int. Nominal
+# 511010  Capital
+
+### Status
+# 01 Creado    1
+# 01 Creado    2
+# 01 Creado    3
+# 86 Suprimido 1
+
+open_items = (spark.read.table("bronze.loan_open_items")
+    # Set Types
+    .withColumn('OpenItemTS',  F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'))
+    .withColumn('DueDate',     F.to_date(F.col('DueDate'),    'yyyyMMdd'))
+    .withColumn('Amount',      F.col('Amount').cast(T.DoubleType()))
+    # Aux Columns
+    .withColumn('cleared',     F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
+                                .cast(T.DoubleType())).fillna(0, subset=['cleared'])
+    .withColumn('uncleared',   F.round(F.col('Amount') - F.col('cleared'), 2))
+    .withColumn('vencido',    (F.col('DueDate') < F.col('OpenItemTS'))
+                             & F.col('StatusCategory').isin([2, 3]))
+    .withColumn('local/fgn',   F.when(F.col('Currency') == 'MXN', 'local').otherwise('foreign'))
+    .withColumn('interes/iva', F.when(F.col('ReceivableType').isin([991100, 511100]), 'interes')
+                                .when(F.col('ReceivableType') == 990004, 'iva'))
+    .withColumn('chk_vencido', ( F.col('vencido') & (F.col('uncleared') >0))
+                              |(~F.col('vencido') & (F.col('uncleared')==0))))
+
+# Pivot on Interes/IVA, Local/Foreign and Uncleared. 
+uncleared = (open_items
+    .filter(F.col('Vencido') & F.col('Interes/IVA').isNotNull())
+    .withColumn('pivoter', F.concat_ws('_', 'interes/iva', 'local/fgn'))
+    .groupBy(['OpenItemTS', 'ContractID']).pivot('pivoter')
+        .agg(F.round(F.sum(F.col('Uncleared')), 2)))
+
+# Display for experimentation. 
+display(uncleared)
+#display(open_items.filter(~F.col('chk_vencido')))
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ## Preparación Gold 🥇 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Algunas funciones auxiliares:
+
+# COMMAND ----------
+
+from typing import List
+from pyspark.sql.dataframe import DataFrame as SparkDataFrame
+from pyspark.sql.column import Column as SparkColumn
+
+def select_ls_from_dict(rename_dict: dict) -> List[SparkColumn]: 
+    the_list = [F.col(vv).alias(kk) for kk, vv in rename_dict.items()]
+    return the_list
 
 
-# Maybe try PIVOT. 
 
-ord_interes_df = (loan_balance_0
-    .select(loan_balance_0.Amount.alias('ord_interes'), loan_balance_0.ID)
-    .filter(loan_balance_0.Code == F.lit(3)))
+# COMMAND ----------
 
-comisiones_df = (loan_balance_0
-    .select(loan_balance_0.Amount.alias('comisiones'), loan_balance_0.ID)
-    .filter(loan_balance_0.Code == F.lit(4)))
+persons_name    = "bronze.persons_set"
+loans_name      = "bronze.loan_contracts"    
+lqan_name       = "bronze.loan_qan_contracts"
+balances_name   = "bronze.loan_balances"     
+opens_name      = "bronze.loan_open_items"   
 
-monto_principal_df = (loan_balance_0
-    .select(loan_balance_0.Amount.alias('monto_principal'), loan_balance_0.ID)
-    .filter(loan_balance_0.Code == F.lit(5)))
-
-ord_comisiones = (ord_interes_df
-    .join(other=comisiones_df, how='inner', on=ord_interes_df.ID == comisiones_df.ID)
-    .select(ord_interes_df.ID, ord_interes_df.ord_interes, comisiones_df.comisiones))
+tables_dict = {
+    "bronze.persons_set"        : persons, 
+    "bronze.loan_contracts"     : spark.read.table("bronze.loan_contracts"), 
+    "bronze.loan_qan_contracts" : spark.read.table("bronze.loan_qan_contracts"),
+    "bronze.loan_balances"      : balances,
+    "bronze.loan_open_items"    : uncleared}
 
 
-two_columns = ['ord_interes', 'comisiones']
 
-loan_balance_1 = (ord_comisiones
-    .join(other=monto_principal_df, how='inner',
-          on=ord_comisiones.ID == monto_principal_df.ID)
-    .select(ord_comisiones.ID, ord_comisiones.ord_interes,
-          ord_comisiones.comisiones, monto_principal_df.monto_principal))
+# COMMAND ----------
 
-for a_col in two_columns:
-    loan_balance_1 = loan_balance_1.withColumn(a_col, F.abs(F.col(a_col)))
+# MAGIC %md
+# MAGIC ### Tabla de instrucciones
+
+# COMMAND ----------
+
+sap_cols_0 = pd.read_feather("../refs/catalogs/cyber_columns.feather")
+
+campo = sap_cols_0['campo']
+tipo_campo = pd.Series(np.where(campo.isnull(), 1,
+                    np.where(campo.notnull() & (campo.str.slice(stop=1) != '='), 2, 3)))
+            
+sap_cols_1 = (sap_cols_0
+    .assign(**{
+        'tipo_campo': tipo_campo, 
+        'la_columna': campo.where(tipo_campo.isin([1, 2]), 
+                sap_cols_0['calc'].str.extract(r"\(.*, (.*)\)", expand=False))}))
+
+sap_cols_1['in_sap'] = np.nan
+for name in tables_dict: 
+    sub_idx = (sap_cols_1['tabla_origen'] == name).isin([True])
+    sap_cols_1.loc[sub_idx, 'in_sap'] = \
+            sap_cols_1['la_columna'][sub_idx].isin(tables_dict[name].columns)
+
+keep_rows = (sap_cols_1['tipo_campo'] == 1) | sap_cols_1['in_sap'] 
+sap_cols = sap_cols_1[keep_rows]
+
+#cols_1 = ['nombre', 'valor_fijo', 'tabla_origen', 'campo', 'calc', 'tipo_campo', 'la_columna'] 
+cols_1 = ['nombre', 'valor_fijo', 'longitud2', 'decimales', ] #'tipo_campo', 'la_columna'
+with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 220):
+    # print(sap_cols[cols_1])
+    # print(sap_cols.loc[sap_cols['tabla_origen'] == 'bronze.loan_contracts', cols_1])
+    print(sap_cols_0.loc[sap_cols_0['valor_fijo'].notnull() & (sap_cols_0['Tipo de dato'] == 'NUMBER'), cols_1])
+
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### Tablas individuales
+
+# COMMAND ----------
+
+persons_select  = {a_row['nombre']: a_row['la_columna'] 
+        for _, a_row in sap_cols[sap_cols['tabla_origen'] == 'bronze.persons_set'].iterrows()}
+loans_select    = {a_row['nombre']: a_row['la_columna'] 
+        for _, a_row in sap_cols[sap_cols['tabla_origen'] == 'bronze.loan_contracts'].iterrows()}
+lqan_select     = {a_row['nombre']: a_row['la_columna'] 
+        for _, a_row in sap_cols[sap_cols['tabla_origen'] == 'bronze.loan_qan_contracts'].iterrows()}
+balances_select = {a_row['nombre']: a_row['la_columna'] 
+        for _, a_row in sap_cols[sap_cols['tabla_origen'] == 'bronze.loan_balances'].iterrows()}
+opens_select    = {a_row['nombre']: a_row['la_columna'] 
+        for _, a_row in sap_cols[sap_cols['tabla_origen'] == 'bronze.loan_open_items'].iterrows()}
+
+# With Join columns. 
+persons_tbl  = tables_dict['bronze.persons_set'].select(*select_ls_from_dict(persons_select), F.col('ID').alias('person_id'))
+loans_tbl    = tables_dict['bronze.loan_contracts'].select(*select_ls_from_dict(loans_select), F.col('ID').alias('loan_id'), F.col('BorrowerID').alias('person_id'))
+lqan_tbl     = tables_dict['bronze.loan_qan_contracts'].select(*select_ls_from_dict(lqan_select), F.col('ID').alias('loan_id'))
+balances_tbl = tables_dict['bronze.loan_balances'].select(*select_ls_from_dict(balances_select), F.col('ID').alias('loan_id'))
+opens_tbl    = tables_dict['bronze.loan_open_items'].select(*select_ls_from_dict(opens_select), F.col('ContractID').alias('loan_id'))
+
+
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### Master Join and Fixed-Value Columns
+
+# COMMAND ----------
+
+fixed_slct = [F.lit(a_row['valor_fijo']).alias(a_row['nombre'])
+    for _, a_row in sap_cols[sap_cols['tipo_campo'] == 1].iterrows()]
+
+fix_chars = sap_cols['nombre'][
+    (sap_cols['tipo_campo'] == 1) & (sap_cols['Tipo de dato'] == 'VARCHAR2')]
+
+golden_1 = (persons_tbl
+    .join(loans_tbl   , how='right', on='person_id')
+    .join(lqan_tbl    , how='left' , on='loan_id')
+    .join(balances_tbl, how='left' , on='loan_id') 
+    .join(opens_tbl   , how='left' , on='loan_id')
+    .drop(*['person_id', 'loan_id'])
+    .select('*', *fixed_slct)
+    .fillna('N/A', fix_chars.tolist()))
+
+display(golden_1)
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Explicit conversion to string
+
+# COMMAND ----------
+
+fstring_keys = {
+    'str': 's', 'date': 's', 'int': 'd', 'dbl': 'f'
+}
+
+sap_cols_fmt_0 = sap_cols.assign(**{
+    'spk_type' : np.where(sap_cols['Tipo de dato'] == 'VARCHAR2', 'str', 
+               np.where(sap_cols['Tipo de dato'] == 'DATE', 'date', 
+             np.where(sap_cols['decimales'] > 0, 'dbl', 'int')))})
+
+fill_zeros   = pd.Series(np.where(sap_cols_fmt_0['Tipo de dato'] == 'NUMBER', '0', ''))
+fill_space   = pd.Series(np.where(sap_cols_fmt_0['Tipo de dato'] == 'NUMBER', ' ', ''))
+old_longitud = (sap_cols_fmt_0['longitud2'] + sap_cols_fmt_0['decimales']).apply(str)
+its_fkey     = pd.Series([fstring_keys[a_spk] for a_spk in sap_cols_fmt_0['spk_type']])
+smp_longitud = sap_cols_fmt_0['longitud2'].apply(str)
+
+
+sap_cols_fmt = sap_cols_fmt_0.assign(**{
+    'f_string' : '%' + fill_zeros + old_longitud + its_fkey, 
+    's_string' : '%' + smp_longitud + 's'}) 
     
-loan_balance_df = (loan_balance_1
-    .withColumn('monto_liquidacion', F.col('comisiones') + F.col('ord_interes') + F.col('monto_principal')))
+fmt_cols = ['nombre', 'Posición inicial', 'longitud2', 'decimales', 'spk_type', 'Tipo de dato', 'f_string', 's_string']
+with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 220):
+    print(sap_cols_fmt.loc[sap_cols_fmt['Tipo de dato'] == 'NUMBER', fmt_cols])
+    
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC #### Open Loans 
+int_select
 
 # COMMAND ----------
 
-# Open Loans
+# The types:  
+# 1. Make sure to cast first. 
+# 2. Each type is converted to string in its terms. 
+# 3. Apply fixed width condition ...
+# 4. Select columns in order. 
 
-rec_types_mv  = [511100, 991100, 511010, 990004, 511200, 990006]
-rec_types_iov = [511100, 991100, 990004]
+cast_types = {
+    'str' : T.StringType(), 
+    'int' : T.DoubleType(), 
+    'dbl' : T.DoubleType(), 
+    'date': T.DateType()
+}
 
-open_items_cols = ['OpenItemID', 'Amount', 'ReceivableDescription',
-    'StatusCategory', 'ReceivableType', 'DueDate', 'OpenItemTS',
-    'ContractID']
+## 1. 
+types_select = [F.col(a_row['nombre']).cast(cast_types[a_row['spk_type']]).alias(a_row['nombre'])
+    for _, a_row in sap_cols_fmt.iterrows()]
 
-loan_open_0 = (spark.read.table(tables['brz_loan_open_items'])
-    .select(*open_items_cols)
-    .withColumn('DueDate', date_format_udf(F.col('DueDate')))
-    .withColumn('OpenItemTS', F.col('OpenItemTS').cast(T.DateType()))
-    .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
-    .dropDuplicates()
-    .withColumn('Amount', udf_ra(F.col('Amount'), F.col('ReceivableDescription'))))
+## 2 and 3.  
+str_select = [F.col(a_row['nombre']) 
+    for _, a_row in sap_cols_fmt.iterrows() if a_row['spk_type'] == 'str']
 
-all_loans_open = loan_open_0.select(F.col('ContractID')).distinct()
+date_select = [F.date_format(a_row['nombre'], 'MMddyyyy').alias(a_row['nombre']) 
+    for _, a_row in sap_cols_fmt.iterrows() if a_row['spk_type'] == 'date']
 
-parcialidades_pagadas = (loan_open_0
-    .filter((F.col('ReceivableType') == 511010) & (F.col('StatusCategory') == 1))
-    .groupBy(F.col('ContractID'))
-    .agg(F.countDistinct(F.col('OpenItemID')).alias('parcialidades_pagadas')))
+#---  Assume decimales < 10. 
+dbl_select = [F.number_format(a_row['nombre'], int(10*a_row['decimales'])).alias(a_row['nombre']) 
+    for _, a_row in sap_cols_fmt.iterrows() if a_row['spk_type'] == 'dbl']
 
-parcialidades_vencidas = (loan_open_0
-    .filter((F.col('ReceivableType') == 511010) 
-            & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
-            & (F.col('DueDate') < F.col('OpenItemTS')))
-    .groupBy(F.col('ContractID'))
-    .agg(F.countDistinct(F.col('OpenItemID')).alias('parcialidades_vencidas')))
+# int_select = [F.format_string(str(a_row['f_string']), a_row['nombre']).alias(a_row['nombre'])
+#     for _, a_row in sap_cols_fmt.iterrows() if a_row['spk_type'] == 'int']
 
-monto_vencido = (loan_open_0
-    .filter((F.col('ReceivableType').isin(rec_types_mv)) 
-            & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
-            & (F.col('DueDate') < F.col('OpenItemTS')))
-    .groupBy(F.col('ContractID'))
-    .agg(F.sum(F.col('Amount')).alias('monto_vencido'))
-    .withColumn('monto_vencido', F.round(F.col('monto_vencido'),2)))
-
-principal_vencido = (loan_open_0
-    .filter((F.col('ReceivableType') == 511010) 
-            & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
-            & (F.col('DueDate') < F.col('OpenItemTS')))
-    .groupBy(F.col('ContractID'))
-    .agg(F.sum(F.col('Amount')).alias('principal_vencido'))
-    .withColumn('principal_vencido', F.round(F.col('principal_vencido'),2)))
-
-interes_ord_vencido = (loan_open_0
-    .filter((F.col('ReceivableType').isin(rec_types_iov)) 
-            & ((F.col('StatusCategory') == 2) | (F.col('StatusCategory') == 3)) 
-            & (F.col('DueDate') < F.col('OpenItemTS')))
-    .groupBy(F.col('ContractID'))
-    .agg(F.sum(F.col('Amount')).alias('interes_ord_vencido'))
-    .withColumn('interes_ord_vencido', F.round(F.col('interes_ord_vencido'), 2)))
-
-loan_open_df = (all_loans_open
-    .join(parcialidades_pagadas, how='left', 
-          on=all_loans_open.ContractID == parcialidades_pagadas.ContractID)
-    .select(all_loans_open.ContractID, parcialidades_pagadas.parcialidades_pagadas)
-    .join(parcialidades_vencidas, how='left',
-          on=all_loans_open.ContractID == parcialidades_vencidas.ContractID)
-    .select(all_loans_open.ContractID, parcialidades_pagadas.parcialidades_pagadas, parcialidades_vencidas.parcialidades_vencidas)
-    .join(monto_vencido, how='left', 
-          on=all_loans_open.ContractID == monto_vencido.ContractID)
-    .select(all_loans_open.ContractID, parcialidades_pagadas.parcialidades_pagadas, 
-        parcialidades_vencidas.parcialidades_vencidas, monto_vencido.monto_vencido)
-    .join(principal_vencido, how='left', 
-          on=all_loans_open.ContractID == principal_vencido.ContractID)
-    .select(
-        all_loans_open.ContractID, parcialidades_pagadas.parcialidades_pagadas,
-        parcialidades_vencidas.parcialidades_vencidas, monto_vencido.monto_vencido,
-        principal_vencido.principal_vencido)
-    .join(interes_ord_vencido, how='left', 
-          on=all_loans_open.ContractID == interes_ord_vencido.ContractID)
-    .select(all_loans_open.ContractID, 
-        parcialidades_pagadas.parcialidades_pagadas, 
-        parcialidades_vencidas.parcialidades_vencidas, 
-        monto_vencido.monto_vencido, 
-        principal_vencido.principal_vencido, 
-        interes_ord_vencido.interes_ord_vencido)
-    .fillna(value=0))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Payment Plans
-
-# COMMAND ----------
-
-# Loan Payment Plans
-
-payment_cols = ['ItemID', 'ContractID', 'Date', 'Category', 'Amount', 'PaymentPlanTS']
-
-loan_payment_0 = (spark.read.table(tables['brz_loan_payments'])
-    .select(*payment_cols)
-    .filter(F.col('Category') == 1)
-    .withColumn('Date',  date_format_udf(F.col('Date')))
-    .withColumn('PaymentPlanTS', F.col('PaymentPlanTS').cast(T.DateType()))
-    .withColumn('Amount',        F.col('Amount'  ).cast(T.DoubleType()))
-    .withColumn('Category',      F.col('Category').cast(T.IntegerType()))
-    .dropDuplicates())
-
-window_payment_plan = W.partitionBy('ContractID').orderBy(F.asc(F.col('Date')))
-
-ranked_loan_payment = (loan_payment_0
-    .filter(F.col('Date') > F.col('PaymentPlanTS'))
-    .withColumn('rank', F.dense_rank().over(window_payment_plan))
-    .filter(F.col('rank') == 1)
-    .withColumn('DaysToPayment', F.datediff(F.col('Date'), F.current_date()))
-    .dropDuplicates())
-
-window_payment_plan = W.partitionBy('ContractID').orderBy(F.asc(F.col('Date')))
-
-ranked_loan_payment = (loan_payment_0
-    .filter(F.col('Date') > F.col('PaymentPlanTS'))
-    .withColumn('rank', F.dense_rank().over(window_payment_plan))
-    .filter(F.col('rank') == 1)
-    .withColumn('DaysToPayment', F.datediff(F.col('Date'), F.current_date()))
-    .dropDuplicates())
-
-latest_payment_plan = ranked_loan_payment.select(
-        F.col('ContractID'), 
-        F.col('Date').alias('sig_pago'), 
-        F.col('Amount').alias('monto_a_pagar'), 
-        F.col('DaysToPayment'))
-
-parcialidades_payment_plan = (loan_payment_0
-    .select(F.col('ContractID'), F.col('ItemID'))
-    .groupBy(F.col('ContractID'))
-    .agg(F.countDistinct(F.col('ItemID')).alias('parcialidades_plan')))
-
-parcialidades_payment_plan = (parcialidades_payment_plan
-    .join(loan_open_df, how='left', 
-        on=parcialidades_payment_plan.ContractID == loan_open_df.ContractID)
-    .select(
-        parcialidades_payment_plan.ContractID, 
-        parcialidades_payment_plan.parcialidades_plan, 
-        loan_open_df.parcialidades_vencidas)
-    .fillna(value=0)
-    .withColumn('parcialidades_plan', F.col('parcialidades_plan') + F.col('parcialidades_vencidas'))
-    .drop(F.col('parcialidades_vencidas')))
-
-loan_payment_df = (latest_payment_plan
-    .join(parcialidades_payment_plan, how='inner', 
-        on=latest_payment_plan.ContractID == parcialidades_payment_plan.ContractID)
-    .drop(parcialidades_payment_plan.ContractID))
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC ### Write tables
-
-# COMMAND ----------
-
-# Person Set utiliza Append, el resto 'overwrite' (default).
-write_dataframe(person_set_df, tables['slv_persons'], 'append')
-
-write_dataframe(loan_payment_df,  tables['slv_loan_payments'])
-write_dataframe(loan_balance_df,  tables['slv_loan_balances'])
-write_dataframe(loan_contract_df, tables['slv_loans'])
-write_dataframe(loan_open_df,     tables['slv_loan_open_items'])
+int_select = [F.format_string(str(a_row['f_string']), a_row['nombre']).alias(a_row['nombre'])
+    for _, a_row in sap_cols_fmt.iterrows() if a_row['spk_type'] == 'int']
 
 
-# COMMAND ----------
+## 3. 
+fxd_width_select = [F.format_string(str(a_row['s_string']), F.col(a_row['nombre'])).alias(a_row['nombre'])
+    for _, a_row in sap_cols_fmt.iterrows()]
 
-# MAGIC %md
-# MAGIC 
-# MAGIC # Silver 🥈 to Gold 🥇
+golden_2 = (golden_1.select(*types_select)
+    .select(*str_select, *dbl_select, *date_select) )  #  , *int_select
+#    .select(*fxd_width_select))
+#    .select(F.concat(*sap_cols_fmt['nombre']).alias('one_mega_string')))
+#    .select(*sap_cols_fmt['nombre'], F.concat(*sap_cols_fmt['nombre']).alias('one_mega_string')))
 
-# COMMAND ----------
-
-# Do a Super JOIN. 
-
-windowSpec = (W.partitionBy('attribute_loan_id')
-    .orderBy(['attribute_due_date', 'promise_id']))
-
-persons_set = (spark.table(tables['slv_persons'])
-    .drop(*['last_login', 'phone_number']))
-
-promises = (spark.table(tables['slv_promises'])
-    .withColumnRenamed('id', 'promise_id')
-    .filter((F.col('attribute_processed') == False) & (F.col('attribute_accomplished') == False))
-    .withColumn('rank', F.dense_rank().over(windowSpec))
-    .filter(F.col('rank') == 1)
-    .drop(F.col('rank')))
-
-# COMMAND ----------
-
-loan_contracts     = spark.table(tables['slv_loans'])
-loan_balances      = spark.table(tables['slv_loan_balances'])
-loan_open_items    = spark.table(tables['slv_loan_open_items'])
-loan_payment_plans = spark.table(tables['slv_loan_payments'])
-
-base_df = (loan_contracts
-    .join(loan_balances, how='left', on=loan_contracts.ID == loan_balances.ID)
-    .drop(loan_balances.ID)
-    .join(persons_set, how='inner', on=loan_contracts.BorrowerID == persons_set.ID)
-    .drop(persons_set.ID))
-
-base_open = (base_df
-    .join(loan_open_items, how='left', on=base_df.ID == loan_open_items.ContractID)
-    .drop(loan_open_items.ContractID)
-    .fillna(value=0))
-
-# COMMAND ----------
-
-full_fields = (base_open
-    .join(loan_payment_plans, how='left', on=base_open.ID == loan_payment_plans.ContractID)
-    .drop(loan_payment_plans.ContractID)
-    .fillna(value=0)
-    .join(promises, how='left', on=base_open.ID == promises.attribute_loan_id)
-    .drop(promises.attribute_loan_id)
-    .dropDuplicates())
-
-the_cols = ['TermSpecificationStartDate', 'sig_pago', 'attribute_due_date']
-
-for a_col in the_cols:
-    full_fields = full_fields.withColumn(a_col, F.date_format(F.col(a_col), 'dd-MM-yyyy'))
-
-# COMMAND ----------
-
-write_dataframe(full_fields, tables['gld_loans'])
+display(golden_2)
