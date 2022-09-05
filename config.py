@@ -95,12 +95,13 @@ CORE_KEYS = {
                 'persons'      : "v15/bp/EventSet", 
                 'accounts'     : "v1/cac/EventSet", 
                 'transactions' : "v1/bape/EventSet", 
-                'prenotes'     : "v1/bapre/EventSet"},
+                'prenotes'     : "v1/bapre/EventSet"}, 
             'person-set'       : {'sub-url' : "v15/bp/PersonSet"},
             'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
             'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
-            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"} } }, 
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
+        } }, 
     'qas-sap' : {
         'main' : {
             'headers' : {
@@ -116,7 +117,7 @@ CORE_KEYS = {
                 'url' : "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
                 'data': {
                     'grant_type' : 'password', 
-                    'username'   : (1, 'core-api-user'), 
+                    'usernasme'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
             'event-set'    : {
                 'persons'      : "v15/bp/EventSet", 
@@ -127,7 +128,8 @@ CORE_KEYS = {
             'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
             'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
-            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}, } } }
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
+        } } } 
 
 
 CRM_KEYS = {
