@@ -38,7 +38,7 @@ non_checks = (cyber_ref_1
 print(non_checks)
 
 #%% And print. 
-ref_columns = cyber_meta['columnas'][cyber_meta['ejec']==1]
+ref_columns = cyber_meta['columnas'][cyber_meta['ejec'] == 1]
 
 cyber_ref = (cyber_ref_1[ref_columns]
     .reset_index())
