@@ -9,7 +9,6 @@ cyber_fields = SITE/"refs/catalogs/Cyber.xlsm.lnk"
 cyber_meta = (tools.read_excel_table(cyber_fields, 'Output', 'output_cols')
     .query(f"proc.notnull()"))
 
-
 replace_types = {row['columnas']: row['proc'] 
         for _, row in cyber_meta.iterrows()}
 

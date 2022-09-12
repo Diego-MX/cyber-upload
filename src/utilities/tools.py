@@ -92,6 +92,7 @@ def read_excel_table(file, sheet:str, table:str=None, **kwargs):
         a_wb = load_workbook(file, data_only=True)
     except InvalidFileException: 
         a_wb = load_workbook(shortcut_target(file), data_only=True)
+    
     a_ws  = a_wb[sheet]
     a_tbl = a_ws.tables[table]
     
