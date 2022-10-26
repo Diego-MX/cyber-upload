@@ -19,21 +19,30 @@ except ImportError:
 
 
 #%% Define tools functions. 
-#  36 RELOAD_FROM_ASTERISK
-#  42 STR_CAMEL_TO_SNAKE
-#  49 STR_SNAKE_TO_CAMEL
-#  56 SNAKE_2_CAMEL
-#  61 SELECT_SUBDICT
-#  68 CAMELIZE_DICT
-#  85 READ_EXCEL_TABLE
-#  98 SHORTCUT_TARGET
-# 119 DICT_MINUS
-# 126 ENCODE64
-# 131 DATECOLS_TO_STR
-# 137 DATAFRAME_TO_LIST
-# 171 SET_DATAFRAME_TYPES
-# 184 CURLIFY
+#  39 DICT_KEYS
+#  50 RELOAD_FROM_ASTERISK
+#  56 STR_CAMEL_TO_SNAKE
+#  63 STR_SNAKE_TO_CAMEL
+#  70 SNAKE_2_CAMEL
+#  75 SELECT_SUBDICT
+#  82 CAMELIZE_DICT
+#  99 READ_EXCEL_TABLE
+# 112 SHORTCUT_TARGET
+# 133 DICT_MINUS
+# 140 ENCODE64
+# 145 DATECOLS_TO_STR
+# 151 DATAFRAME_TO_LIST
+# 185 SET_DATAFRAME_TYPES
+# 198 CURLIFY
 
+
+def dict_get2(a_dict, ls_keys, b_val): 
+    # Extends a_dict.get(a_key, b_value) to consider several keys. 
+    ls_keys_0 = [k for k in ls_keys if k in a_dict]
+    a_key = ls_keys_0[0] if ls_keys_0 else None
+    a_val = a_dict.get(a_key, b_val)
+    return a_val
+            
 
 def reload_from_asterisk(module):
     a_mod = reload(sys.modules[module])

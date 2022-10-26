@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
+from src.utilities import tools
+
 try: 
     from pyspark.dbutils import DBUtils
 except ImportError: 
@@ -14,8 +16,10 @@ except ImportError:
     load_dotenv = None
 
 SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
-ENV = environ.get('ENV_TYPE', environ.get('ENV', 'qas'))        # dev, qas, stg, prod
-SERVER = environ.get('SERVER_TYPE', 'wap')  # dbks, local, wap. 
+ENV  = tools.dict_get2(environ, ['ENV_TYPE', 'ENV'], 'nan-env')
+SERVER   = environ.get('SERVER_TYPE', 'wap')  # dbks, local, wap. 
+CORE_ENV = environ.get('CORE_ENV', 'qas-sap')
+CRM_ENV  = environ.get('CRM_ENV', 'prd')
 
 
 PAGE_MAX = 1000
@@ -35,6 +39,14 @@ SETUP_KEYS = {
             'tenant_id'       : (1, 'aad-tenant-id'), 
             'subscription_id' : (1, 'sp-core-events-suscription') } , 
         'dbks': {'scope': 'eh-core-banking'}
+    }, 
+    'stg' : {
+        'service-principal' : {
+            'client_id'       : (1, 'sp-core-events-client'), 
+            'client_secret'   : (1, 'sp-core-events-secret'), 
+            'tenant_id'       : (1, 'aad-tenant-id'), 
+            'subscription_id' : (1, 'sp-core-events-subscription') } , 
+        'dbks': {'scope': 'eh-core-banking'}
     }
 }
 
@@ -46,7 +58,7 @@ PLATFORM_KEYS = {
             'url'   : "https://kv-collections-data-dev.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
+            'url'   : "https://lakehylia.blob.core.windows.net/"}, 
         'app-id'    : 'cx-collections-id'}, 
     'qas': {        
         'key-vault' : {
@@ -117,7 +129,7 @@ CORE_KEYS = {
                 'url' : "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
                 'data': {
                     'grant_type' : 'password', 
-                    'usernasme'   : (1, 'core-api-user'), 
+                    'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
             'event-set'    : {
                 'persons'      : "v15/bp/EventSet", 
@@ -133,7 +145,7 @@ CORE_KEYS = {
 
 
 CRM_KEYS = {
-    'sandbox' : {
+    'sandbox-zd' : {
         'main' : {
             'url'  : "https://bineo1633010523.zendesk.com/api",
             'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
@@ -147,7 +159,7 @@ CRM_KEYS = {
                 'sub-url' : "sunshine/objects/records"}, 
             'filters'  : ("sunshine/objects/records",
                     "services/zis/inbound_webhooks/generic/ingest") } },
-     'prod' : {
+     'prod-zd' : {
         'main' : {
             'url'  : "https://bineo.zendesk.com/api",
             'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
@@ -182,12 +194,26 @@ DBKS_KEYS = {
             'contracts'   : "bronze.loan_contracts", 
             'collections' : "gold.loan_contracts"} },
     'qas': { 
-    }  
-} 
+        'connect': {
+            'wap': {
+                'Driver'         : "/opt/simba/spark/lib/64/libsparkodbc_sb64.so",
+                'PORT'           : '443',
+                'Schema'         : 'default',
+                'SparkServerType': '3',
+                'AuthMech'       : '3',
+                'UID'            : 'token',
+                'ThriftTransport': '2',
+                'SSL'            : '1', 
+                'PWD'            : (1, 'dbks-wap-token'),
+                'HOST'           : (1, 'dbks-odbc-host'),
+                'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
+        'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
+            'contracts'   : "bronze.loan_contracts", 
+            'collections' : "gold.loan_contracts"}   }   } 
                                     
 DBKS_TABLES = {          
     'dev': {
-        'base' : 'abfss://{stage}@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates',
+        'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
         'items': {  # table, location, old
             'brz_persons'         : 
                 ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),
@@ -225,13 +251,31 @@ DBKS_TABLES = {
             'slv_promises'        : 'silver.zendesk_promises', 
             'gld_loans'           : 'gold.loan_contracts'} }, 
     'qas': {
-        'brz_persons' : {
-            'name'  : "din_clients.brz_ops_persons_set", 
-            'location' : "ops/core-banking/batch-updates/persons-set"},
-        'brz_loans' : {
-            'name'  : "nayru_accounts.brz_ops_loan_contracts", 
-            'location' : "ops/core-banking/batch-updates/loan-contracts"}
-} }
+        'base': 'abfss://{stage}@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'items': {  # table, location, old
+            'brz_persons'         : 
+                ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),
+            'brz_loans'           : 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts', 'bronze.loan_contracts'), 
+            'brz_loan_balances'   : 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances',  'bronze.loan_balances'), 
+            'brz_loan_open_items' : 
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items', 'bronze.loan_open_items'),  
+            'brz_loan_payments'   : 
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
+            'slv_persons'         : 
+                ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
+            'slv_loan_balances'   : 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances',  'silver.loan_balances'), 
+            'slv_loan_open_items' : 
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items', 'silver.loan_open_items'),  
+            'slv_loan_payments'   : 
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
+            'slv_promises'        : 
+                ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
+            'gld_loans'           : 
+                ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')}
+}   }  
 
 
 class ConfigEnviron():

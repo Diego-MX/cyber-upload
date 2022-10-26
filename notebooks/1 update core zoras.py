@@ -8,7 +8,7 @@
 # MAGIC After moving `Person Set` and `Loan Contract` to both metastore/datalake and QAs, there was rupture in the data tables.  
 # MAGIC The purpose of this notebook is to allow us to temporarily set back the previous changes, for the big event of Collections Testing.  
 # MAGIC The only difference between this and its original, is the writing location of the tables.  
-# MAGIC That is to say, this writes them as tables persé and in the cluster corresponding to DBFS;  
+# MAGIC That is to say, this writes them as tables _per se_ and in the cluster corresponding to DBFS;  
 # MAGIC whereas the newer modified one writes them directly in their delta location in the datalake.   
 
 # COMMAND ----------
@@ -20,16 +20,16 @@
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
-core_session = SAPSession('qas-sap', az_manager)
+core_session = SAPSession(CORE_ENV, az_manager)
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
 
-at_base     = DBKS_TABLES[ENV]['base']
+at_base     = DBKS_TABLES[ENV]['base'] # Tiene placeholders de STAGE, STORAGE
 table_items = DBKS_TABLES[ENV]['items'] 
 
 
@@ -37,7 +37,7 @@ table_items = DBKS_TABLES[ENV]['items']
 
 first_time = False 
 
-abfss_loc = at_base.format(stage='bronze')
+abfss_loc = at_base.format(stage='bronze', storage=at_storage)
 
 # table_tuple:  new_name, location, old_name
 def set_table_delta(a_tuple, spk_session):

@@ -1,8 +1,0 @@
-{
-  "mssql.connections": [
-    {
-      "profileName": "hylia-catalogs",
-      "connectionString": "Server=tcp:sql-lakehylia-dev.database.windows.net,1433;Initial Catalog=sql_prod_catalogs_data_dev;Persist Security Info=False;User ID=admin-data;Password=C&$bGRQ8k2R#23rV9hoYtar*x;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30"
-    }
-  ]
-}
