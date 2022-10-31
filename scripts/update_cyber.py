@@ -12,6 +12,9 @@ cyber_meta = (tools.read_excel_table(cyber_fields, 'Output', 'output_cols')
 replace_types = {row['columnas']: row['proc'] 
         for _, row in cyber_meta.iterrows()}
 
+# weird_bools = { a_col: a_proc 
+#       for a_col, a_proc in replace.items()
+#       if a_proc == 'bool' }
 weird_bools = filter(lambda k: replace_types[k] == 'bool', replace_types)
 
 
@@ -31,7 +34,7 @@ cyber_ref_1 = (cyber_ref_2[cyber_meta['columnas']]
 #%% Checks
 
 non_checks = (cyber_ref_1
-    .filter(like='check', axis=1)
+    .filter(like='chk', axis=1)
     .apply(lambda lgl_srs: sum(~lgl_srs), axis=0))
 
 print(non_checks)
@@ -44,3 +47,4 @@ cyber_ref = (cyber_ref_1[ref_columns]
 
 cyber_ref.to_feather("refs/catalogs/cyber_columns.feather")
 tables_meta.to_feather("refs/catalogs/cyber_sap.feather")
+

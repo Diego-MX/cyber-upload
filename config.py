@@ -1,8 +1,10 @@
 from os import environ, getcwd, getenv
-import re
 from pathlib import Path
+import re
 from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
+from src.utilities import tools 
+
 try: 
     from pyspark.dbutils import DBUtils
 except ImportError: 
@@ -13,8 +15,9 @@ try:
 except ImportError:
     load_dotenv = None
 
+
 SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
-ENV = environ.get('ENV_TYPE', environ.get('ENV', 'qas'))        # dev, qas, stg, prod
+ENV  = tools.dict_get(['ENV_TYPE', 'ENV'], None)   # dev, qas, stg, prod
 SERVER = environ.get('SERVER_TYPE', 'wap')  # dbks, local, wap. 
 
 
@@ -210,7 +213,7 @@ DBKS_TABLES = {
             'slv_promises'        : 
                 ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
             'gld_loans'           : 
-                ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
+                ('nayru_accounts.gld_cx_collections_loans', 'gold.loan_contracts')},
         'names' : {
             'brz_persons'         : 'bronze.persons_set', 
             'brz_loans'           : 'bronze.loan_contracts',        
