@@ -25,11 +25,11 @@
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
-core_session = SAPSession('qas-sap', az_manager)
+core_session = SAPSession(CORE_ENV, az_manager)
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)

@@ -214,6 +214,7 @@ DBKS_KEYS = {
 DBKS_TABLES = {          
     'dev': {
         'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects',
         'items': {  # table, location, old
             'brz_persons'         : 
                 ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),
@@ -225,8 +226,12 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items', 'bronze.loan_open_items'),  
             'brz_loan_payments'   : 
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', None, 'bronze.crm_payment_promises'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts', 'silver.loan_contracts'), 
             'slv_loan_balances'   : 
                 ('nayru_accounts.slv_ops_loan_balances',   'loan-balances',  'silver.loan_balances'), 
             'slv_loan_open_items' : 
@@ -252,6 +257,7 @@ DBKS_TABLES = {
             'gld_loans'           : 'gold.loan_contracts'} }, 
     'qas': {
         'base': 'abfss://{stage}@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects',
         'items': {  # table, location, old
             'brz_persons'         : 
                 ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),

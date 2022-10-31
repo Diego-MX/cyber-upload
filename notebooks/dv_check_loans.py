@@ -10,9 +10,8 @@ import pyspark.pandas as ps
 
 # COMMAND ----------
 
-loans = ps.read_table('bronze.loan_contracts')
-print(f'Loan Entries: {loans.shape[0]}')
-display(loans)
+# MAGIC %sql
+# MAGIC SELECT FirstName, BorrowerID, sig_pago, monto_principal FROM gold.loan_contracts WHERE (1 = 1) and (`AddressRegion` == 'CUAUHTEMOC')
 
 # COMMAND ----------
 

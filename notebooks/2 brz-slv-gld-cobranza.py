@@ -429,24 +429,24 @@ loan_open_items    = spark.table(tables['slv_loan_open_items'])
 loan_payment_plans = spark.table(tables['slv_loan_payments'])
 
 base_df = (loan_contracts
-    .join(loan_balances, how='left', on=loan_contracts.ID == loan_balances.ID)
-    .drop(loan_balances.ID)
-    .join(persons_set, how='inner', on=loan_contracts.BorrowerID == persons_set.ID)
-    .drop(persons_set.ID))
+    .join(loan_balances, how='left', on=loan_contracts['ID'] == loan_balances['ID'])
+    .drop(loan_balances['ID'])
+    .join(persons_set, how='inner', on=loan_contracts['BorrowerID'] == persons_set['ID'])
+    .drop(persons_set['ID']))
 
 base_open = (base_df
-    .join(loan_open_items, how='left', on=base_df.ID == loan_open_items.ContractID)
-    .drop(loan_open_items.ContractID)
+    .join(loan_open_items, how='left', on=base_df['ID'] == loan_open_items['ContractID'])
+    .drop(loan_open_items['ContractID'])
     .fillna(value=0))
 
 # COMMAND ----------
 
 full_fields = (base_open
-    .join(loan_payment_plans, how='left', on=base_open.ID == loan_payment_plans.ContractID)
-    .drop(loan_payment_plans.ContractID)
+    .join(loan_payment_plans, how='left', on=base_open['ID'] == loan_payment_plans['ContractID'])
+    .drop(loan_payment_plans['ContractID'])
     .fillna(value=0)
-    .join(promises, how='left', on=base_open.ID == promises.attribute_loan_id)
-    .drop(promises.attribute_loan_id)
+    .join(promises, how='left', on=base_open['ID'] == promises['attribute_loan_id'])
+    .drop(promises['attribute_loan_id'])
     .dropDuplicates())
 
 the_cols = ['TermSpecificationStartDate', 'sig_pago', 'attribute_due_date']
