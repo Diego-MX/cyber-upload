@@ -1,1 +1,10 @@
+name : Pull Request Validation 
+on :
+  pull_request :
+    branches : []
+  
+jobs : 
+  validate-request :
+    runs-on : ubuntu-latest
+
 
