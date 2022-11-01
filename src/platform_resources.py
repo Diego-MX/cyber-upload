@@ -9,10 +9,15 @@ class AzureResourcer():
         self.config = PLATFORM_KEYS[env_obj.env]
         self.set_secretters()
     
+    
     def set_vault(self):
         vault_url = self.config['key-vault']['url']
         the_creds = self.env.credential
         self.vault = SecretClient(vault_url=vault_url, credential=the_creds)
+        
+        #to_secret_or_not = self.vault.list_properties_of_secrets()
+        #next(to_secret_or_not)
+        
     
     def set_secretters(self): 
         if not hasattr(self, 'vault'): 
@@ -46,7 +51,7 @@ class AzureResourcer():
             pre_confs = {
                 f"fs.azure.account.auth.type.{blob_key}.dfs.core.windows.net"           : 'OAuth',
                 f"fs.azure.account.oauth.provider.type.{blob_key}.dfs.core.windows.net" : "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
-                f"fs.azure.account.oauth2.client.endpoint.{blob_key}.dfs.core.windows.net"     : oauth2_endpoint,
+                f"fs.azure.account.oauth2.client.endpoint.{blob_key}.dfs.core.windows.net" : oauth2_endpoint,
                 f"fs.azure.account.oauth2.client.id.{blob_key}.dfs.core.windows.net"    : sp_items['client_id'],
                 f"fs.azure.account.oauth2.client.secret.{blob_key}.dfs.core.windows.net": sp_items['client_secret']}
         elif gen_value == 'gen1': 

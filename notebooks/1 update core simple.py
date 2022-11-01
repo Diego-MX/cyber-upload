@@ -46,8 +46,8 @@ persons_spk = spark.createDataFrame(persons_df)
 loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
 
-lqan_df = core_session.get_loans_qan()
-lqan_spk = spark.createDataFrame(lqan_df)
+# lqan_df = core_session.get_loans_qan()
+# lqan_spk = spark.createDataFrame(lqan_df)
 
 
 # COMMAND ----------

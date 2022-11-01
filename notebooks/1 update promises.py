@@ -27,9 +27,9 @@
 # COMMAND ----------
 
 from importlib import reload
-from src import crm_platform
+from src import crm_platform, platform_resources
+import config
 reload(crm_platform)
-
 
 # COMMAND ----------
 
@@ -45,7 +45,6 @@ at_storage = azure_getter.get_storage()
 
 abfss_loc = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
 tbl_items = DBKS_TABLES[ENV]['items']
-
 
 # COMMAND ----------
 
