@@ -1,0 +1,35 @@
+name : Setup Databricks Job  
+on : 
+  push :
+    branches : ['dev', 'qas', 'stg', 'prd']
+
+env :
+  GH_REPO    : Bineo2/data-cx-collections-upload
+  BRANCH_ENV : ${{github.base_ref || github.ref_name}}
+
+jobs :
+  build-and-deploy : 
+    runs-on     : ubuntu-latest
+    environment : ${{github.base_ref || github.ref_name}}
+    
+    steps :    
+    - name : Checkout GitHub Actions 
+      uses : actions/checkout@v2
+      with : 
+        repository : ${{env.GH_REPO}}
+        ref        : ${{env.BRANCH_ENV}}
+
+    - name : Setup Python CLI 
+      uses : actions/setup-python@v2
+      with : 
+        python-version : 3.8
+    
+    - name : Py-Packages 
+      run : |
+        python -m pip install databricks-cli
+        
+        
+
+
+        
+     
