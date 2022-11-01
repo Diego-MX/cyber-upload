@@ -25,7 +25,7 @@
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
@@ -46,8 +46,8 @@ persons_spk = spark.createDataFrame(persons_df)
 loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
 
-lqan_df = core_session.get_loans_qan()
-lqan_spk = spark.createDataFrame(lqan_df)
+# lqan_df = core_session.get_loans_qan()
+# lqan_spk = spark.createDataFrame(lqan_df)
 
 
 # COMMAND ----------

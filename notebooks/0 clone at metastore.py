@@ -8,6 +8,29 @@
 
 # COMMAND ----------
 
+from datetime import datetime as dt
+import re
+from delta.tables import DeltaTable
+from pyspark.sql import functions as F, types as T, Window as W
+
+from src.platform_resources import AzureResourcer
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+
+tbl_items = DBKS_TABLES[ENV]['items']
+
+app_environ = ConfigEnviron(ENV, SERVER, spark)
+az_manager  = AzureResourcer(app_environ)
+
+at_storage = az_manager.get_storage()
+az_manager.set_dbks_permissions(at_storage)
+
+# Sustituye el placeholder AT_STORAGE, aunque mantiene STAGE para sustituirse después. 
+base_location = DBKS_TABLES[ENV]['base']
+abfss_loc = base_location.format(stage='gold', storage =at_storage)
+
+
+# COMMAND ----------
+
 # MAGIC %sql 
-# MAGIC CREATE TABLE nayru_accounts.brz_ops_loan_balances USING DELTA
-# MAGIC LOCATION "abfss://bronze@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates/loan-balances";
+# MAGIC CREATE TABLE nayru_accounts.gld_cx_collections_loans USING DELTA
+# MAGIC LOCATION "abfss://gold@stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts";

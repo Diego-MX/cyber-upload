@@ -62,12 +62,12 @@ PLATFORM_KEYS = {
         'app-id'    : 'cx-collections-id'}, 
     'qas': {        
         'key-vault' : {
-            'name'  : 'kv-collections-data-dev', 
-            'url'   : "https://kv-collections-data-dev.vault.azure.net/"}, 
+            'name'  : 'kv-cx-data-qas', 
+            'url'   : "https://kv-cx-data-qas.vault.azure.net/"}, 
         'storage'   : {
-            'name'  : 'lakehylia', 
-            'url'   : 'https://lakehylia.blob.core.windows.net/'}, 
-        'app-id'    : 'cx-collections-id'} }
+            'name'  : 'stlakehyliaqas', 
+            'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} } }
+        #,'app-id'    : 'cx-collections-id'} 
 
 
 CORE_KEYS = {
@@ -214,7 +214,8 @@ DBKS_KEYS = {
 DBKS_TABLES = {          
     'dev': {
         'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
-        'items': {  # table, location, old
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects',
+        'items': {  # table, base-location, prev-name. 
             'brz_persons'         : 
                 ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),
             'brz_loans'           : 
@@ -225,8 +226,12 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items', 'bronze.loan_open_items'),  
             'brz_loan_payments'   : 
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.zendesk_promises'), 
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts', 'silver.loan_contracts'), 
             'slv_loan_balances'   : 
                 ('nayru_accounts.slv_ops_loan_balances',   'loan-balances',  'silver.loan_balances'), 
             'slv_loan_open_items' : 
@@ -234,10 +239,10 @@ DBKS_TABLES = {
             'slv_loan_payments'   : 
                 ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
             'slv_promises'        : 
-                ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
+                ('farore_transactions.slv_cx_payment_promises', 'promises', 'silver.zendesk_promises'), 
             'gld_loans'           : 
                 ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')},
-        'names' : {
+        'names' : { # ya no se usan NAMES, sino ITEMS. 
             'brz_persons'         : 'bronze.persons_set', 
             'brz_loans'           : 'bronze.loan_contracts',        
             'brz_loan_balances'   : 'bronze.loan_balances', 
@@ -251,30 +256,35 @@ DBKS_TABLES = {
             'slv_promises'        : 'silver.zendesk_promises', 
             'gld_loans'           : 'gold.loan_contracts'} }, 
     'qas': {
-        'base': 'abfss://{stage}@lakehylia.dfs.core.windows.net/ops/core-banking/batch-updates', 
-        'items': {  # table, location, old
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects', 
+        'items': {  # table, location.
             'brz_persons'         : 
-                ('din_clients.brz_ops_persons_set',        'persons-set',    'bronze.persons_set'),
+                ('din_clients.brz_ops_persons_set',        'persons-set'),
             'brz_loans'           : 
-                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts', 'bronze.loan_contracts'), 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
             'brz_loan_balances'   : 
-                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances',  'bronze.loan_balances'), 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
             'brz_loan_open_items' : 
-                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items', 'bronze.loan_open_items'),  
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
             'brz_loan_payments'   : 
-                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises'), 
             'slv_persons'         : 
-                ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
+                ('din_clients.slv_ops_persons_set',        'persons-set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
             'slv_loan_balances'   : 
-                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances',  'silver.loan_balances'), 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
             'slv_loan_open_items' : 
-                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items', 'silver.loan_open_items'),  
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
             'slv_loan_payments'   : 
-                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
             'slv_promises'        : 
-                ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
+                ('farore_transactions.slv_cx_payment_promises', 'promises'), 
             'gld_loans'           : 
-                ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')}
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}
 }   }  
 
 
@@ -312,6 +322,7 @@ class ConfigEnviron():
                 mod_key = re.sub('_', '-', a_key.lower())
                 the_val = dbutils.secrets.get(scope=self.config['dbks']['scope'], key=mod_key)
                 return the_val
+            
         self.get_secret = get_secret
 
     def call_dict(self, a_dict): 

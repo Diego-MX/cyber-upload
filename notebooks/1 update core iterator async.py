@@ -19,25 +19,27 @@ from pyspark.sql import functions as F, types as T, Window as W
 
 import asyncio
 from httpx import Limits, Timeout
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
-from src.platform_resources import AzureResourcer
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
 from src.core_banking import SAPSessionAsync
+from src.platform_resources import AzureResourcer
 
-   
+
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
 
-api_types = ['open_items', 'payment_plan', 'balances']
-loans_ids = spark.table('bronze.loan_contracts').select('ID').toPandas()['ID'].tolist()
-
+at_base     = DBKS_TABLES[ENV]['base']
+table_items = DBKS_TABLES[ENV]['items'] 
 
 at_storage = azure_getter.get_storage()
 azure_getter.set_dbks_permissions(at_storage)
 
-at_base     = DBKS_TABLES[ENV]['base']
-table_items = DBKS_TABLES[ENV]['items'] 
-tables      = DBKS_TABLES[ENV]['names']
+abfss_brz = at_base.format(stage='bronze', storage=at_storage)
+abfss_slv = at_base.format(stage='silver', storage=at_storage)
 
+api_types = ['open_items', 'payment_plan', 'balances']
+loans_ids = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{table_items['brz_loans'][1]}")
+    .select('ID').toPandas()['ID'].tolist())
 
 # COMMAND ----------
 
@@ -57,7 +59,7 @@ async def call_all_apis(api_calls, ids_lists):
     sap_limits = Limits(max_keepalive_connections=10, max_connections=50)
     sap_timeouts = Timeout(10, pool=50, read=50)
     
-    async with SAPSessionAsync('qas-sap', azure_getter, limits=sap_limits, timeout=sap_timeouts) as core_client: 
+    async with SAPSessionAsync(CORE_ENV, azure_getter, limits=sap_limits, timeout=sap_timeouts) as core_client: 
         tasks = []
         for rev_params in product(ids_lists, api_calls): 
             params = rev_params[::-1]
@@ -115,17 +117,24 @@ print(f"""Lengths:
 
 # COMMAND ----------
 
-balances_df = pd.concat(calls_dicts["balances"].values()).rename(columns={"ts_call": "BalancesTS"})
-openitems_df = pd.concat(calls_dicts["open_items"].values()).rename(columns={"ts_call": "OpenItemTS"})
-pymntplans_df = pd.concat(calls_dicts["payment_plan"].values()).rename(columns={"ts_call": "PaymentPlanTS"})
 
-balances_spk = spark.createDataFrame(balances_df)
-openitems_spk = spark.createDataFrame(openitems_df)
+balances_df   = (pd.concat(calls_dicts["balances"].values())
+    .rename(columns={"ts_call": "BalancesTS"}))
+openitems_df  = (pd.concat(calls_dicts["open_items"].values())
+    .rename(columns={"ts_call": "OpenItemTS"}))
+pymntplans_df = (pd.concat(calls_dicts["payment_plan"].values())
+    .rename(columns={"ts_call": "PaymentPlanTS"}))
+
+balances_spk   = spark.createDataFrame(balances_df  )
+openitems_spk  = spark.createDataFrame(openitems_df )
 pymntplans_spk = spark.createDataFrame(pymntplans_df)
 
-balances_spk.write.mode("append").saveAsTable(f"{tables['brz_loan_balances']}_history")
-openitems_spk.write.mode("append").saveAsTable(f"{tables['brz_loan_open_items']}_history")
-pymntplans_spk.write.mode("append").saveAsTable(f"{tables['brz_loan_payments']}_history")
+(balances_spk.write.format('delta').mode('append')
+     .save(f"{abfss_brz}/{table_items['brz_loan_balances'  ][1]}_history"))
+(openitems_spk.write.format('delta').mode('append')
+     .save(f"{abfss_brz}/{table_items['brz_loan_open_items'][1]}_history"))
+(pymntplans_spk.write.format('delta').mode('append')
+     .save(f"{abfss_brz}/{table_items['brz_loan_payments'  ][1]}_history") )
 
 
 # COMMAND ----------
@@ -153,7 +162,12 @@ pymntplans_user = (pymntplans_spk
 
 # COMMAND ----------
 
-balances_user.write.mode('overwrite').saveAsTable(tables['brz_loan_balances'])
-openitems_user.write.mode('overwrite').saveAsTable(tables['brz_loan_open_items'])
-pymntplans_user.write.mode('overwrite').saveAsTable(tables['brz_loan_payments'])
+(balances_user.write.format('delta').mode('overwrite')
+     .save(f"{abfss_brz}/{table_items['brz_loan_balances'][1]}"))
+
+(openitems_user.write.format('delta').mode('overwrite')
+     .save(f"{abfss_brz}/{table_items['brz_loan_open_items'][1]}"))
+
+(pymntplans_user.write.format('delta').mode('overwrite')
+     .save(f"{abfss_brz}/{table_items['brz_loan_payments'][1]}"))
 

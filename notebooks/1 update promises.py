@@ -26,14 +26,25 @@
 
 # COMMAND ----------
 
-from config import ConfigEnviron, ENV, SERVER
+from importlib import reload
+from src import crm_platform, platform_resources
+import config
+reload(crm_platform)
+
+# COMMAND ----------
+
+from config import ConfigEnviron, ENV, SERVER, CRM_ENV, DBKS_TABLES
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
 secretter = ConfigEnviron(ENV, SERVER, spark)
-azurer_getter = AzureResourcer(secretter)
-zendesk = ZendeskSession('sandbox', azurer_getter)
+azure_getter = AzureResourcer(secretter)
+zendesker = ZendeskSession(CRM_ENV, azure_getter)
 
+at_storage = azure_getter.get_storage()
+
+abfss_loc = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
+tbl_items = DBKS_TABLES[ENV]['items']
 
 # COMMAND ----------
 
@@ -44,12 +55,12 @@ zendesk = ZendeskSession('sandbox', azurer_getter)
 
 # COMMAND ----------
 
-promises_df = zendesk.get_promises().drop(columns='external_id')
+promises_meta = tbl_items['brz_promises']
+promises_tbl = promises_meta[2] if len(promises_meta) > 2 else promises_meta[0]
+
+promises_df = zendesker.get_promises().drop(columns='external_id')
 promises_spk = spark.createDataFrame(promises_df)
-promises_spk.write.mode('overwrite').saveAsTable('bronze.crm_payment_promises')
+(promises_spk.write.mode('overwrite')
+        .format('delta')
+        .save(f"{abfss_loc}/promises"))
 
-
-# COMMAND ----------
-
-# MAGIC %sql 
-# MAGIC DESCRIBE TABLE EXTENDED bronze.crm_payment_promises
