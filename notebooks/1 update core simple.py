@@ -25,31 +25,17 @@
 from datetime import datetime as dt
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
-core_session = SAPSession('qas-sap', az_manager)
+core_session = SAPSession(CORE_ENV, az_manager)
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
 
-at_base = DBKS_TABLES[ENV]['base']
+at_base = DBKS_TABLES[ENV]['base']  # con placeholders STAGE, STORAGE. 
 table_items = DBKS_TABLES[ENV]['items'] 
-
-
-# COMMAND ----------
-
-first_time = False 
-
-abfss_loc = at_base.format(stage='bronze')
-
-# table_tuple:  new_name, location, old_name
-def set_table_delta(a_tuple, spk_session):
-    table_loc = f"{abfss_loc}/{a_tuple[1]}"
-    the_clause = f"CREATE TABLE {a_dict['name']} USING DELTA LOCATION \"{abfss_loc}\";"
-    print(the_clause)
-    #spk_session.sql(the_clause)
 
 
 # COMMAND ----------
@@ -66,6 +52,9 @@ lqan_spk = spark.createDataFrame(lqan_df)
 
 # COMMAND ----------
 
+
+abfss_loc = at_base.format(stage='bronze', storage=at_storage)
+
 (persons_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
@@ -75,9 +64,5 @@ lqan_spk = spark.createDataFrame(lqan_df)
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
     .save(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
-
-if first_time: 
-    set_table_delta(persons_dict, spark)
-    set_table_delta(loans_dict, spark)
  
 

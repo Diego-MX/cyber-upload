@@ -2,11 +2,9 @@
 # MAGIC %md 
 # MAGIC 
 # MAGIC # Descripción
-# MAGIC Este _notebook_ fue escrito originalmente por Jacobo.  
-# MAGIC Para llevarlo de DEV a QAs, le hice (Diego) algunas factorizaciones:  
-# MAGIC - Indicar tablas a partir de un diccionario en `CONFIG.PY`.  
-# MAGIC - Agrupar el código por celdas de acuerdo a las tablas que se procesan.
-# MAGIC - Encadenar las instrucciones de las tablas en una sola, cuando es posible. 
+# MAGIC 
+# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican los tipos de columnas desde el lado de la fuente. 
+# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos de columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
@@ -14,11 +12,14 @@
 
 # COMMAND ----------
 
+from datetime import datetime as dt, date
 import numpy as np
 import pandas as pd
-from pyspark.sql import functions as F, types as T, Window as W
-from datetime import datetime as dt
+from pyspark.sql import (dataframe as DF, functions as F, types as T, Window as W)
+from pyspark.sql.dataframe import DataFrame
+from pytz import timezone
 import re
+from typing import Tuple
 
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
@@ -31,12 +32,31 @@ at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
 
 # Sustituye el placeholder AT_STORAGE, aunque mantiene STAGE para sustituirse después. 
-base_location = f"abfss://{{stage}}@{at_storage}.dfs.core.windows.net/ops/core-banking-batch-updates"
+base_location = f"abfss://gold@lakehylia.dfs.core.windows.net/cx/collections/cyber"
+
+cyber_terminology = {
+    'core_balance' : 'C8BD1374', 'cms_balance'  : 'C8BD10000',
+    'core_status'  : 'C8BD1343', 'cms_status'   : 'C8BD10001', 
+    'core_payment' : 'C8BD1353', 'cms_payment'  : 'C8BD10002'}
 
 def pd_print(a_df: pd.DataFrame, width=180): 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', width):
         print(a_df)
 
+def save_as_file(a_df: DF.DataFrame, path_dir, path_file, **kwargs):
+    std_args = {
+        'mode': 'overwrite', 
+        'header': 'false'}
+    std_args.update(kwargs)
+    
+    a_df.coalesce(1).write.mode(std_args['mode']).option('header', std_args['header']).text(path_dir)
+    
+    f_extras = [filish for filish in dbutils.fs.ls(path_dir) if filish.name.startswith('part-')]
+    
+    if len(f_extras) != 1: 
+        raise "Expect only one file starting with 'PART'"
+    
+    dbutils.fs.mv(f_extras[0].path, path_file)
 
 # COMMAND ----------
 
@@ -48,19 +68,52 @@ def pd_print(a_df: pd.DataFrame, width=180):
 # MAGIC %md
 # MAGIC ## Solo 4 requieren modificación  
 # MAGIC 
-# MAGIC * `Loans Contract`:  es para filtrar
-# MAGIC * `Person Set`: tiene una modificación de dirección
-# MAGIC * `Balances`, `Open Items`: sí se tiene que analizar a fondo
+# MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan algunas columnas auxiliares.  
+# MAGIC * `Person Set`: tiene algunas modificaciones personalizadas.
+# MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo. 
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Loan Contract (Contract Set)
+# MAGIC ### Loan Contract
 
 # COMMAND ----------
 
-loan_contract = (spark.read.table(tables['brz_loans'])
-    .filter(F.col('LifeCycleStatusTxt') == 'activos, utilizados'))
+loan_contract_0 = (spark.read.table(tables['brz_loans'])
+    .filter(F.col('LifeCycleStatusTxt') == 'activos, utilizados')
+    .withColumn('yesterday', F.date_add(F.current_date(), -1))
+    .withColumn('status_2', F.when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') == 0), 'VIGENTE')
+                             .when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') >  0), 'VENCIDO')
+                             .when( F.col('LifeCycleStatus') == 50, 'LIQUIDADO')) )
+
+def spk_sapdate(str_col, dt_type): 
+    if dt_type == '/Date': 
+        dt_col = F.to_timestamp(F.regexp_extract(F.col(str_col), '\d+', 0)/1000)
+    elif dt_type == 'ymd': 
+        dt_col = F.to_date(F.col(str_col), 'yyyyMMdd')
+    return dt_col.alias(str_col)
+
+date_1_cols = ['CreationDateTime', 'LastChangeDateTime']
+
+date_2_cols = ['StartDate', 'CurrentPostingDate', 'EvaluationDate',
+    'TermSpecificationStartDate', 'TermSpecificationEndDate',
+    'TermAgreementFixingPeriodStartDate', 'TermAgreementFixingPeriodEndDate',
+    'PaymentPlanStartDate', 'PaymentPlanEndDate',
+    'EffectiveYieldValidityStartDate',
+    'EffectiveYieldCalculationPeriodStartDate', 'EffectiveYieldCalculationPeriodEndDate']
+
+dt_1_select = [ F.to_timestamp(F.regexp_extract(a_col, '\d+', 0)/1000).alias(a_col) 
+    for a_col in date_1_cols]
+dt_2_select = [ F.to_date(F.col(a_col), 'yyyyMMdd').alias(a_col) 
+    for a_col in date_2_cols]
+
+new_dates = (loan_contract_0
+    .select('ID', *(dt_1_select + dt_2_select)))
+
+loan_contract = (loan_contract_0
+    .drop(*(date_1_cols + date_2_cols))
+    .join(new_dates, on='ID'))
+
 display(loan_contract)
 
 # COMMAND ----------
@@ -71,15 +124,41 @@ display(loan_contract)
 # COMMAND ----------
 
 # Person Set
+states_str = ["AGU,1", "BCN,2", "BCS,3", "CAM,4", "COA,5", "COL,6", "CHH,8", "CHP,7", 
+              "CMX,9", "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
+              "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
+              "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
+states_data = [ {'AddressRegion': each_split[0], 'state_key': each_split[1]} 
+    for each_split in map(lambda x: x.split(','), states_str)]
+
+states_df = spark.createDataFrame(states_data)
 
 persons = (spark.read.table(tables['brz_persons'])
     .withColumn('split'    , F.split('LastName', ' ', 2))
     .withColumn('LastNameP', F.col('split').getItem(0))
     .withColumn('LastNameM', F.col('split').getItem(1))
-    .withColumnRenamed('Address', 'Address2')
-    .withColumn('address' , F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID')))
+    .withColumn('full_name1',F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'))
+    .withColumn('full_name' ,F.regexp_replace(F.col('full_name1'), ' +', ' '))
+    .withColumn('address2',  F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID'))
+    .join(states_df, how='left', on='AddressRegion')
+    )
 
 display(persons)
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### Loan Contract QAN
+
+# COMMAND ----------
+
+loans_qan = (spark.read.table("bronze.loan_qan_contracts"))
+
+display(loans_qan)
+
+# COMMAND ----------
+
+loans_qan.columns
 
 # COMMAND ----------
 
@@ -173,47 +252,27 @@ opens_name      = "bronze.loan_open_items"
 tables_dict = {
     "bronze.persons_set"        : persons, 
     "bronze.loan_contracts"     : loan_contract, 
-    "bronze.loan_qan_contracts" : spark.read.table("bronze.loan_qan_contracts"),
+    "bronze.loan_qan_contracts" : loans_qan,
     "bronze.loan_balances"      : balances,
     "bronze.loan_open_items"    : uncleared}
 
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC ### Tablas individuales
-
-# COMMAND ----------
-
 the_sap_tbls = pd.read_feather("../refs/catalogs/cyber_sap.feather")
+
+join_dict = {}
+for _, t_row in the_sap_tbls.iterrows(): 
+    if t_row['join_cols']: 
+        the_cols = t_row['join_cols'].split(',')
+        t_dict = dict(key_entry.split('=') for key_entry in the_cols)
+        join_dict[t_row['datalake']] = t_dict
+
+join_select = {}
+for key, v_dict in join_dict.items(): 
+    join_select[key] = [F.col(k).alias(v) for k, v in v_dict.items()] 
+    
 the_sap_tbls
-
-# COMMAND ----------
-
-# Only on SAP_COLS
-
-# joins_dict = {a_row['tabla_origen']: dict(a_row['join_cols'].split(',')) 
-#               for _, a_row in the_sap_tbls.iterrows()}
-
-persons_select  = [F.col(a_row['la_columna']).alias(a_row['nombre']) 
-        for _, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.persons_set']
-loans_select    = [F.col(a_row['la_columna']).alias(a_row['nombre']) 
-        for _, a_row in sap_cols.iterrows() if a_row['tabla_origen'] ==  'bronze.loan_contracts']
-lqan_select     = [F.col(a_row['la_columna']).alias(a_row['nombre']) 
-        for _, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.loan_qan_contracts']
-balances_select = [F.col(a_row['la_columna']).alias(a_row['nombre']) 
-        for _, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.loan_balances']
-opens_select    = [F.col(a_row['la_columna']).alias(a_row['nombre']) 
-        for _, a_row in sap_cols.iterrows() if a_row['tabla_origen'] ==  'bronze.loan_open_items']
-
-# With Join columns. 
-persons_tbl  = tables_dict['bronze.persons_set'].select(*persons_select, F.col('ID').alias('person_id'))
-loans_tbl    = tables_dict['bronze.loan_contracts'].select(*loans_select, F.col('ID').alias('loan_id'), F.col('BorrowerID').alias('person_id'))
-lqan_tbl     = tables_dict['bronze.loan_qan_contracts'].select(*lqan_select, F.col('ID').alias('loan_id'))
-balances_tbl = tables_dict['bronze.loan_balances'].select(*balances_select, F.col('ID').alias('loan_id'))
-opens_tbl    = tables_dict['bronze.loan_open_items'].select(*opens_select, F.col('ContractID').alias('loan_id'))
-
-
 
 # COMMAND ----------
 
@@ -222,43 +281,84 @@ opens_tbl    = tables_dict['bronze.loan_open_items'].select(*opens_select, F.col
 
 # COMMAND ----------
 
+# ['nombre', 'Posición inicial', 'Longitud', 'Tipo de dato', 'aux_nombre',
+#  'valor_fijo', 'tabla_origen', 'tipo_calc', 'ref_col', 'ref_type', 'ref_format']
+
 all_cols_1 = (pd.read_feather("../refs/catalogs/cyber_columns.feather")
     .drop(columns=['index']))
 
+longitud   = all_cols_1['Longitud'  ]
 valor_fijo = all_cols_1['valor_fijo']
-campo      = all_cols_1['campo']
-tipo_calc  = all_cols_1['tipo_calc']
-ref_col    = all_cols_1['ref_col']
+tipo_calc  = all_cols_1['tipo_calc' ]
+ref_col    = all_cols_1['ref_col'   ]
 
 all_cols_0 = (all_cols_1
-    .assign(**{
-        'tabla_origen': all_cols_1['tabla_origen'].fillna(''), 
-        'valor_fijo': np.where((valor_fijo == 'N/A') | valor_fijo.isnull(), None, valor_fijo), 
-        'la_columna': np.where(tipo_calc == 1, campo, 
-                    np.where(tipo_calc == 2, ref_col.str.extract(r"\(.*, (.*)\)", expand=False), 
-                  np.where(tipo_calc == 3, None, None)))}))
+    .assign(
+        la_columna   = np.where(tipo_calc == 1, ref_col, 
+                     np.where(tipo_calc == 2, ref_col.str.extract(r"\(.*, (.*)\)", expand=False), 
+                   np.where(tipo_calc == 3, None, None))), 
+        valor_fijo   = np.where(valor_fijo.isnull() | valor_fijo.isna() | (valor_fijo == 'N/A'), None, valor_fijo),
+        width        = longitud.astype(float).astype(int), 
+        width_1      = lambda df: df['width'].where(df['ref_type'] != 'dbl', df['width'] + 1),
+        precision_1  = longitud.str.split('.').str[1], 
+        precision    = lambda df: np.where(df['ref_type'] == 'dbl', df['precision_1'], df['width']),
+        tabla_origen = lambda df: df['tabla_origen'].fillna(''))
+    .set_index('nombre'))
 
 all_cols_0['in_sap'] = False
-for name in tables_dict: 
-    sub_idx = (all_cols_1['tabla_origen'] == name).isin([True])
-    all_cols_0.loc[sub_idx, 'in_sap'] = \
-            all_cols_0['la_columna'][sub_idx].isin(tables_dict[name].columns)
+for name in tables_dict:
+    tbl_cols = tables_dict[name].columns
+    sub_idx  = (all_cols_0['tabla_origen'] == name).isin([True])
+    in_sap   = all_cols_0['la_columna'][sub_idx].isin(tbl_cols)
+    all_cols_0.loc[sub_idx, 'in_sap'] = in_sap
 
-all_cols = all_cols_0.assign(**{
-    'spk_type' : np.where(all_cols_0['Tipo de dato'] == 'VARCHAR2', 'str', 
-               np.where(all_cols_0['Tipo de dato'] == 'DATE', 'date', 
-             np.where(all_cols_0['decimales'] > 0, 'dbl', 'int')))})
+all_cols = (all_cols_0.
+    assign(
+        x_format = [each['ref_format'].format(each['width_1'], each['precision']) 
+                    for _, each in all_cols_0.iterrows()], 
+        y_format = lambda df: df['x_format'].str.replace(r'\.\d*', '', regex=True),
+        c_format = lambda df: np.where(df['ref_type'] == 'int', df['y_format'], df['x_format']), 
+        s_format = ["%{}.{}s".format(wth, wth) for wth in all_cols_0['width']],
+        is_fixed = (all_cols_0['tipo_calc'].isin([3, 4]) | 
+                       ~all_cols_0['in_sap']).isin([True])))
 
 sap_cols = all_cols[all_cols['in_sap']]
 
-# [ 'nombre', 'Posición inicial', 'longitud2', 'decimales', 'valor_fijo',
-#   'Tipo de dato', 'tabla_origen', 'campo', 'calc', 'tipo_calc', 'ref_col']
+# ['nombre', 'Posición inicial', 'Longitud', 'Tipo de dato', 'aux_nombre',
+#        'valor_fijo', 'tabla_origen', 'tipo_calc', 'ref_col', 'ref_type',
+#        'ref_format', 'in_sap']
 # += ['la_columna', 'in_sap'] 
-cols_1 = ['nombre', 'tipo_calc', 'Tipo de dato', 'valor_fijo', 'la_columna', 'in_sap', 'spk_type'] 
-with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 220):
-    print(all_cols.loc[all_cols['tipo_calc'] == 3, cols_1])
+
+some_rows = all_cols['is_fixed']
+some_cols = ['tipo_calc', 'in_sap', 'tabla_origen', 'la_columna', 'ref_format', 's_format', 'c_format'] 
+
+pd_print(all_cols.loc[:, some_cols], 180)
+# pd_print(all_cols_1.loc[some_rows, some_cols])
     
 
+
+# COMMAND ----------
+
+# Only on SAP_COLS
+
+persons_select  = [F.col(a_row['la_columna']).alias(name) 
+        for name, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.persons_set']
+loans_select    = [F.col(a_row['la_columna']).alias(name) 
+        for name, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.loan_contracts']
+lqan_select     = [F.col(a_row['la_columna']).alias(name) 
+        for name, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.loan_qan_contracts']
+balances_select = [F.col(a_row['la_columna']).alias(name) 
+        for name, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.loan_balances']
+opens_select    = [F.col(a_row['la_columna']).alias(name) 
+        for name, a_row in sap_cols.iterrows() if a_row['tabla_origen'] == 'bronze.loan_open_items']
+
+# With Join columns. 
+persons_tbl  = tables_dict['bronze.persons_set'].select(*persons_select, F.col('ID').alias('person_id'))
+loans_tbl    = (tables_dict['bronze.loan_contracts']
+    .select(*loans_select, F.col('ID').alias('loan_id'), F.col('BorrowerID').alias('person_id')))
+lqan_tbl     = tables_dict['bronze.loan_qan_contracts'].select(*lqan_select, F.col('ID').alias('loan_id'))
+balances_tbl = tables_dict['bronze.loan_balances'     ].select(*balances_select, F.col('ID').alias('loan_id'))
+opens_tbl    = tables_dict['bronze.loan_open_items'   ].select(*opens_select, F.col('ContractID').alias('loan_id'))
 
 # COMMAND ----------
 
@@ -267,42 +367,53 @@ with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'd
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC 1. Definir tipos de _Spark_, y los valores nulos para cada uno de ellos.  
+# MAGIC 2. Crear columnas para los valores fijos definidos.  
+# MAGIC 3. Convertir a los tipos definidos en (1).  
+# MAGIC 4. Las fechas se manejan por separado.  
+
+# COMMAND ----------
+
 cast_types = {
-    'str' : T.StringType(), 
-    'int' : T.IntegerType(), 
-    'dbl' : T.DoubleType(), 
-    'date': T.DateType()
-}
-# VALOR_FIJO tiene 'N/A' != None. 
+    'str' : T.StringType(),   # ''
+    'int' : T.IntegerType(),  # 0
+    'dbl' : T.DoubleType(),   # 0
+    'date': T.DateType()}     # date(1970, 1, 1)
 
-fixed_slct = [ F.lit(a_row['valor_fijo'])
-                .cast(cast_types[a_row['spk_type']])
-                .alias(a_row['nombre'])
-    for _, a_row in all_cols[all_cols['tipo_calc'] == 3].iterrows()]
+null_values = {
+    'str' : '', 
+    'int' : 0, 
+    'dbl' : 0, 
+    'date': '1900-01-01'}
 
-missing_cols = [F.lit(None).alias(a_row['nombre'])
-    for _, a_row in all_cols[all_cols['tipo_calc'] == 4].iterrows()]
+fixed_values = { name: 
+    a_row['valor_fijo'] if a_row['valor_fijo'] else null_values[a_row['ref_type']]
+    for name, a_row in all_cols.iterrows() if a_row['is_fixed']}
 
-missing_sap = [F.lit(None).alias(a_row['nombre'])
-    for _, a_row in all_cols[all_cols['tipo_calc'].isin([1, 2]) & ~all_cols['in_sap']].iterrows()]
+fixed_select = [ F.lit(fixed_values[name]).cast(cast_types[a_row['ref_type']]).alias(name)
+    for name, a_row in all_cols[all_cols['is_fixed']].iterrows()]
 
-null_as_zeros = [a_row['nombre'] for _, a_row in all_cols.iterrows() 
-            if (a_row['spk_type'] in ['dbl', 'int'])]
-null_as_blank = [a_row['nombre'] for _, a_row in all_cols.iterrows() 
-            if (a_row['spk_type'] in ['date', 'str'])]
+types_select = [ F.col(name).cast(cast_types[a_row['ref_type']]).alias(name)
+    for name, a_row in all_cols.iterrows()]
 
+dates_select = [ F.when(F.col(name).isNull(), date(1900, 1, 1)).otherwise(F.col(name)).alias(name)
+    for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'date']
 
-golden_1 = (persons_tbl
+golden = (persons_tbl
     .join(loans_tbl   , how='right', on='person_id')
     .join(lqan_tbl    , how='left' , on='loan_id')
     .join(balances_tbl, how='left' , on='loan_id') 
     .join(opens_tbl   , how='left' , on='loan_id')
     .drop(*['person_id', 'loan_id'])
-    .select('*', *missing_cols, *missing_sap, *fixed_slct)
-    .fillna(0, subset=null_as_zeros)
-    .fillna('', subset=null_as_blank))
+    .select('*', *fixed_select)
+    .fillna('1900-01-01', all_cols.index[all_cols['ref_type'] == 'date'].tolist())
+    .fillna('',           all_cols.index[all_cols['ref_type'] == 'str' ].tolist())
+    .fillna(0,            all_cols.index[all_cols['ref_type'].isin(['dbl', 'int'])].tolist())
+    .select(*types_select)
+    )
 
-display(golden_1)
+
 
 # COMMAND ----------
 
@@ -311,65 +422,49 @@ display(golden_1)
 
 # COMMAND ----------
 
-longitud_f = (all_cols['longitud2'].astype('float') 
-            + all_cols['decimales']/10).astype(str)
-longitud_i =  all_cols['longitud2'].astype(str)
+str_select  = [F.format_string(a_row['c_format'], F.col(name)).alias(name)
+    for name, a_row in all_cols[all_cols['ref_type'] == 'str'].iterrows()]
 
-pre_format = np.where(all_cols['spk_type'] == 'str', longitud_i + 's', 
-             np.where(all_cols['spk_type'] == 'date',longitud_i + 's', 
-             np.where(all_cols['spk_type'] == 'dbl', longitud_f + 'f', '0' + longitud_i + 'd')))
+date_select = [F.when(F.col(name) == date(1900, 1, 1), F.lit('        '))
+        .otherwise(F.date_format(F.col(name), 'MMddyyyy')).alias(name)
+    for name in all_cols.index[all_cols['ref_type'] == 'date']]
 
-all_cols_fmt = all_cols.assign(**{
-    'f_string' : '%' + pre_format,
-    's_string' : '%' + longitud_i + 's'}) 
+dbl_select  = [F.regexp_replace(
+                  F.format_string(a_row['c_format'], name), 
+                  '[\.,]', '').alias(name) 
+    for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'dbl']
 
-# [ 'nombre', 'Posición inicial', 'longitud2', 'decimales', 'valor_fijo',
-#   'Tipo de dato', 'tabla_origen', 'campo', 'calc', 'tipo_calc', 'ref_col',
-#   'la_columna', 'in_sap', 'spk_type']
-# ... 'f_string', 's_string']
-fmt_cols = ['nombre', 'Posición inicial', 'longitud2', 'decimales', 'spk_type', 'Tipo de dato', 'f_string', 's_string']
-with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 220):
-    print(all_cols_fmt.loc[all_cols_fmt['Tipo de dato'] == 'NUMBER', fmt_cols])
-    
+int_select = [F.format_string(str(a_row['c_format']), name).alias(name)
+    for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'int']
+
+## 3. 
+fxw_select = [F.format_string(a_row['s_format'], F.col(name)).alias(name)
+    for name, a_row in all_cols.iterrows()]
+
+fxw_core_balances = (golden.select(*types_select)
+    .select(*str_select, *dbl_select, *date_select, *int_select)  
+    .select(*fxw_select)
+    .select(F.concat(*all_cols.index).alias('|'.join(all_cols['aux_nombre'])))
+    )
+
+some_cols = all_cols.index[all_cols['ref_type'] == 'dbl']
+
+display(fxw_core_balances)
 
 # COMMAND ----------
 
-# The types:  
-# 1. Let's cast to type first ;) 
-# 2. Each type is converted to string in its terms. 
-# 3. Apply fixed width condition ...
-# 4. Select columns in order. 
+explore = False
 
+if explore: 
+    time_format = '%Y-%m-%d_%H-%M'
+    file_header = 'true'
+else: 
+    time_format = '%Y-%m-%d_00-00'
+    file_header = 'false'
+    
+now_time = dt.now(tz=timezone('America/Mexico_City')).strftime(time_format)
 
-## 1. 
-types_select = [
-    F.col(a_row['nombre']).cast(cast_types[a_row['spk_type']]).alias(a_row['nombre'])
-        for _, a_row in all_cols_fmt.iterrows()]
-## 2. 
-str_select = [F.col(a_row['nombre']) 
-    for _, a_row in all_cols_fmt.iterrows() if a_row['spk_type'] == 'str']
+report1_pre = f"{base_location}/spark/core_balance/{now_time}"
+report1_pos = f"{base_location}/core_balance/{now_time}.txt"
 
-date_select = [F.date_format(a_row['nombre'], 'MMddyyyy').alias(a_row['nombre']) 
-    for _, a_row in all_cols_fmt.iterrows() if a_row['spk_type'] == 'date']
-
-dbl_select = [F.format_number(a_row['nombre'], int(a_row['decimales'])).alias(a_row['nombre']) 
-    for _, a_row in all_cols_fmt.iterrows() if a_row['spk_type'] == 'dbl']
-
-# int_select = [F.format_string(str(a_row['f_string']), a_row['nombre']).alias(a_row['nombre'])
-#     for _, a_row in sap_cols_fmt.iterrows() if a_row['spk_type'] == 'int']
-
-int_select = [F.format_string(str(a_row['f_string']), a_row['nombre']).alias(a_row['nombre'])
-    for _, a_row in all_cols_fmt.iterrows() if a_row['spk_type'] == 'int']
-
-## 3. 
-fxd_width_select = [F.format_string(str(a_row['s_string']), F.col(a_row['nombre'])).alias(a_row['nombre'])
-    for _, a_row in all_cols_fmt.iterrows()]
-
-golden_2 = (golden_1.select(*types_select)
-    .select(*int_select, *str_select, *dbl_select, *date_select)   
-    .select(*fxd_width_select)
-    .select(F.concat(*sap_cols_fmt['nombre']).alias('one_mega_string'))
-#    .select(*sap_cols_fmt['nombre'], F.concat(*sap_cols_fmt['nombre']).alias('one_mega_string'))
-)
-
-display(golden_2)
+save_as_file(fxw_core_balances, report1_pre, report1_pos)

@@ -12,22 +12,68 @@ It has two stages:
 
 And it also sets some common references for the other given repo with datalake/cosmosDB.  
 
-# Contents
+File history: 
+- Mar '22 creation 
+- Oct '22 edit
 
-The contents as of March '22 are the following:  
+## Runbook 
+
+Some variable names are predefined as to match the ones in earlier stage of development.  
+To suggest a change, consider redefining it in the code.   
+
+
+Previous requirements: 
+- Databricks secrets scope (`eh-core-banking`) with service principal keys:  
+  `sp-core-events-client`, `sp-core-events-secret`, `aad-tenant-id`, `sp-core-events-subscription`  
+  This works as an identity for the running application.  
+
+- Azure key vault (`kv-collections-data-<env>`);  
+  Give access to the service principal above and set keys:   
+  SAP keys: `core-api-key`, `core-api-secret`, `core-api-user`, `core-api-password`  
+  CRM keys:  `crm-api-user`, `crm-api-token`, 
+      `crm-zis-id`, `crm-zis-user`, `crm-zis-pass`  
+
+- Databricks Tables and access.  
+  Datalake, e.g. storage container `stlakehylia<qas>` 
+  and its corresponding 'folders' (`bronze`, `silver`, `gold`) at `.../ops/core-banking/batch-updates/...`  
+  `persons_set`, `loan_contracts`, `loan_contracts`,  
+  `loan_balances`, `loan_open_items`, `loan_payments`,   
+  `zendesk_promises`  
+  
+- File `config.py`, consider the following checks:  
+  Environment variables `ENV_TYPE` (`dev`, `qas`, `stg`, `prd`)  
+  `SERVER_TYPE=dbks` (in other places we may use `wap`, `local-win`, `local-mac`)  
+  `CORE_ENV=<ENV>-sap` (it is not always the case that our environment stage is the same as the core's)  
+  `CRM_ENV=<ENV>-zd` (same as above, and consider that the names may differ, eg. `sandbox` instead of `dev`)
+  
+- Also in `config.py` check following configurations:   
+  `CORE_KEYS[$CORE_ENV] = ... main[base-url], calls[auth, url]`  
+  `CRM_KEYS[$CRM_ENV]   = ... main[url]`
+  Azure resources: `key-vault`, `storage`, (`app-id`). 
+  
+- Inside Databricks, not readily automized:   
+  0. Check configuration: metastore and other mothers.  
+  1. Create tables.  
+  2. Create jobs from notebooks.  
+  
+  
+- For the twin repository `data-collections-webapp`, also setup:  
+  Key vault secrets:  `dbks-wap-token`, `dbks-odbc-host`, `dbks-odbc-http`  
+  corresponding to -obviously- Databricks connection parameters.  
+  
+  
+  
 
 ## Jobs/Notebooks: 
 
 - `1 update core iterator` calls SAP functions to be iterated by user.   
   This is not optimal, as the number of users grow.  Its setup every hour.  
 
-- `1 update core simple` calls SAP functions to be called once for all users.   
+- `1 update core simple zoras` calls SAP functions to be called once for all users.   
   Also updated every hour, which does work.   
 
 - `1 update promises` calls Zendesk functions to update promises every hour.   
 
-- `2 messages calls hourly` checks for the types of messages to be called each hour 
-  and calls them.  
 
 Other notebooks that are called on a regular basis and stored elsewhere ... _en el_ 
 workspace de Jacobo:   
