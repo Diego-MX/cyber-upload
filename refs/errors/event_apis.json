@@ -1,0 +1,42 @@
+[ {
+    "$filter":"ge(EventDateTime,datetime'2022-07-21T20:41:42')", 
+    "output": {
+      "error": {
+        "code":"005056A509B11EE1B9A8FEA8DE87F78E",
+        "message":{
+          "lang":"es",
+          "value":"Eigenschaft ge in Typ Event nicht gefunden"},
+        "innererror":{
+          "transactionid":"F781A949417E0200E0062D9DE14BCC0E",
+          "timestamp":"20220721234143.0053890",
+          "Error_Resolution":{
+            "SAP_Transaction":"For backend administrators: use ADT feed reader \"SAP Gateway Error Log\" or run transaction /IWFND/ERROR_LOG on SAP Gateway hub system and search for entries with the timestamp above for more details",
+            "SAP_Note":"See SAP Note 1797736 for error analysis (https://service.sap.com/sap/support/notes/1797736)"
+  } } } } }, 
+  {
+    "filter": "ge(EventDateTime,datetime'2022-07-21T20:57:03')", 
+    "output": {
+      "error":{
+        "code":"00/001",
+        "message":{
+          "lang":"es",
+          "value":"filter=EventDateTime mandatory"},
+        "innererror":{
+          "application":{
+            "component_id":"FS-AM",
+            "service_namespace":"/BAO/",
+            "service_id":"AM_BASIC0_BAPE_SRV",
+            "service_version":"0001"},
+          "transactionid":"F781A949417E0340E0062D99EC62FC99",
+          "timestamp":"",
+          "Error_Resolution":{
+            "SAP_Transaction":"",
+            "SAP_Note":"See SAP Note 1797736 for error analysis (https://service.sap.com/sap/support/notes/1797736)"},
+          "errordetails":[ {
+            "code":"00/001",
+            "message":"filter=EventDateTime mandatory",
+            "propertyref":"",
+            "severity":"error",
+            "transition":false,
+            "target":""} ]
+} } } } ]

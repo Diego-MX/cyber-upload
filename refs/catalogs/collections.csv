@@ -1,0 +1,42 @@
+nombre,filtro,comunicaciones,database,dtipo,comparador,_middlename
+Número de préstamo,True,True,num_prestamo,numeric,only_equal,BankAccountID
+Monto dispersado,True,True,monto_dispersado,float,numeric,InitialLoanAmount
+Fecha de inicio,True,True,fecha_inicio,date,numeric,TermSpecificationStartDate
+CLABE,,True,clabe,str,numeric,ClabeAccount
+Parcialidades pagadas,True,True,parcialidades_pagadas,numeric,,parcialidades_pagadas
+Parcialidades por pagar,True,True,parcialidades_plan,numeric,numeric,parcialidades_plan
+Parcialidades vencidas,True,True,parcialidades_vencidas,numeric,numeric,parcialidades_vencidas
+Días de atraso,True,True,dias_atraso,numeric,numeric,OverdueDays
+Monto principal,True,True,monto_principal,numeric,numeric,monto_principal
+Interés ordinario,True,True,ord_interes,numeric,numeric,ord_interes
+Comisiones,True,True,comisiones,numeric,numeric,comisiones
+Monto de liquidación,True,True,monto_liquidacion,numeric,numeric,monto_liquidacion
+Termino,True,True,termino,integer,numeric,TermSpecificationValidityPeriodDurationM
+Tasa de interés,True,True,tasa_interes,numeric,numeric,NominalInterestRate
+Siguiente fecha de pago,True,True,sig_pago,date,numeric,sig_pago
+Monto a pagar,True,True,monto_a_pagar,numeric,numeric,monto_a_pagar
+Monto vencido,True,True,monto_vencido,numeric,numeric,monto_vencido
+Principal vencido,True,True,principal_vencido,numeric,numeric,principal_vencido
+Interés ordinario vencido,True,True,interes_ord_vencido,numeric,numeric,interes_ord_vencido
+id,,True,num_cliente,str,only_equal,BorrowerID
+Nombre(s),,True,nombre,str,string,FirstName
+Primer Apellido,,True,apellido,str,,LastName
+Segundo Apellido,,True,apellido_2,str,,LastName2
+Estado,True,True,ciudad,str,string,AddressRegion
+Municipio/alcaldía,True,True,municipio,str,string,AddressCity
+Colonia,,True,colonia,str,,AddressDistrictName
+Calle,,True,calle,str,,AddressStreet
+Número exterior,,True,num_ext,str,,AddressHouseID
+Codigo postal,True,True,zipcode,str,string,AddressPostalCode
+Genero,True,True,genero,str,,Gender
+Estatus préstamo,True,True,estatus,str,,LifeCycleStatusTxt
+id de Promesa,True,True,promesa_id,str,,promise_id
+Descuento principal,True,True,promesa_descuento_principal,numeric,,principal
+Descuento intereses,True,True,promesa_descuento_intereses,numeric,,interest
+Descuento Comisiones,True,True,promesa_descuento_comisiones,numeric,,comission
+Monto de la promesa,True,True,promesa_monto,float,,attribute_payment_amount
+Fecha de creación de la promesa,True,True,promesa_fecha_inicio,date,,created_at
+Fecha de vencimiento de la promesa,True,True,promesa_fecha_vencimiento,date,,attribute_due_date
+Promesa procesada,True,True,promesa_procesada,bool,,attribute_processed
+Promesa cumplida,True,True,promesa_cumplida,bool,,attribute_accomplished
+Ejecutivo,True,True,promesa_ejecutivo,str,,attribute_agent_name

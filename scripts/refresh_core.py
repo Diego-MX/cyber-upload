@@ -15,10 +15,8 @@ load_dotenv(override=True)
 
 #%% Obtener los nuevos préstamos. 
 
-if 'ipykernel' not in sys.modules:
-    deposit_how = "feather"
-else:
-    deposit_how = "delta"  # "blob"  "feather"
+in_dbks = 'ipykernel' not in sys.modules
+deposit_how = 'feather' if in_dbks else 'delta'  # blob, feather
 
 
 hour_str = dt.now().strftime("%Y%m%d_%H%M")
@@ -76,3 +74,4 @@ if deposit_how == "delta":
     loans_df.to_delta(f"{storage_dir}/current.delta")
     persons_df.to_delta(f"{storage_dir}/{hour_str}.delta")   
     loans_df.to_delta(f"{storage_dir}/{hour_str}.delta")
+
