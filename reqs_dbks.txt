@@ -2,28 +2,20 @@
 # The Python Worker is managed by Azure Functions platform
 # Manually managing azure-functions-worker may cause unexpected issues
 
+
 # Utilities
+deepdiff
 azure-identity
 azure-keyvault-secrets
-azure-storage-blob
-msrestazure
+
+httpx
 python-dotenv
-winshell
 
 # Data 
 pandas
-pyarrow
 openpyxl
-pyodbc
 
 # Web
 requests
+httpx
 jsonschema
-Flask
-fastapi
-uvicorn
-
-# Lowlevel
-orjson
-
-
