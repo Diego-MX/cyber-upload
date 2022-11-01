@@ -5,7 +5,7 @@ on :
 
 env :
   GH_REPO    : Bineo2/data-cx-collections-upload
-  ENV_BRANCH : ${{github.base_ref || github.ref_name}}
+  BRANCH_ENV : ${{github.base_ref || github.ref_name}}
 
 jobs :
   build-and-deploy : 
@@ -17,26 +17,19 @@ jobs :
       uses : actions/checkout@v2
       with : 
         repository : ${{env.GH_REPO}}
-        ref        : ${{env.ENV_BRANCH}}
+        ref        : ${{env.BRANCH_ENV}}
 
-    # https://github.com/mr-smithers-excellent/docker-build-push
-    - name : Docker registry, build and push
-      id   : container-registry
-      uses : mr-smithers-excellent/docker-build-push@v5.5
+    - name : Setup Python CLI 
+      uses : actions/setup-python@v2
       with : 
-        registry   : ${{secrets.ACR_USER}}.azurecr.io
-        username   : ${{secrets.ACR_USER}}
-        password   : ${{secrets.ACR_PASS}}
-        image      : ${{env.DKR_IMAGE}}
-        tags       : ${{env.DKR_TAG}}
-        dockerfile : dockerfile.ci 
-        buildArgs  : SERVER_TYPE=wap,ENV_TYPE=${{env.ENV_BRANCH}}
+        python-version : 3.8
+    
+    - name : Py-Packages 
+      run : |
+        python -m pip install databricks-cli
         
-    - name : Deploy to App Service
-      uses : azure/webapps-deploy@v2
-      with :
-        images : "${{secrets.ACR_USER}}.azurecr.io/${{env.DKR_IMAGE}}:${{env.DKR_TAG}}"
-        app-name : ${{env.WAP_NAME}}
-        publish-profile : ${{secrets.WAP_PUBLISH}}
+        
+
+
         
      
