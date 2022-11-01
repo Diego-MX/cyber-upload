@@ -1,4 +1,4 @@
-name : Setup Databricks Jobs.  
+name : Setup Databricks Job  
 on : 
   push :
     branches : ['dev', 'qas', 'stg', 'prd']
