@@ -1,0 +1,12 @@
+nombre,filtro,comunicaciones,database,dtipo,comparador,_middlename
+Fecha de inicio,True,True,PaymentPlanStartDate,date,numeric,PaymentPlanStartDate
+CLABE,,True,BankRoutingID,str,numeric,BankRoutingID
+Días de atraso,True,True,OverdueDays,numeric,numeric,OverdueDays
+Monto principal,True,True,EffectiveCapital,numeric,numeric,EffectiveCapital
+Periodicidad de pago,True,True,TermSpecificationValidityPeriodDuration,str,numeric,TermSpecificationValidityPeriodDuration
+Tasa de interés,True,True,NominalInterestRate,numeric,numeric,NominalInterestRate
+Monto a pagar,True,True,CurrentOpenItemsAmount,numeric,numeric,CurrentOpenItemsAmount
+Monto vencido,True,True,OutstandingBalance,numeric,numeric,OutstandingBalance
+id,,True,BorrowerID,str,only_equal,BorrowerID
+Nombre(s),,True,BorrowerName,str,string,BorrowerName
+Estatus préstamo,True,True,LifeCycleStatusTxt,str,,LifeCycleStatusTxt
