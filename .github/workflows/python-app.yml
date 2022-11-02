@@ -32,11 +32,8 @@ jobs :
       uses : microsoft/install-databricks-cli@v1.0.0
  
     # Import notebook to Shared
-    - name : Import Job Notebooks 
-      run : databricks workspace import_dir --overwrite ./notebooks '/Shared/Job Notebooks'
+    # - name : Import Job Notebooks 
+    #    run : databricks workspace import_dir --overwrite ./notebooks '/Shared/Job Notebooks'
 
-    # List Shared content
-    - name : List workspace with databricks CLI
-      run : databricks workspace list --absolute --long --id /Shared
 
 

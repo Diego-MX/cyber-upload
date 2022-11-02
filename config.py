@@ -78,15 +78,15 @@ PLATFORM_KEYS = {
             'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} }, 
     'stg': {        
         'key-vault' : {
-            'name'  : 'kv-cx-collections-stg', 
-            'url'   : "https://kv-cx-collections-stg.vault.azure.net/"}, 
+            'name'  : 'kv-cx-adm-stg', 
+            'url'   : "https://kv-cx-adm-stg.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'stlakehyliastg', 
             'url'   : 'https://stlakehyliastg.blob.core.windows.net/'} }, 
     'prd': {        
         'key-vault' : {
-            'name'  : 'kv-cx-collections-prd', 
-            'url'   : "https://kv-cx-collections-prd.vault.azure.net/"}, 
+            'name'  : 'kv-cx-data-prd', 
+            'url'   : "https://kv-cx-data-prd.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'stlakehyliaprd', 
             'url'   : 'https://stlakehyliaprd.blob.core.windows.net/'} }
