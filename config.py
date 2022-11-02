@@ -228,7 +228,7 @@ DBKS_TABLES = {
             'brz_loan_payments'   : 
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
             'brz_promises'        : 
-                ('farore_transactions.brz_cx_payment_promises', None, 'bronze.crm_payment_promises'),
+                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.crm_payment_promises'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
             'slv_loans'         : 
@@ -240,7 +240,7 @@ DBKS_TABLES = {
             'slv_loan_payments'   : 
                 ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
             'slv_promises'        : 
-                ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
+                ('farore_transactions.slv_cx_payment_promises', 'promises', 'silver.zendesk_promises'), 
             'gld_loans'           : 
                 ('nayru_accounts.gld_cx_collections_loans', 'gold.loan_contracts')},
         'names' : {
@@ -270,6 +270,8 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items', 'bronze.loan_open_items'),  
             'brz_loan_payments'   : 
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.crm_payment_promises'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
             'slv_loan_balances'   : 
@@ -279,7 +281,7 @@ DBKS_TABLES = {
             'slv_loan_payments'   : 
                 ('nayru_accounts.slv_ops_loan_payments',   'loan-payments',  'silver.loan_payments'),
             'slv_promises'        : 
-                ('farore_transactions.slv_cx_payment_promises', '', 'silver.zendesk_promises'), 
+                ('farore_transactions.slv_cx_payment_promises', 'promises', 'silver.zendesk_promises'), 
             'gld_loans'           : 
                 ('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts', 'gold.loan_contracts')}
 }   }  
