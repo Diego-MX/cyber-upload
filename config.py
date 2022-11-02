@@ -43,13 +43,21 @@ SETUP_KEYS = {
     }, 
     'stg' : {
         'service-principal' : {
-            'client_id'       : (1, 'sp-core-events-client'), 
-            'client_secret'   : (1, 'sp-core-events-secret'), 
+            'client_id'       : (1, 'sp-collections-client'), 
+            'client_secret'   : (1, 'sp-collections-secret'), 
             'tenant_id'       : (1, 'aad-tenant-id'), 
-            'subscription_id' : (1, 'sp-core-events-subscription') } , 
-        'dbks': {'scope': 'eh-core-banking'}
+            'subscription_id' : (1, 'sp-collections-subscription') } , 
+        'dbks': {'scope': 'cx-collections'}
+    },
+    'prd' : {
+        'service-principal' : {
+            'client_id'       : (1, 'sp-collections-client'), 
+            'client_secret'   : (1, 'sp-collections-secret'), 
+            'tenant_id'       : (1, 'aad-tenant-id'), 
+            'subscription_id' : (1, 'sp-collections-subscription') } , 
+        'dbks': {'scope': 'cx-collections'}
     }
-}
+} 
 
 
 PLATFORM_KEYS = {
@@ -67,7 +75,22 @@ PLATFORM_KEYS = {
             'url'   : "https://kv-cx-data-qas.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'stlakehyliaqas', 
-            'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} } }
+            'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} }, 
+    'stg': {        
+        'key-vault' : {
+            'name'  : 'kv-cx-collections-stg', 
+            'url'   : "https://kv-cx-collections-stg.vault.azure.net/"}, 
+        'storage'   : {
+            'name'  : 'stlakehyliastg', 
+            'url'   : 'https://stlakehyliastg.blob.core.windows.net/'} }, 
+    'prd': {        
+        'key-vault' : {
+            'name'  : 'kv-cx-collections-prd', 
+            'url'   : "https://kv-cx-collections-prd.vault.azure.net/"}, 
+        'storage'   : {
+            'name'  : 'stlakehyliaprd', 
+            'url'   : 'https://stlakehyliaprd.blob.core.windows.net/'} }
+}
         #,'app-id'    : 'cx-collections-id'} 
 
 
@@ -175,6 +198,7 @@ CRM_KEYS = {
             'filters'  : ("sunshine/objects/records",
                     "services/zis/inbound_webhooks/generic/ingest") } }}
 
+
 DBKS_KEYS = {
     'dev': {
         'connect': {
@@ -210,8 +234,10 @@ DBKS_KEYS = {
                 'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
             'contracts'   : "bronze.loan_contracts", 
-            'collections' : "gold.loan_contracts"}   }   } 
-                                    
+            'collections' : "gold.loan_contracts"}   }, 
+} 
+
+
 DBKS_TABLES = {          
     'dev': {
         'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
@@ -228,7 +254,7 @@ DBKS_TABLES = {
             'brz_loan_payments'   : 
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
             'brz_promises'        : 
-                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.zendesk_promises'), 
+                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.crm_payment_promises'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
             'slv_loans'         : 
@@ -285,8 +311,68 @@ DBKS_TABLES = {
             'slv_promises'        : 
                 ('farore_transactions.slv_cx_payment_promises', 'promises'), 
             'gld_loans'           : 
-                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}
-}   }  
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
+    'stg': {
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects', 
+        'items': {  # table, location.
+            'brz_persons'         : 
+                ('din_clients.brz_ops_persons_set',        'persons-set'),
+            'brz_loans'           : 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
+            'brz_loan_balances'   : 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
+            'brz_loan_open_items' : 
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
+            'brz_loan_payments'   : 
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'slv_persons'         : 
+                ('din_clients.slv_ops_persons_set',        'persons-set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
+            'slv_loan_balances'   : 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
+            'slv_loan_open_items' : 
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
+            'slv_loan_payments'   : 
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
+            'slv_promises'        : 
+                ('farore_transactions.slv_cx_payment_promises', 'promises'), 
+            'gld_loans'           : 
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
+    'prd': {
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects', 
+        'items': {  # table, location.
+            'brz_persons'         : 
+                ('din_clients.brz_ops_persons_set',        'persons-set'),
+            'brz_loans'           : 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
+            'brz_loan_balances'   : 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
+            'brz_loan_open_items' : 
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
+            'brz_loan_payments'   : 
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'slv_persons'         : 
+                ('din_clients.slv_ops_persons_set',        'persons-set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
+            'slv_loan_balances'   : 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
+            'slv_loan_open_items' : 
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
+            'slv_loan_payments'   : 
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
+            'slv_promises'        : 
+                ('farore_transactions.slv_cx_payment_promises', 'promises'), 
+            'gld_loans'           : 
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
+  }  
 
 
 class ConfigEnviron():
