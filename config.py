@@ -43,13 +43,21 @@ SETUP_KEYS = {
     }, 
     'stg' : {
         'service-principal' : {
-            'client_id'       : (1, 'sp-core-events-client'), 
-            'client_secret'   : (1, 'sp-core-events-secret'), 
+            'client_id'       : (1, 'sp-collections-client'), 
+            'client_secret'   : (1, 'sp-collections-secret'), 
             'tenant_id'       : (1, 'aad-tenant-id'), 
-            'subscription_id' : (1, 'sp-core-events-subscription') } , 
-        'dbks': {'scope': 'eh-core-banking'}
+            'subscription_id' : (1, 'sp-collections-subscription') } , 
+        'dbks': {'scope': 'cx-collections'}
+    },
+    'prd' : {
+        'service-principal' : {
+            'client_id'       : (1, 'sp-collections-client'), 
+            'client_secret'   : (1, 'sp-collections-secret'), 
+            'tenant_id'       : (1, 'aad-tenant-id'), 
+            'subscription_id' : (1, 'sp-collections-subscription') } , 
+        'dbks': {'scope': 'cx-collections'}
     }
-}
+} 
 
 
 PLATFORM_KEYS = {
@@ -67,7 +75,22 @@ PLATFORM_KEYS = {
             'url'   : "https://kv-cx-data-qas.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'stlakehyliaqas', 
-            'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} } }
+            'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} }, 
+    'stg': {        
+        'key-vault' : {
+            'name'  : 'kv-cx-collections-stg', 
+            'url'   : "https://kv-cx-collections-stg.vault.azure.net/"}, 
+        'storage'   : {
+            'name'  : 'stlakehyliastg', 
+            'url'   : 'https://stlakehyliastg.blob.core.windows.net/'} }, 
+    'prd': {        
+        'key-vault' : {
+            'name'  : 'kv-cx-collections-prd', 
+            'url'   : "https://kv-cx-collections-prd.vault.azure.net/"}, 
+        'storage'   : {
+            'name'  : 'stlakehyliaprd', 
+            'url'   : 'https://stlakehyliaprd.blob.core.windows.net/'} }
+}
         #,'app-id'    : 'cx-collections-id'} 
 
 
@@ -210,7 +233,8 @@ DBKS_KEYS = {
                 'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
             'contracts'   : "bronze.loan_contracts", 
-            'collections' : "gold.loan_contracts"}   }   } 
+            'collections' : "gold.loan_contracts"}   }, 
+} 
                                     
 DBKS_TABLES = {          
     'dev': {
