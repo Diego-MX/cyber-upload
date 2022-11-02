@@ -60,3 +60,8 @@ one_bronze = brz_loans.filter(F.col('BankAccountID')=='03017012378')
 brz_json = loads(one_bronze.toJSON().collect()[0])
 print(dumps(brz_json, indent=2))
 
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT BankAccountID, InitialLoanAmount, TermSpecificationStartDate, ClabeAccount, monto_principal, parcialidades_pagadas, parcialidades_plan, LifeCycleStatusTxt, parcialidades_vencidas, ord_interes, OverdueDays, comisiones, monto_liquidacion, TermSpecificationValidityPeriodDurationM, NominalInterestRate, sig_pago, monto_a_pagar, monto_vencido, interes_ord_vencido, BorrowerID, FirstName, LastName, LastName2, AddressRegion, AddressCity, AddressDistrictName, AddressStreet, AddressHouseID, AddressPostalCode, Gender, promise_id, principal, interest, comission, attribute_payment_amount, created_at, attribute_due_date, attribute_processed, attribute_accomplished, attribute_agent_name FROM gold.loan_contracts WHERE (1 = 1) and (`AddressPostalCode` == '06720'); 
