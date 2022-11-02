@@ -252,7 +252,7 @@ DBKS_TABLES = {
             'brz_loan_payments'   : 
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
             'brz_promises'        : 
-                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.zendesk_promises'), 
+                ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.crm_payment_promises'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
             'slv_loans'         : 

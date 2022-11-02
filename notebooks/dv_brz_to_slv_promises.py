@@ -7,8 +7,7 @@
 
 # COMMAND ----------
 
-from pyspark.sql.functions import F
-from pyspark.sql.types import T
+from pyspark.sql import functions as F, types as T
 from datetime import datetime
 import json
 import re
