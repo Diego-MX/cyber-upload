@@ -12,7 +12,7 @@
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC #### Libraries and Basic Functions
+# MAGIC ## Libraries and Basic Functions
 
 # COMMAND ----------
 
@@ -20,20 +20,18 @@
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC # Descripción
-# MAGIC ... 
-
-# COMMAND ----------
-
 from importlib import reload
-from src import crm_platform, platform_resources
+from src import crm_platform
 import config
-reload(crm_platform)
+reload(config)
 
 # COMMAND ----------
 
 from config import ConfigEnviron, ENV, SERVER, CRM_ENV, DBKS_TABLES
+from datetime import datetime as dt
+import json
+from pyspark.sql import functions as F, types as T
+import re
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 
@@ -43,15 +41,44 @@ zendesker = ZendeskSession(CRM_ENV, azure_getter)
 
 at_storage = azure_getter.get_storage()
 
-abfss_loc = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
+abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
+abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage)
+
 tbl_items = DBKS_TABLES[ENV]['items']
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC # ToDo
-# MAGIC 1. Hacer el query incremental. 
-# MAGIC 2. Poner la tabla en Datalake. 
+def unnest(c, s):
+    if c == '':
+        return None
+    else:
+        c = json.loads(c)
+        return c[s]
+
+udf_unnest = F.udf(unnest, T.IntegerType())
+
+def date_format(c):
+    pattern1 = re.compile("^[0-9]+/[0-9]+/[0-9]+$")
+    pattern2 = re.compile("^[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+.[0-9]+Z$")
+    pattern3 = re.compile("^[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+Z$")
+    pattern4 = re.compile("^[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+.[0-9]+z$")
+    if pattern1.match(c):
+        return dt.strptime(c, "%d/%m/%Y").strftime("%Y-%m-%d")
+    elif pattern2.match(c):
+        return dt.strptime(c, "%Y-%m-%dT%H:%M:%S.%fZ").strftime("%Y-%m-%d")
+    elif pattern3.match(c):
+        return dt.strptime(c, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d")
+    elif pattern4.match(c):
+        return dt.strptime(c, "%Y-%m-%dT%H:%M:%S.%fz").strftime("%Y-%m-%d")
+    else:
+        return None
+
+udf_date_format = F.udf(date_format, T.StringType())
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ## Raw to Bronze
 
 # COMMAND ----------
 
@@ -62,5 +89,32 @@ promises_df = zendesker.get_promises().drop(columns='external_id')
 promises_spk = spark.createDataFrame(promises_df)
 (promises_spk.write.mode('overwrite')
         .format('delta')
-        .save(f"{abfss_loc}/promises"))
+        .save(f"{abfss_brz}/promises"))
 
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC # Bronze to Silver 
+
+# COMMAND ----------
+
+
+slv_promises_0 = promises_spk
+
+cols_unnest = ['comission', 'interest', 'principal']
+for a_col in cols_unnest:
+    slv_promises_0 = slv_promises_0.withColumn(a_col, udf_unnest('attribute_compensation', F.lit(a_col)))
+
+slv_promises = (slv_promises_0
+    .withColumn('created_at', F.col('created_at').cast(T.TimestampType()))
+    .withColumn('updated_at', F.col('updated_at').cast(T.TimestampType()))
+    .withColumn('attribute_due_date', udf_date_format('attribute_due_date'))
+    .withColumn('attribute_due_date', F.col('attribute_due_date').cast(T.DateType()))
+    .drop(F.col('attribute_compensation')))
+
+
+
+# COMMAND ----------
+
+slv_promises.write.mode('overwrite').format('delta').save(f"{abfss_slv}/promises")
