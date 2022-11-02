@@ -198,6 +198,7 @@ CRM_KEYS = {
             'filters'  : ("sunshine/objects/records",
                     "services/zis/inbound_webhooks/generic/ingest") } }}
 
+
 DBKS_KEYS = {
     'dev': {
         'connect': {
@@ -235,7 +236,8 @@ DBKS_KEYS = {
             'contracts'   : "bronze.loan_contracts", 
             'collections' : "gold.loan_contracts"}   }, 
 } 
-                                    
+
+
 DBKS_TABLES = {          
     'dev': {
         'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
@@ -309,8 +311,68 @@ DBKS_TABLES = {
             'slv_promises'        : 
                 ('farore_transactions.slv_cx_payment_promises', 'promises'), 
             'gld_loans'           : 
-                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}
-}   }  
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
+    'stg': {
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects', 
+        'items': {  # table, location.
+            'brz_persons'         : 
+                ('din_clients.brz_ops_persons_set',        'persons-set'),
+            'brz_loans'           : 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
+            'brz_loan_balances'   : 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
+            'brz_loan_open_items' : 
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
+            'brz_loan_payments'   : 
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'slv_persons'         : 
+                ('din_clients.slv_ops_persons_set',        'persons-set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
+            'slv_loan_balances'   : 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
+            'slv_loan_open_items' : 
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
+            'slv_loan_payments'   : 
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
+            'slv_promises'        : 
+                ('farore_transactions.slv_cx_payment_promises', 'promises'), 
+            'gld_loans'           : 
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
+    'prd': {
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates', 
+        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects', 
+        'items': {  # table, location.
+            'brz_persons'         : 
+                ('din_clients.brz_ops_persons_set',        'persons-set'),
+            'brz_loans'           : 
+                ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
+            'brz_loan_balances'   : 
+                ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
+            'brz_loan_open_items' : 
+                ('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
+            'brz_loan_payments'   : 
+                ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+            'brz_promises'        : 
+                ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'slv_persons'         : 
+                ('din_clients.slv_ops_persons_set',        'persons-set'), 
+            'slv_loans'         : 
+                ('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
+            'slv_loan_balances'   : 
+                ('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
+            'slv_loan_open_items' : 
+                ('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
+            'slv_loan_payments'   : 
+                ('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
+            'slv_promises'        : 
+                ('farore_transactions.slv_cx_payment_promises', 'promises'), 
+            'gld_loans'           : 
+                ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
+  }  
 
 
 class ConfigEnviron():
