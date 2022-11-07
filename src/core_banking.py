@@ -272,10 +272,15 @@ class SAPSession(Session):
             return None   
 
         loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
-        for loan in loans_ls: 
-            loan.pop('__metadata')
         
-        return pd.DataFrame(loans_ls)
+        if loans_ls: 
+            for loan in loans_ls: 
+                loan.pop('__metadata')
+            loans_df = pd.DataFrame(loans_ls)
+        else: 
+            loans_df = pd.DataFrame([], columns=select_attrs)
+        
+        return loans_df 
 
 
     def get_loans_qan(self, tries=3): 
