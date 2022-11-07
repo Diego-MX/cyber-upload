@@ -22,10 +22,20 @@
 
 # COMMAND ----------
 
+from importlib import reload
+from src import core_banking
+reload(core_banking)
+
+# COMMAND ----------
+
 from datetime import datetime as dt
+from pyspark.sql import functions as F, types as T
+
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
+
+CORE_ENV = 'prd-sap'
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
@@ -44,11 +54,18 @@ persons_df = core_session.get_persons()
 persons_spk = spark.createDataFrame(persons_df)
 
 loans_df  = core_session.get_loans()
-loans_spk = spark.createDataFrame(loans_df)
 
-# lqan_df = core_session.get_loans_qan()
-# lqan_spk = spark.createDataFrame(lqan_df)
+if loans_df.shape[0]:
+    loans_spk = spark.createDataFrame(loans_df)
+else: 
+    loan_schema = T.StructType([T.StructField(a_col.strip(), T.StringType(), True) 
+            for a_col in loans_df.columns])
+    loans_spk = spark.createDataFrame([], loan_schema)
 
+
+# COMMAND ----------
+
+loans_df.columns
 
 # COMMAND ----------
 

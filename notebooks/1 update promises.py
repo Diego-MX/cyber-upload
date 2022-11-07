@@ -20,13 +20,6 @@
 
 # COMMAND ----------
 
-from importlib import reload
-from src import crm_platform
-import config
-reload(config)
-
-# COMMAND ----------
-
 from config import ConfigEnviron, ENV, SERVER, CRM_ENV, DBKS_TABLES
 from datetime import datetime as dt
 import json

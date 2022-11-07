@@ -78,15 +78,15 @@ PLATFORM_KEYS = {
             'url'   : 'https://stlakehyliaqas.blob.core.windows.net/'} }, 
     'stg': {        
         'key-vault' : {
-            'name'  : 'kv-cx-collections-stg', 
-            'url'   : "https://kv-cx-collections-stg.vault.azure.net/"}, 
+            'name'  : 'kv-cx-adm-stg', 
+            'url'   : "https://kv-cx-adm-stg.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'stlakehyliastg', 
             'url'   : 'https://stlakehyliastg.blob.core.windows.net/'} }, 
     'prd': {        
         'key-vault' : {
-            'name'  : 'kv-cx-collections-prd', 
-            'url'   : "https://kv-cx-collections-prd.vault.azure.net/"}, 
+            'name'  : 'kv-cx-data-prd', 
+            'url'   : "https://kv-cx-data-prd.vault.azure.net/"}, 
         'storage'   : {
             'name'  : 'stlakehyliaprd', 
             'url'   : 'https://stlakehyliaprd.blob.core.windows.net/'} }
@@ -164,8 +164,39 @@ CORE_KEYS = {
             'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
             'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
-            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
-        } } } 
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}
+        } 
+    }, 
+    'prd-sap': {
+        'main' : {
+            'headers' : {
+                'format'          : 'json',
+                'Accept-Encoding' : "gzip, deflate",
+                'Accept'          : "application/json" }, 
+            'base-url' : "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b",
+            'access' : {
+                'username': (1, 'core-api-key'), 
+                'password': (1, 'core-api-secret') } }, 
+        'calls' : {
+            'auth' : {
+                'url' : "https://apiprd.apimanagement.us21.hana.ondemand.com/oauth2/token", 
+                'data': {
+                    'grant_type' : 'password', 
+                    'username'   : (1, 'core-api-user'), 
+                    'password'   : (1, 'core-api-password') } },
+            'event-set'    : {
+                'persons'      : "v15/bp/EventSet", 
+                'accounts'     : "v1/cac/EventSet", 
+                'transactions' : "v1/bape/EventSet", 
+                'prenotes'     : "v1/bapre/EventSet"},
+            'person-set'       : {'sub-url' : "v15/bp/PersonSet"},
+            'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
+            'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}
+        } 
+    }
+} 
 
 
 CRM_KEYS = {
