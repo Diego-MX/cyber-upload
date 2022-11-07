@@ -3,8 +3,8 @@
 # MAGIC # Objetivo
 # MAGIC 
 # MAGIC Al crear las tablas Δ, no se había puesto atención en la ubicación física... (que no es tan física, pero es lo más físico a lo que aspiran las ubicaciones de tablas).  
-# MAGIC Después de algunos meses se descubrió que tienen que estar en cierta ubicación.  
 # MAGIC En este _notebook_ movemos las tablas al Lago Hylia. 
+# MAGIC Después de algunos meses se descubrió que tienen que estar en cierta ubicación.  
 
 # COMMAND ----------
 
@@ -26,7 +26,7 @@ az_manager.set_dbks_permissions(at_storage)
 
 # Sustituye el placeholder AT_STORAGE, aunque mantiene STAGE para sustituirse después. 
 base_location = DBKS_TABLES[ENV]['base']
-abfss_loc = base_location.format(stage='gold', storage =at_storage)
+abfss_loc = base_location.format(stage='gold', storage=at_storage)
 
 
 # COMMAND ----------
