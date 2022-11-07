@@ -164,9 +164,14 @@ CORE_KEYS = {
             'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
             'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
             'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
+<<<<<<< HEAD
             'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}
         } 
     }, 
+=======
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
+        } }, 
+>>>>>>> 0e8fc3bb5ae7bf3d904cedd8aff9025b1e1cdb80
     'prd-sap': {
         'main' : {
             'headers' : {
@@ -194,9 +199,13 @@ CORE_KEYS = {
             'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
             'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
             'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}
+<<<<<<< HEAD
         } 
     }
 } 
+=======
+        } } } 
+>>>>>>> 0e8fc3bb5ae7bf3d904cedd8aff9025b1e1cdb80
 
 
 CRM_KEYS = {

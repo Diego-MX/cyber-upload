@@ -96,7 +96,10 @@ abfss_brz = base_location.format(stage='bronze', storage=at_storage)
 abfss_slv = base_location.format(stage='silver', storage=at_storage)
 abfss_gld = base_location.format(stage='gold', storage=at_storage)
 promise_slv = promise_loc.format(stage='silver', storage=at_storage) 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0e8fc3bb5ae7bf3d904cedd8aff9025b1e1cdb80
 
 # COMMAND ----------
 

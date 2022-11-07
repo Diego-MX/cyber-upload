@@ -33,4 +33,4 @@ abfss_loc = base_location.format(stage='gold', storage =at_storage)
 
 # MAGIC %sql 
 # MAGIC CREATE TABLE nayru_accounts.gld_cx_collections_loans USING DELTA
-# MAGIC LOCATION "abfss://gold@stlakehyliaqas.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts";
+# MAGIC LOCATION "abfss://gold@stlakehyliastg.dfs.core.windows.net/ops/core-banking/batch-updates/loan-contracts";
