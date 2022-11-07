@@ -10,15 +10,6 @@ class AzureResourcer():
         self.set_secretters()
     
     
-    def set_vault(self):
-        vault_url = self.config['key-vault']['url']
-        the_creds = self.env.credential
-        self.vault = SecretClient(vault_url=vault_url, credential=the_creds)
-        
-        #to_secret_or_not = self.vault.list_properties_of_secrets()
-        #next(to_secret_or_not)
-        
-    
     def set_secretters(self): 
         if not hasattr(self, 'vault'): 
             self.set_vault()
@@ -31,6 +22,16 @@ class AzureResourcer():
         
         self.get_secret = get_secret 
         self.call_dict  = call_dict
+   
+    
+    def set_vault(self):
+        vault_url = self.config['key-vault']['url']
+        the_creds = self.env.credential
+        self.vault = SecretClient(vault_url=vault_url, credential=the_creds)
+        
+        #to_secret_or_not = self.vault.list_properties_of_secrets()
+        #next(to_secret_or_not)
+        
     
     def get_storage(self, account=None): 
         if ('storage' in self.config) and ('name' in self.config['storage']):
