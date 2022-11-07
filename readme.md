@@ -23,18 +23,18 @@ To suggest a change, consider redefining it in the code.
 
 
 Previous requirements: 
-- Databricks secrets scope (`eh-core-banking`) with service principal keys:  
-  `sp-core-events-client`, `sp-core-events-secret`, `aad-tenant-id`, `sp-core-events-subscription`  
+- Databricks secrets scope (`cx-collections`) with service principal keys:  
+  `sp-collections-client`, `sp-collections-secret`, `aad-tenant-id`, `sp-collections-subscription`  
   This works as an identity for the running application.  
 
-- Azure key vault (`kv-collections-data-<env>`);  
+- Azure key vault (`kv-cx-collections-<env>`);  
   Give access to the service principal above and set keys:   
   SAP keys: `core-api-key`, `core-api-secret`, `core-api-user`, `core-api-password`  
   CRM keys:  `crm-api-user`, `crm-api-token`, 
       `crm-zis-id`, `crm-zis-user`, `crm-zis-pass`  
 
 - Databricks Tables and access.  
-  Datalake, e.g. storage container `stlakehylia<qas>` 
+  Give access to the service principal above to datalake, e.g. storage container `stlakehylia<qas>` 
   and its corresponding 'folders' (`bronze`, `silver`, `gold`) at `.../ops/core-banking/batch-updates/...`  
   `persons_set`, `loan_contracts`, `loan_contracts`,  
   `loan_balances`, `loan_open_items`, `loan_payments`,   

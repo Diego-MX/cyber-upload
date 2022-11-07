@@ -13,13 +13,6 @@
 
 # COMMAND ----------
 
-from importlib import reload
-import config
-reload(config)
-
-
-# COMMAND ----------
-
 from datetime import datetime as dt
 import re
 from delta.tables import DeltaTable
@@ -102,7 +95,7 @@ date_format_udf = F.udf(date_format, T.DateType())
 abfss_brz = base_location.format(stage='bronze', storage=at_storage)
 abfss_slv = base_location.format(stage='silver', storage=at_storage)
 abfss_gld = base_location.format(stage='gold', storage=at_storage)
-promise_brz = promise_loc.format(stage='bronze', storage=at_storage) 
+promise_slv = promise_loc.format(stage='silver', storage=at_storage) 
 
 # COMMAND ----------
 
@@ -136,6 +129,8 @@ if DeltaTable.isDeltaTable(spark, slv_persons):
         .drop(person_silver.ID))
 else: 
     person_set_df = person_set_0
+
+display(person_set_df)
 
 # COMMAND ----------
 
@@ -180,18 +175,28 @@ code_cols = {
 
 code_select = [(vv).alias(kk) for kk, vv in code_cols.items()]
 
+pre_balances = spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}")
 
-# ['ID', 'Code', 'Name', 'Amount', 'Currency', 'BalancesTS']
-loan_balance_df = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}")
-    # Set types
-    .withColumn('Code', F.col('Code').cast(T.IntegerType()))
-    .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
-    .withColumn('BalancesTS', F.col('BalancesTS').cast(T.DateType()))
-    # Pivot Code/Amount
-    .groupBy(fixed_cols).pivot('Code')
-    .agg(F.round(F.sum(F.col('Amount')), 2))
-    .select(*fixed_cols, *code_select))
-
+if pre_balances.count():
+    # ['ID', 'Code', 'Name', 'Amount', 'Currency', 'BalancesTS']
+    loan_balance_df = (pre_balances
+        # Set types
+        .withColumn('Code', F.col('Code').cast(T.IntegerType()))
+        .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
+        .withColumn('BalancesTS', F.col('BalancesTS').cast(T.DateType()))
+        # Pivot Code/Amount
+        .groupBy(fixed_cols).pivot('Code')
+        .agg(F.round(F.sum(F.col('Amount')), 2))
+        .select(*fixed_cols, *code_select))
+else:
+    blnc_fields = [('ID', 's'), ('ord_interes', 'd'), ('comisiones', 'd'), 
+              ('monto_principal', 'd'), ('monto_liquidacion', 'd')]
+    f_types = {'s': T.StringType, 'd': T.DoubleType}
+    
+    schema = T.StructType([ T.StructField(fld[0], f_types[fld[1]](), True)
+            for fld in blnc_fields])
+    loan_balance_df = spark.createDataFrame([], schema)
+    
 display(loan_balance_df)
 
 
@@ -249,7 +254,6 @@ open_items_cols = {
     'monto_vencido'         : F.col('capital_vencido_monto') 
             + F.col('impuesto_vencido_monto') + F.col('comision_vencido_monto')}
 
-
 pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
     .withColumn('OpenItemTS', F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'))
     .withColumn('DueDate',    F.to_date(F.col('DueDate'),    'yyyyMMdd'))
@@ -269,16 +273,27 @@ pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_
                                .when(F.col('Currency').isNotNull(), 'foreign')))
 
 
-open_items_slct = [vv.alias(kk) for kk, vv in open_items_cols.items()]
+if pre_open_items.count(): 
+    open_items_slct = [vv.alias(kk) for kk, vv in open_items_cols.items()]
 
-loan_open_df = (pre_open_items
-    .withColumn('pivoter', F.concat_ws('_', 'recibible', 'estatus_2'))
-    .groupBy(*['ContractID']).pivot('pivoter')
-        .agg(F.round(F.sum(F.col('Uncleared')), 2).alias('monto'), 
-             F.countDistinct(F.col('OpenItemID')).alias('n'))
-    .select(*['ContractID'], *open_items_slct)
-    .fillna(value=0))
-
+    loan_open_df = (pre_open_items
+        .withColumn('pivoter', F.concat_ws('_', 'recibible', 'estatus_2'))
+        .groupBy(*['ContractID']).pivot('pivoter')
+            .agg(F.round(F.sum(F.col('Uncleared')), 2).alias('monto'), 
+                 F.countDistinct(F.col('OpenItemID')).alias('n'))
+        .select(*['ContractID'], *open_items_slct)
+        .fillna(value=0))
+else: 
+    pre_fields = [('ContractID', 'string'), ('parcialidades_pagadas', 'long'), 
+        ('parcialidades_vencidas', 'long'), ('principal_vencido', 'double'), 
+        ('interes_ord_vencido', 'double'), ('monto_vencido', 'double')]
+    
+    field_map = {
+        'long': T.LongType, 'string': T.StringType, 'double': T.DoubleType}
+    
+    schema = T.StructType([T.StructField( fld[0], field_map[fld[1]](), True)
+        for fld in pre_fields])
+    loan_open_df = spark.createDataFrame([], schema)
 
 # COMMAND ----------
 
@@ -397,6 +412,10 @@ display(loan_payment_df)
 
 # COMMAND ----------
 
+display(person_set_df)
+
+# COMMAND ----------
+
 # Person Set utiliza Append, el resto 'overwrite' (default).
 write_dataframe(person_set_df, f"{abfss_slv}/{tbl_items['slv_persons'][1]}", 'append')
 
@@ -404,6 +423,8 @@ write_dataframe(loan_payment_df,  f"{abfss_slv}/{tbl_items['slv_loan_payments'][
 write_dataframe(loan_balance_df,  f"{abfss_slv}/{tbl_items['slv_loan_balances'][1]}")
 write_dataframe(loan_contract_df, f"{abfss_slv}/{tbl_items['slv_loans'][1]}")
 write_dataframe(loan_open_df,     f"{abfss_slv}/{tbl_items['slv_loan_open_items'][1]}")
+
+
 
 # COMMAND ----------
 
@@ -423,7 +444,7 @@ persons_set = (spark.read.format('delta')
     .drop(*['last_login', 'phone_number']))
 
 promises = (spark.read.format('delta')
-    .load(f"{promise_brz}/{tbl_items['brz_promises'][1]}") 
+    .load(f"{promise_slv}/{tbl_items['slv_promises'][1]}") 
     .withColumnRenamed('id', 'promise_id')
     .filter((F.col('attribute_processed') == False) & (F.col('attribute_accomplished') == False))
     .withColumn('rank', F.dense_rank().over(windowSpec))
