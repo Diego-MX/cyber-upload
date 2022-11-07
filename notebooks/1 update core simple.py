@@ -23,6 +23,7 @@
 # COMMAND ----------
 
 from datetime import datetime as dt
+from pyspark.sql import functions as F, types as T
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
@@ -44,14 +45,19 @@ persons_df = core_session.get_persons()
 persons_spk = spark.createDataFrame(persons_df)
 
 loans_df  = core_session.get_loans()
-loans_spk = spark.createDataFrame(loans_df)
+
+if loans_df.shape[0]:
+    loans_spk = spark.createDataFrame(loans_df)
+else: 
+    loan_cols = T.StructType([T.StructField(a_col, T.StringType(), True) 
+            for a_col in loans_df.columns])
+    loans_spk = spark.createDataFrame([])
 
 # lqan_df = core_session.get_loans_qan()
 # lqan_spk = spark.createDataFrame(lqan_df)
 
 
 # COMMAND ----------
-
 
 abfss_loc = at_base.format(stage='bronze', storage=at_storage)
 
@@ -65,4 +71,3 @@ abfss_loc = at_base.format(stage='bronze', storage=at_storage)
     .option('overwriteSchema', True)
     .save(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
  
-

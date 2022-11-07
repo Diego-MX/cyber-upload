@@ -24,6 +24,8 @@ from importlib import reload
 from src import crm_platform
 import config
 reload(config)
+from src import platform_resources
+reload(platform_resources)
 
 # COMMAND ----------
 
@@ -37,10 +39,11 @@ from src.crm_platform import ZendeskSession
 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
-zendesker = ZendeskSession(CRM_ENV, azure_getter)
 
 at_storage = azure_getter.get_storage()
+azure_getter.set_dbks_permissions(at_storage)
 
+zendesker = ZendeskSession(CRM_ENV, azure_getter)
 abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
 abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage)
 

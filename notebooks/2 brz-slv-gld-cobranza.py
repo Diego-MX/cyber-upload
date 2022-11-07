@@ -102,7 +102,7 @@ date_format_udf = F.udf(date_format, T.DateType())
 abfss_brz = base_location.format(stage='bronze', storage=at_storage)
 abfss_slv = base_location.format(stage='silver', storage=at_storage)
 abfss_gld = base_location.format(stage='gold', storage=at_storage)
-promise_brz = promise_loc.format(stage='bronze', storage=at_storage) 
+promise_slv = promise_loc.format(stage='silver', storage=at_storage) 
 
 # COMMAND ----------
 
@@ -182,7 +182,8 @@ code_select = [(vv).alias(kk) for kk, vv in code_cols.items()]
 
 
 # ['ID', 'Code', 'Name', 'Amount', 'Currency', 'BalancesTS']
-loan_balance_df = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}")
+loan_balance_df = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}")
     # Set types
     .withColumn('Code', F.col('Code').cast(T.IntegerType()))
     .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
@@ -423,7 +424,7 @@ persons_set = (spark.read.format('delta')
     .drop(*['last_login', 'phone_number']))
 
 promises = (spark.read.format('delta')
-    .load(f"{promise_brz}/{tbl_items['brz_promises'][1]}") 
+    .load(f"{promise_slv}/{tbl_items['slv_promises'][1]}") 
     .withColumnRenamed('id', 'promise_id')
     .filter((F.col('attribute_processed') == False) & (F.col('attribute_accomplished') == False))
     .withColumn('rank', F.dense_rank().over(windowSpec))
