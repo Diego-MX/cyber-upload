@@ -281,7 +281,7 @@ class SAPSession(Session):
             loans_df = pd.DataFrame([], columns=select_attrs)
         
         return loans_df 
-        
+
 
     def get_loans_qan(self, tries=3): 
         if not hasattr(self, 'token'): 
