@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC 
-# MAGIC # Descripción
+# MAGIC # Preparación
 # MAGIC 
 # MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican los tipos de columnas desde el lado de la fuente. 
 # MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos de columnas especificados para crear el _output_.
@@ -12,14 +12,16 @@
 
 # COMMAND ----------
 
+from base64 import b64encode
 from datetime import datetime as dt, date
+from functools import reduce
 import numpy as np
 import pandas as pd
 from pyspark.sql import (dataframe as DF, functions as F, types as T, Window as W)
 from pyspark.sql.dataframe import DataFrame
 from pytz import timezone
-import re
 from typing import Tuple
+from unicodedata import normalize
 
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
@@ -39,10 +41,26 @@ cyber_terminology = {
     'core_status'  : 'C8BD1343', 'cms_status'   : 'C8BD10001', 
     'core_payment' : 'C8BD1353', 'cms_payment'  : 'C8BD10002'}
 
+
+# COMMAND ----------
+
+@F.pandas_udf(T.StringType())
+def udf_toascii(x_str):   # IEC-8859-1 es lo más parecido a ANSI que encontramos
+    y_str = x_str.str.normalize('NFKD').map(lambda xx: xx.encode('ascii', 'ignore')) 
+    # y_str = normalize('NFKD', x_str).encode('ascii', 'ignore').decode('ascii')
+    return y_str
+
+
+def with_columns(a_df, cols_dict): 
+    func = lambda df1, col_kv: df1.withColumn(*col_kv)
+    return reduce(func, cols_dict.items(), a_df)
+    
+    
 def pd_print(a_df: pd.DataFrame, width=180): 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', width):
         print(a_df)
 
+        
 def save_as_file(a_df: DF.DataFrame, path_dir, path_file, **kwargs):
     std_args = {
         'mode': 'overwrite', 
@@ -118,6 +136,13 @@ display(loan_contract)
 
 # COMMAND ----------
 
+non_strings = [a_col for a_col in loan_contract.dtypes if a_col[1] != 'string']
+non_strings
+loan_non_strings = loan_contract.select(*[non_str[0] for non_str in non_strings])
+display(loan_non_strings)
+
+# COMMAND ----------
+
 # MAGIC %md 
 # MAGIC ### Person Set 
 
@@ -128,6 +153,7 @@ states_str = ["AGU,1", "BCN,2", "BCS,3", "CAM,4", "COA,5", "COL,6", "CHH,8", "CH
               "CMX,9", "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
               "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
               "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
+
 states_data = [ {'AddressRegion': each_split[0], 'state_key': each_split[1]} 
     for each_split in map(lambda x: x.split(','), states_str)]
 
@@ -140,8 +166,7 @@ persons = (spark.read.table(tables['brz_persons'])
     .withColumn('full_name1',F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'))
     .withColumn('full_name' ,F.regexp_replace(F.col('full_name1'), ' +', ' '))
     .withColumn('address2',  F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID'))
-    .join(states_df, how='left', on='AddressRegion')
-    )
+    .join(states_df, how='left', on='AddressRegion'))
 
 display(persons)
 
@@ -155,10 +180,6 @@ display(persons)
 loans_qan = (spark.read.table("bronze.loan_qan_contracts"))
 
 display(loans_qan)
-
-# COMMAND ----------
-
-loans_qan.columns
 
 # COMMAND ----------
 
@@ -239,7 +260,7 @@ display(uncleared)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Algunas funciones auxiliares:
+# MAGIC Algunas variables auxiliares:
 
 # COMMAND ----------
 
@@ -256,6 +277,11 @@ tables_dict = {
     "bronze.loan_balances"      : balances,
     "bronze.loan_open_items"    : uncleared}
 
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC Esta tabla de tablas no se usa mucho. 
 
 # COMMAND ----------
 
@@ -278,6 +304,11 @@ the_sap_tbls
 
 # MAGIC %md
 # MAGIC ### Tabla de instrucciones
+# MAGIC 
+# MAGIC Leemos los archivos `feather` que se compilaron a partir de las definiciones en Excel.  
+# MAGIC Hacemos la preparación técnica de la tabla correspondiente.  
+# MAGIC * `all_cols` es la tabla con las instrucciones técnicas.  
+# MAGIC * `sap_cols` es el subconjunto de aquellas que confirmadas (deberían ser todas, pero no) de SAP.  
 
 # COMMAND ----------
 
@@ -339,6 +370,12 @@ pd_print(all_cols.loc[:, some_cols], 180)
 
 # COMMAND ----------
 
+# MAGIC %md 
+# MAGIC * De `sap_cols` obtenemos las columnas confirmadas de SAP.  
+# MAGIC * Creamos tablas intermedias.  
+
+# COMMAND ----------
+
 # Only on SAP_COLS
 
 persons_select  = [F.col(a_row['la_columna']).alias(name) 
@@ -379,13 +416,13 @@ cast_types = {
     'str' : T.StringType(),   # ''
     'int' : T.IntegerType(),  # 0
     'dbl' : T.DoubleType(),   # 0
-    'date': T.DateType()}     # date(1970, 1, 1)
+    'date': T.DateType()}     # date(1900, 1, 1)
 
 null_values = {
     'str' : '', 
     'int' : 0, 
     'dbl' : 0, 
-    'date': '1900-01-01'}
+    'date': '1900-01-01'}  # Posteriormente cambia a '0000-00-00'
 
 fixed_values = { name: 
     a_row['valor_fijo'] if a_row['valor_fijo'] else null_values[a_row['ref_type']]
@@ -397,23 +434,23 @@ fixed_select = [ F.lit(fixed_values[name]).cast(cast_types[a_row['ref_type']]).a
 types_select = [ F.col(name).cast(cast_types[a_row['ref_type']]).alias(name)
     for name, a_row in all_cols.iterrows()]
 
-dates_select = [ F.when(F.col(name).isNull(), date(1900, 1, 1)).otherwise(F.col(name)).alias(name)
-    for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'date']
+dates_dict = { name: F.when(F.col(name).isNull(), date(1900, 1, 1)).otherwise(F.col(name))
+    for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'date'}
 
-golden = (persons_tbl
+golden_0 = (persons_tbl
     .join(loans_tbl   , how='right', on='person_id')
     .join(lqan_tbl    , how='left' , on='loan_id')
     .join(balances_tbl, how='left' , on='loan_id') 
-    .join(opens_tbl   , how='left' , on='loan_id')
+    .join(opens_tbl   , how='left' , on='loan_id') 
     .drop(*['person_id', 'loan_id'])
     .select('*', *fixed_select)
-    .fillna('1900-01-01', all_cols.index[all_cols['ref_type'] == 'date'].tolist())
-    .fillna('',           all_cols.index[all_cols['ref_type'] == 'str' ].tolist())
-    .fillna(0,            all_cols.index[all_cols['ref_type'].isin(['dbl', 'int'])].tolist())
-    .select(*types_select)
-    )
+    .fillna('', all_cols.index[all_cols['ref_type'] == 'str' ].tolist())
+    .fillna(0,  all_cols.index[all_cols['ref_type'].isin(['dbl', 'int'])].tolist())
+    .select(*types_select))
 
+golden = (with_columns(golden_0, dates_dict))
 
+display(golden)
 
 # COMMAND ----------
 
@@ -422,16 +459,27 @@ golden = (persons_tbl
 
 # COMMAND ----------
 
-str_select  = [F.format_string(a_row['c_format'], F.col(name)).alias(name)
+# MAGIC %md 
+# MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna `str`, `date`, `dbl`, `int`.  
+# MAGIC - `STR`: Aplicar formato `c_format`, y dejar ASCII.   
+# MAGIC - `DATE`: Convertir los `1900-1-1` capturados previamente y aplicar `date-format`.  
+# MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
+# MAGIC - `INT`: Aplicar `c_format`.  
+# MAGIC 
+# MAGIC Post-formatos, aplicar el `s-format`, concatenar.  
+
+# COMMAND ----------
+
+
+str_select  = [F.format_string(a_row['c_format'], udf_toascii(F.col(name))).alias(name)
     for name, a_row in all_cols[all_cols['ref_type'] == 'str'].iterrows()]
 
-date_select = [F.when(F.col(name) == date(1900, 1, 1), F.lit('        '))
+date_select = [F.when(F.col(name) == date(1900, 1, 1), F.lit('00000000'))
         .otherwise(F.date_format(F.col(name), 'MMddyyyy')).alias(name)
     for name in all_cols.index[all_cols['ref_type'] == 'date']]
 
 dbl_select  = [F.regexp_replace(
-                  F.format_string(a_row['c_format'], name), 
-                  '[\.,]', '').alias(name) 
+            F.format_string(a_row['c_format'], name), '[\.,]', '').alias(name) 
     for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'dbl']
 
 int_select = [F.format_string(str(a_row['c_format']), name).alias(name)
@@ -441,13 +489,16 @@ int_select = [F.format_string(str(a_row['c_format']), name).alias(name)
 fxw_select = [F.format_string(a_row['s_format'], F.col(name)).alias(name)
     for name, a_row in all_cols.iterrows()]
 
-fxw_core_balances = (golden.select(*types_select)
+pre_fixed = (golden.select(*types_select)
     .select(*str_select, *dbl_select, *date_select, *int_select)  
-    .select(*fxw_select)
-    .select(F.concat(*all_cols.index).alias('|'.join(all_cols['aux_nombre'])))
-    )
+    .select(*fxw_select))
 
-some_cols = all_cols.index[all_cols['ref_type'] == 'dbl']
+fxw_core_balances = (pre_fixed
+    .select(F.concat(*all_cols.index).alias('|'.join(all_cols['aux_nombre'])) ))
+        
+display(fxw_core_balances)
+
+# COMMAND ----------
 
 display(fxw_core_balances)
 
