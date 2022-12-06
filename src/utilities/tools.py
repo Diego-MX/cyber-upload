@@ -1,4 +1,4 @@
-import base64
+from base64 import b64encode
 import json 
 import pandas as pd
 from pathlib import WindowsPath
@@ -135,9 +135,7 @@ def dict_minus(a_dict, key_ls, copy=True):
     return b_dict
 
 
-def encode64(a_str): 
-    encoded = base64.b64encode(a_str.encode('ascii')).decode('ascii')
-    return encoded
+encode64 = lambda a_str: b64encode(a_str.encode('ascii')).decode('ascii')
 
 
 def datecols_to_str(a_df):
