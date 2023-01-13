@@ -188,10 +188,6 @@ code_cols = {
 
 code_select = [(vv).alias(kk) for kk, vv in code_cols.items()]
 
-<<<<<<< HEAD
-=======
-
->>>>>>> qas
 # ['ID', 'Code', 'Name', 'Amount', 'Currency', 'BalancesTS']
 loan_balance_slv = (spark.read.format('delta')
     .load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}")
@@ -205,10 +201,6 @@ loan_balance_slv = (spark.read.format('delta')
     .select(*fixed_cols, *code_select))
 
 display(loan_balance_slv)
-<<<<<<< HEAD
-=======
-
->>>>>>> qas
 
 # COMMAND ----------
 
