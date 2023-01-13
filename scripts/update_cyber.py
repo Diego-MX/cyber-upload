@@ -11,9 +11,9 @@ cyber_tables = {
     'sap_saldos': {}, 
     'sap_pagos': {}, 
     'sap_estatus': {}, 
-    'fiserv_saldos': {}, 
-    'fiserv_pagos': {}, 
-    'fiserv_estatus': {}
+    # 'fiserv_saldos': {}, 
+    # 'fiserv_pagos': {}, 
+    # 'fiserv_estatus': {}
 }
 
 expect_specs = (tools.read_excel_table(cyber_fields, 'general', 'especificacion')
@@ -23,7 +23,6 @@ data_types = tools.read_excel_table(cyber_fields, 'general', 'tipo_datos')
 
 
 def excelref_to_feather(xls_df): 
-
     expect_proc = expect_specs.loc[expect_specs['proc'].notnull(), 'proc']
     weird_bools = expect_proc[expect_proc == 'bool']
     bool_func = (lambda a_col: 
@@ -34,12 +33,18 @@ def excelref_to_feather(xls_df):
         .astype(expect_proc)
         .assign(lon_dec = lambda df: df['Longitud'].astype(float)))
 
+    as_lgl = lambda srs: srs.isin([True]).astype(bool)
+
     specs_2 = df0.assign(
-        chk_date = np.where(df0['Tipo de dato'] == 'DATE', df0['Longitud'] == 8, True), 
-        chk_mand = np.where(df0['Mandatorio'], df0['tabla'] != '', True), 
-        chk_aplica = np.where(df0['Aplica PréstamoV1'] == 'N', df0['columna_valor'] == 'N/A', True),
-        chk_len  = df0['Posición inicial'] + df0['lon_dec'] == df0['Posición inicial'].shift(), 
-        chk_name = df0['nombre'].duplicated()
+        chk_date   = np.where(as_lgl(df0['Tipo de dato'] == 'DATE'), 
+                            as_lgl(df0['lon_dec'] == 8), True), 
+        chk_mand   = np.where(as_lgl(df0['Mandatorio']), 
+                            as_lgl(df0['columna_valor'] != ''), True), 
+        chk_aplica = np.where(as_lgl(df0['Aplica'] == 'N'  ), 
+                            as_lgl(df0['columna_valor'] == 'N/A'), True),
+        chk_len    = as_lgl(df0['Posición inicial'] + np.floor(df0['lon_dec']) 
+                         == df0['Posición inicial'].shift(-1)), 
+        chk_name  = ~as_lgl(df0['nombre'].duplicated())
     )
 
     exec_cols  = expect_specs.loc[expect_specs['ejec'] == 1, 'ejec']
