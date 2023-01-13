@@ -12,12 +12,7 @@
 
 # COMMAND ----------
 
-from importlib import reload
-from src import platform_resources; reload(platform_resources)
-import config; reload(config)
-
-# COMMAND ----------
-
+from base64 import b64encode
 from datetime import datetime as dt, date
 from functools import reduce
 import numpy as np
@@ -47,11 +42,27 @@ cyber_terminology = {
     'core_status'  : 'C8BD1343', 'cms_status'   : 'C8BD10001', 
     'core_payment' : 'C8BD1353', 'cms_payment'  : 'C8BD10002'}
 
-def pd_print(a_df: pd_DF, width=180): 
+
+# COMMAND ----------
+
+@F.pandas_udf(T.StringType())
+def udf_toascii(x_str):   # IEC-8859-1 es lo más parecido a ANSI que encontramos
+    y_str = x_str.str.normalize('NFKD').map(lambda xx: xx.encode('ascii', 'ignore')) 
+    # y_str = normalize('NFKD', x_str).encode('ascii', 'ignore').decode('ascii')
+    return y_str
+
+
+def with_columns(a_df, cols_dict): 
+    func = lambda df1, col_kv: df1.withColumn(*col_kv)
+    return reduce(func, cols_dict.items(), a_df)
+    
+    
+def pd_print(a_df: pd.DataFrame, width=180): 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', width):
         print(a_df)
 
-def save_as_file(a_df: spk_DF, path_dir, path_file, **kwargs):
+        
+def save_as_file(a_df: DF.DataFrame, path_dir, path_file, **kwargs):
     std_args = {
         'mode': 'overwrite', 
         'header': 'false'}
@@ -302,7 +313,12 @@ tables_dict = {
 
 # COMMAND ----------
 
-the_sap_tbls = pd.read_feather("../refs/catalogs/sap_.feather")
+# MAGIC %md 
+# MAGIC Esta tabla de tablas no se usa mucho. 
+
+# COMMAND ----------
+
+the_sap_tbls = pd.read_feather("../refs/catalogs/cyber_sap.feather")
 
 join_dict = {}
 for _, t_row in the_sap_tbls.iterrows(): 
@@ -490,12 +506,12 @@ display(golden)
 str_select  = [F.format_string(a_row['c_format'], F.col(name)).alias(name)
     for name, a_row in all_cols[all_cols['ref_type'] == 'str'].iterrows()]
 
-date_select = [F.when(F.col(name) == date(1900, 1, 1), F.lit('        ')) # 8 espacios !!!
+date_select = [F.when(F.col(name) == date(1900, 1, 1), F.lit('00000000'))
         .otherwise(F.date_format(F.col(name), 'MMddyyyy')).alias(name)
     for name in all_cols.index[all_cols['ref_type'] == 'date']]
 
-dbl_select = [F.regexp_replace(F.format_string(a_row['c_format'], name), 
-                  '[\.,]', '').alias(name) 
+dbl_select  = [F.regexp_replace(
+            F.format_string(a_row['c_format'], name), '[\.,]', '').alias(name) 
     for name, a_row in all_cols.iterrows() if a_row['ref_type'] == 'dbl']
 
 int_select = [F.format_string(str(a_row['c_format']), name).alias(name)
