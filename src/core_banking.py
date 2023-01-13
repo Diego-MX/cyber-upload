@@ -22,6 +22,7 @@ try:
 except ImportError: 
     DeltaTable = None
 
+    
 def str_error(an_error): 
     try: 
         a_json = an_error.json()

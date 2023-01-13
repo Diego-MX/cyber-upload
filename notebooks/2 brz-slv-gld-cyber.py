@@ -17,8 +17,9 @@ from datetime import datetime as dt, date
 from functools import reduce
 import numpy as np
 import pandas as pd
-from pyspark.sql import (dataframe as DF, functions as F, types as T, Window as W)
-from pyspark.sql.dataframe import DataFrame
+from pandas.core.frame import DataFrame as pd_DF
+from pyspark.sql import (functions as F, types as T, Window as W)
+from pyspark.sql.dataframe import DataFrame as spk_DF
 from pytz import timezone
 from typing import Tuple
 from unicodedata import normalize
@@ -26,7 +27,7 @@ from unicodedata import normalize
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 
-tables = DBKS_TABLES[ENV]['names']
+tables = DBKS_TABLES[ENV]['items']
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
 
@@ -67,9 +68,13 @@ def save_as_file(a_df: DF.DataFrame, path_dir, path_file, **kwargs):
         'header': 'false'}
     std_args.update(kwargs)
     
-    a_df.coalesce(1).write.mode(std_args['mode']).option('header', std_args['header']).text(path_dir)
+    (a_df.coalesce(1).write
+         .mode(std_args['mode'])
+         .option('header', std_args['header'])
+         .text(path_dir))
     
-    f_extras = [filish for filish in dbutils.fs.ls(path_dir) if filish.name.startswith('part-')]
+    f_extras = [filish for filish in dbutils.fs.ls(path_dir) 
+            if filish.name.startswith('part-')]
     
     if len(f_extras) != 1: 
         raise "Expect only one file starting with 'PART'"
@@ -93,11 +98,44 @@ def save_as_file(a_df: DF.DataFrame, path_dir, path_file, **kwargs):
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ### Transaction Payments
+
+# COMMAND ----------
+
+pymt_codes  = ['92703', '92704', '92709', '92710', '92711', '92798', '92799', 
+    '500021', '500022', '500023', '500401', '500412', '500908', 
+    '550002', '550021', '550022', '950401', '950404']
+
+by_acct_new = W.partitionBy('AccountID').orderBy(F.col('ValueDate').desc())
+by_acct_old = W.partitionBy('AccountID').orderBy(F.col('ValueDate'))
+
+pmts_prep = (spark.read.table('farore_transactions.brz_ops_transactions_set')
+    .filter(F.col('TransactionTypeCode').isin(pymt_codes))
+    .withColumn('by_acct_new', F.row_number().over(by_acct_new))
+    .withColumn('by_acct_old', F.row_number().over(by_acct_old)))
+
+last_pmts = (pmts_prep
+    .filter(F.col('by_acct_new') == 1)
+    .select('AccountID', 
+        F.col('ValueDate').alias('last_date'), 
+        F.col('Amount').alias('last_amount'), 
+        F.col('AmountAc').alias('last_amount_local')))
+                
+txns_grpd = (pmts_prep
+    .filter(F.col('by_acct_old') == 1)
+    .select('AccountID', F.col('ValueDate').alias('first_date')) 
+    .join(last_pmts, on='AccountID', how='inner'))
+
+display(txns_grpd)
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ### Loan Contract
 
 # COMMAND ----------
 
-loan_contract_0 = (spark.read.table(tables['brz_loans'])
+loan_contract_0 = (spark.read.table(tables['brz_loans'][0])
     .filter(F.col('LifeCycleStatusTxt') == 'activos, utilizados')
     .withColumn('yesterday', F.date_add(F.current_date(), -1))
     .withColumn('status_2', F.when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') == 0), 'VIGENTE')
@@ -149,8 +187,8 @@ display(loan_non_strings)
 # COMMAND ----------
 
 # Person Set
-states_str = ["AGU,1", "BCN,2", "BCS,3", "CAM,4", "COA,5", "COL,6", "CHH,8", "CHP,7", 
-              "CMX,9", "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
+states_str = ["AGU,1",  "BCN,2",  "BCS,3",  "CAM,4",  "COA,5",  "COL,6",  "CHH,8",  "CHP,7", 
+              "CMX,9",  "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
               "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
               "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
 
@@ -159,7 +197,7 @@ states_data = [ {'AddressRegion': each_split[0], 'state_key': each_split[1]}
 
 states_df = spark.createDataFrame(states_data)
 
-persons = (spark.read.table(tables['brz_persons'])
+persons = (spark.read.table("din_clients.brz_ops_persons_set")
     .withColumn('split'    , F.split('LastName', ' ', 2))
     .withColumn('LastNameP', F.col('split').getItem(0))
     .withColumn('LastNameM', F.col('split').getItem(1))
@@ -224,7 +262,7 @@ display(balances)
 # 01 Creado    3
 # 86 Suprimido 1
 
-open_items = (spark.read.table("bronze.loan_open_items")
+open_items = (spark.read.table("nayru_accounts.brz_ops_loan_open_items")
     # Set Types
     .withColumn('OpenItemTS',  F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'))
     .withColumn('DueDate',     F.to_date(F.col('DueDate'),    'yyyyMMdd'))
@@ -264,18 +302,13 @@ display(uncleared)
 
 # COMMAND ----------
 
-persons_name    = "bronze.persons_set"
-loans_name      = "bronze.loan_contracts"    
-lqan_name       = "bronze.loan_qan_contracts"
-balances_name   = "bronze.loan_balances"     
-opens_name      = "bronze.loan_open_items"   
-
 tables_dict = {
-    "bronze.persons_set"        : persons, 
-    "bronze.loan_contracts"     : loan_contract, 
-    "bronze.loan_qan_contracts" : loans_qan,
-    "bronze.loan_balances"      : balances,
-    "bronze.loan_open_items"    : uncleared}
+    "PersonSet"    : persons, 
+    "ContractSet"  : loan_contract, 
+    "Lacqan"       : loans_qan,
+    "BalancesWide" : balances,
+    "OpenItemsUncleared" : uncleared, 
+    "TxnsGrouped"  : txns_grpd}
 
 
 # COMMAND ----------
@@ -470,8 +503,7 @@ display(golden)
 
 # COMMAND ----------
 
-
-str_select  = [F.format_string(a_row['c_format'], udf_toascii(F.col(name))).alias(name)
+str_select  = [F.format_string(a_row['c_format'], F.col(name)).alias(name)
     for name, a_row in all_cols[all_cols['ref_type'] == 'str'].iterrows()]
 
 date_select = [F.when(F.col(name) == date(1900, 1, 1), F.lit('00000000'))
