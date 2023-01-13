@@ -1,50 +1,67 @@
 
+from itertools import product
+import numpy as np
 from src.utilities import tools
 from config import SITE
 
 #%% Preparación
-cyber_fields = SITE/"refs/catalogs/Cyber.xlsm.lnk"
+cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
-# todas las columnas
-cyber_meta = (tools.read_excel_table(cyber_fields, 'Output', 'output_cols')
-    .query(f"proc.notnull()"))
+cyber_tables = {
+    'sap_saldos': {}, 
+    'sap_pagos': {}, 
+    'sap_estatus': {}, 
+    'fiserv_saldos': {}, 
+    'fiserv_pagos': {}, 
+    'fiserv_estatus': {}
+}
 
-replace_types = {row['columnas']: row['proc'] 
-        for _, row in cyber_meta.iterrows()}
+expect_specs = (tools.read_excel_table(cyber_fields, 'general', 'especificacion')
+    .set_index('columna'))
 
-# weird_bools = { a_col: a_proc 
-#       for a_col, a_proc in replace.items()
-#       if a_proc == 'bool' }
-weird_bools = filter(lambda k: replace_types[k] == 'bool', replace_types)
-
-
-tables_meta = tools.read_excel_table(cyber_fields, 'Output', 'tablas_sap')
-replace_tbls = {row['tabla_origen']: row['datalake'] 
-        for _, row in tables_meta.iterrows()}
+data_types = tools.read_excel_table(cyber_fields, 'general', 'tipo_datos')
 
 
-#%% Ejecución
-cyber_ref_2 = tools.read_excel_table(cyber_fields, 'Output', 'output')
+def excelref_to_feather(xls_df): 
 
-cyber_ref_1 = (cyber_ref_2[cyber_meta['columnas']]
-    .apply(lambda a_col: (a_col == 1) if a_col.name in weird_bools else a_col)
-    .astype(replace_types)
-    .replace({'tabla_origen': replace_tbls}))
+    expect_proc = expect_specs.loc[expect_specs['proc'].notnull(), 'proc']
+    weird_bools = expect_proc[expect_proc == 'bool']
+    bool_func = (lambda a_col: 
+        (a_col == 1) if (a_col.name in weird_bools.index) else a_col)
 
-#%% Checks
+    df0 = (xls_df[expect_proc.index]
+        .apply(bool_func, axis=1)
+        .astype(expect_proc)
+        .assign(lon_dec = lambda df: df['Longitud'].astype(float)))
 
-non_checks = (cyber_ref_1
-    .filter(like='chk', axis=1)
-    .apply(lambda lgl_srs: sum(~lgl_srs), axis=0))
+    specs_2 = df0.assign(
+        chk_date = np.where(df0['Tipo de dato'] == 'DATE', df0['Longitud'] == 8, True), 
+        chk_mand = np.where(df0['Mandatorio'], df0['tabla'] != '', True), 
+        chk_aplica = np.where(df0['Aplica PréstamoV1'] == 'N', df0['columna_valor'] == 'N/A', True),
+        chk_len  = df0['Posición inicial'] + df0['lon_dec'] == df0['Posición inicial'].shift(), 
+        chk_name = df0['nombre'].duplicated()
+    )
 
-print(non_checks)
+    exec_cols  = expect_specs.loc[expect_specs['ejec'] == 1, 'ejec']
+    specs_exec = specs_2[exec_cols.index].reset_index()
+        
+    checks = (specs_2
+        .filter(like='chk', axis=1)
+        .apply(lambda srs: sum(~srs), axis=0))
 
-#%% And print. 
-ref_columns = cyber_meta['columnas'][cyber_meta['ejec'] == 1]
+    return (specs_exec, checks)
 
-cyber_ref = (cyber_ref_1[ref_columns]
-    .reset_index())
 
-cyber_ref.to_feather("refs/catalogs/cyber_columns.feather")
-tables_meta.to_feather("refs/catalogs/cyber_sap.feather")
+
+for a_spec in cyber_tables: 
+    print(a_spec)
+    spec_ref  = tools.read_excel_table(cyber_fields, a_spec)
+    has_join  = tools.read_excel_table(cyber_fields, a_spec, f"{a_spec}_join") 
+    (execs, checks) = excelref_to_feather(spec_ref)
+    print(checks)
+
+    execs.to_feather(f"refs/catalogs/cyber_{a_spec}.feather")
+    if has_join is not None: 
+        has_join.to_feather(f"refs/catalogs/cyber_{a_spec}_joins.feather")
+    
 

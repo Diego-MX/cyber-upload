@@ -103,8 +103,11 @@ def read_excel_table(file, sheet:str, table:str=None, **kwargs):
         a_wb = load_workbook(shortcut_target(file), data_only=True)
     
     a_ws  = a_wb[sheet]
-    a_tbl = a_ws.tables[table]
-    
+
+    if table not in a_ws.tables: 
+        return None
+
+    a_tbl = a_ws.tables[table]    
     rows_ls = [[ cell.value for cell in row ] for row in a_ws[a_tbl.ref]]
     tbl_df  = pd.DataFrame(data=rows_ls[1:], index=None, columns=rows_ls[0], **kwargs)
     return tbl_df
@@ -135,7 +138,8 @@ def dict_minus(a_dict, key_ls, copy=True):
     return b_dict
 
 
-encode64 = lambda a_str: b64encode(a_str.encode('ascii')).decode('ascii')
+encode64 = (lambda a_str: 
+    b64encode(a_str.encode('ascii')).decode('ascii'))
 
 
 def datecols_to_str(a_df):
