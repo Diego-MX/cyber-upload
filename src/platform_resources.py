@@ -15,10 +15,9 @@ class AzureResourcer():
             self.set_vault()
         
         get_secret = lambda k: self.vault.get_secret(k).value
-        
-        is_tuple  = lambda x: isinstance(x, tuple)
-        secret_2  = lambda v_ish: get_secret(v_ish[1]) if is_tuple(v_ish) else v_ish 
-        call_dict = lambda d: {k:secret_2(v) for k, v in d.items()} 
+        is_tuple   = lambda x: isinstance(x, tuple)
+        secret_2   = lambda v_ish: get_secret(v_ish[1]) if is_tuple(v_ish) else v_ish 
+        call_dict  = lambda d: {k:secret_2(v) for k, v in d.items()} 
         
         self.get_secret = get_secret 
         self.call_dict  = call_dict

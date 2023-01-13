@@ -21,7 +21,6 @@ File history:
 Some variable names are predefined as to match the ones in earlier stage of development.  
 To suggest a change, consider redefining it in the code.   
 
-
 Previous requirements: 
 - Databricks secrets scope (`cx-collections`) with service principal keys:  
   `sp-collections-client`, `sp-collections-secret`, `aad-tenant-id`, `sp-collections-subscription`  
