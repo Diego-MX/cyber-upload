@@ -1,6 +1,7 @@
 from os import environ, getcwd, getenv
 from pathlib import Path
 import re
+
 from azure.identity import ClientSecretCredential
 from azure.identity._credentials.default import DefaultAzureCredential
 from src.utilities import tools 
@@ -138,7 +139,7 @@ CORE_KEYS = {
             'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
             'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"},
         } }, 
-    'qas-sap' : {
+    'qas-sap': {
         'main' : {
             'headers' : {
                 'format'          : 'json',
@@ -275,6 +276,7 @@ DBKS_TABLES = {
             'brz_loan_balances'   : 'bronze.loan_balances', 
             'brz_loan_open_items' : 'bronze.loan_open_items',  
             'brz_loan_payments'   : 'bronze.loan_payment_plans',
+            'brz_transactions'    : 'bronze.transactions_set',
             'slv_persons'         : 'silver.persons_set',
             'slv_loan_payments'   : 'silver.loan_payment_plans',
             'slv_loan_balances'   : 'silver.loan_balances',

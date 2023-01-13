@@ -11,9 +11,9 @@ class LoanSources(Base):
 
     id = alq.Column(alq.Integer, primary_key=True)
     name = alq.Column(alq.String(32))
-
+  
     attributes = orm.relationship('LoanAttributes', 
-            back_populates='loan_source', cascade="all, delete-orphan")
+            back_populates='loan_source', cascade="all, delete-orphan") 
 
     def __repr__(self): 
         return f"LoanSource(id={self.id}, name={self.name})"

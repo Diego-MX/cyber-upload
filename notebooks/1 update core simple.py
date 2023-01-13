@@ -37,6 +37,7 @@ az_manager.set_dbks_permissions(at_storage)
 at_base = DBKS_TABLES[ENV]['base']  # con placeholders STAGE, STORAGE. 
 table_items = DBKS_TABLES[ENV]['items'] 
 
+abfss_loc = at_base.format(stage='bronze', storage=at_storage)
 
 # COMMAND ----------
 
@@ -46,14 +47,10 @@ persons_spk = spark.createDataFrame(persons_df)
 loans_df  = core_session.get_loans()
 loans_spk = spark.createDataFrame(loans_df)
 
-# lqan_df = core_session.get_loans_qan()
-# lqan_spk = spark.createDataFrame(lqan_df)
-
+lqan_df = core_session.get_loans_qan()
+lqan_spk = spark.createDataFrame(lqan_df)
 
 # COMMAND ----------
-
-
-abfss_loc = at_base.format(stage='bronze', storage=at_storage)
 
 (persons_spk.write
     .format('delta').mode('overwrite')
@@ -65,4 +62,20 @@ abfss_loc = at_base.format(stage='bronze', storage=at_storage)
     .option('overwriteSchema', True)
     .save(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
  
+(lqan_spk.write
+    .format('delta').mode('overwrite')
+    .option('overwriteSchema', True)
+    .save(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
 
+
+# COMMAND ----------
+
+loans_brz = (spark.read.format('delta')
+    .load(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
+display(loans_brz)
+
+# COMMAND ----------
+
+persons_brz = (spark.read.format('delta')
+    .load(f"{abfss_loc}/{table_items['brz_persons'][1]}"))
+display(persons_brz)
