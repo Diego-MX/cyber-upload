@@ -213,8 +213,6 @@ class SAPSession(Session):
                 'root'   : ('__metadata', 'dataOld'),
                 'dataNew': ('__metadata', 'PaymentNotes')}}
         
-        
-        
         data_ls = [an_event.pop('dataNew') for an_event in events_ls]
         for pop_field in data_poppers[event_type]['dataNew']: 
             to_discard = [a_data.pop(pop_field) for a_data in data_ls]
@@ -251,13 +249,14 @@ class SAPSession(Session):
             return (data_df, meta_df)
         
 
-    def get_loans(self, tries=3): 
+    def get_loans(self, params_x={}, how_many=PAGE_MAX, tries=3): 
         if not hasattr(self, 'token'): 
             self.set_token()
+        select_attrs = attributes_from_column('all')
+        loan_params  = {'$top': how_many, '$skip': 0,
+            '$select': ','.join(select_attrs)}
         
         loan_config  = self.config['calls']['contract-set']
-        select_attrs = attributes_from_column('all')
-        loan_params  = {'$select': ','.join(select_attrs)}
         
         for _ in range(tries): 
             the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
@@ -272,7 +271,8 @@ class SAPSession(Session):
         else: 
             return None   
 
-        loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
+        loans_ls = the_resp.json()['d']['results']  
+        # [metadata : [id, uri, type], borrowerName]
         
         if loans_ls: 
             for loan in loans_ls: 
@@ -280,35 +280,44 @@ class SAPSession(Session):
             loans_df = pd.DataFrame(loans_ls)
         else: 
             loans_df = pd.DataFrame([], columns=select_attrs)
-        
         return loans_df 
 
 
-    def get_loans_qan(self, tries=3): 
+    def get_loans_qan(self, params_x={}, how_many=PAGE_MAX, tries=3): 
         if not hasattr(self, 'token'): 
             self.set_token()
-        
+            
         loan_config  = self.config['calls']['contract-qan']
         select_attrs = attributes_from_column('qan')
-        loan_params  = {'$select': ','.join(select_attrs)}
+        params_0 = {'$top': how_many, '$skip': 0,
+            '$select': ','.join(select_attrs)}
+        params_0.update(params_x)
+        
+        post_lqan = []
+        while True: 
+            for _ in range(tries): 
+                the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
+                    auth=BearerAuth(self.token['access_token']), 
+                    params=params_0)
 
-        for _ in range(tries): 
-            the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-                auth=BearerAuth(self.token['access_token']), 
-                params=loan_params)
-            
-            if the_resp.status_code == 401: 
-                self.set_token()
-                continue
-            elif the_resp.status_code == 200: 
+                if the_resp.status_code == 401: 
+                    self.set_token()
+                    continue
+                elif the_resp.status_code == 200: 
+                    break
+            else: 
+                return None   
+
+            loans_ls = the_resp.json()['d']['results']    
+            # [metadata : [id, uri, type], borrowerName]
+            post_lqan.extend(loans_ls)
+
+            params_0['$skip'] += how_many
+            if len(loans_ls) < how_many: 
                 break
-        else: 
-            return None   
-
-        loans_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
+        
         for loan in loans_ls: 
             loan.pop('__metadata')
-        
         return pd.DataFrame(loans_ls)
 
     
@@ -333,7 +342,8 @@ class SAPSession(Session):
             else:
                 raise "Could not call API."
             
-            persons_ls = the_resp.json()['d']['results']  # [metadata : [id, uri, type], borrowerName]
+            persons_ls = the_resp.json()['d']['results']  
+            # [metadata : [id, uri, type], borrowerName]
             post_persons.extend(persons_ls)
 
             params_0['$skip'] += how_many

@@ -15,7 +15,7 @@
 
 from datetime import datetime as dt
 import re
-from delta.tables import DeltaTable
+from delta.tables import DeltaTable as Δ
 from pyspark.sql import functions as F, types as T, Window as W
 
 from src.platform_resources import AzureResourcer
@@ -122,7 +122,7 @@ person_set_0 = (spark.read.format('delta')
 
 slv_persons = f"{abfss_slv}/{tbl_items['slv_persons'][1]}"
 
-if DeltaTable.isDeltaTable(spark, slv_persons): 
+if Δ.isDeltaTable(spark, slv_persons): 
     print("Person Set Delta Table")
     person_slv_0 = spark.read.format('delta').load(slv_persons)
 
@@ -138,12 +138,6 @@ else:
 display(person_slv)
     
 
-
-# COMMAND ----------
-
-display(person_set_0)
-
-display(person_set_df)
 
 # COMMAND ----------
 
