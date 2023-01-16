@@ -441,9 +441,9 @@ class ConfigEnviron():
             def get_secret(a_key): 
                 mod_key = re.sub('_', '-', a_key.lower())
                 the_val = dbutils.secrets.get(scope=self.config['dbks']['scope'], key=mod_key)
-                return the_val
-            
+                return the_val            
         self.get_secret = get_secret
+
 
     def call_dict(self, a_dict): 
         if not hasattr(self, 'get_secret'): 

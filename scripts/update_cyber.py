@@ -1,20 +1,14 @@
-
-from itertools import product
+from datetime import datetime as dt 
 import numpy as np
+from pytz import timezone 
 from src.utilities import tools
-from config import SITE
+from src.platform_resources import AzureResourcer
+from config import (ConfigEnviron, 
+    ENV, SERVER, SITE)
 
 #%% Preparación
-cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
-cyber_tables = {
-    'sap_saldos': {}, 
-    'sap_pagos': {}, 
-    'sap_estatus': {}, 
-    # 'fiserv_saldos': {}, 
-    # 'fiserv_pagos': {}, 
-    # 'fiserv_estatus': {}
-}
+cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
 expect_specs = (tools.read_excel_table(cyber_fields, 'general', 'especificacion')
     .set_index('columna'))
@@ -37,15 +31,14 @@ def excelref_to_feather(xls_df):
 
     specs_2 = df0.assign(
         chk_date   = np.where(as_lgl(df0['Tipo de dato'] == 'DATE'), 
-                            as_lgl(df0['lon_dec'] == 8), True), 
+                              as_lgl(df0['lon_dec'] == 8), True), 
         chk_mand   = np.where(as_lgl(df0['Mandatorio']), 
-                            as_lgl(df0['columna_valor'] != ''), True), 
+                              as_lgl(df0['columna_valor'] != ''), True), 
         chk_aplica = np.where(as_lgl(df0['Aplica'] == 'N'  ), 
-                            as_lgl(df0['columna_valor'] == 'N/A'), True),
+                              as_lgl(df0['columna_valor'] == 'N/A'), True),
         chk_len    = as_lgl(df0['Posición inicial'] + np.floor(df0['lon_dec']) 
                          == df0['Posición inicial'].shift(-1)), 
-        chk_name  = ~as_lgl(df0['nombre'].duplicated())
-    )
+        chk_name   =~as_lgl(df0['nombre'].duplicated()))
 
     exec_cols  = expect_specs.loc[expect_specs['ejec'] == 1, 'ejec']
     specs_exec = specs_2[exec_cols.index].reset_index()
@@ -57,16 +50,45 @@ def excelref_to_feather(xls_df):
     return (specs_exec, checks)
 
 
+if __name__ == '__main__': 
 
-for a_spec in cyber_tables: 
-    print(a_spec)
-    spec_ref  = tools.read_excel_table(cyber_fields, a_spec)
-    has_join  = tools.read_excel_table(cyber_fields, a_spec, f"{a_spec}_join") 
-    (execs, checks) = excelref_to_feather(spec_ref)
-    print(checks)
+    app_environ = ConfigEnviron(ENV, SERVER)
+    az_manager = AzureResourcer(app_environ)
+    print(f"Variables: (Env, Server)={ENV, SERVER}")
 
-    execs.to_feather(f"refs/catalogs/cyber_{a_spec}.feather")
-    if has_join is not None: 
-        has_join.to_feather(f"refs/catalogs/cyber_{a_spec}_joins.feather")
+    blobs_paths = f"cx/collections/cyber/spec_files"
     
+    cyber_tasks = [
+        'sap_saldos' , # 'fiserv_saldos' ,
+        'sap_pagos'  , # 'fiserv_pagos'  ,
+        'sap_estatus'] # 'fiserv_estatus'
+
+    for each_task in cyber_tasks: 
+        print(f"\nRunning task: {each_task}")
+        spec_local = f"refs/catalogs/cyber_{each_task}.feather"
+        join_local = f"refs/catalogs/cyber_{each_task}_joins.feather"
+
+        now_str = dt.now(tz=timezone('America/Mexico_City')).strftime('%Y-%m-%d_%H:%M')
+
+        blob_1  = f"{blobs_paths}/{each_task}_specs_latest.feather" 
+        blob_2  = f"{blobs_paths}/{each_task}_specs_{now_str}.feather" 
+        blob_3  = f"{blobs_paths}/{each_task}_joins_latest.feather" 
+        blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.feather" 
+
+        spec_ref = tools.read_excel_table(cyber_fields, each_task)
+        has_join = tools.read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
+        (execs, checks) = excelref_to_feather(spec_ref)
+        execs.to_feather(spec_local)
+        az_manager.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
+        az_manager.upload_storage_blob(spec_local, blob_2, 'gold')
+        print(checks)
+
+        if has_join is not None: 
+            has_join.to_feather(join_local)
+            az_manager.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
+            az_manager.upload_storage_blob(join_local, blob_4, 'gold')
+
+
+
+
 
