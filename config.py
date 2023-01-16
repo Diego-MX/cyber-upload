@@ -287,6 +287,8 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.crm_payment_promises'),
+            'brz_txns'           : 
+                ('farore_transactions.brz_ops_transactions_set', 'transactions', 'not-used'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
             'slv_loans'         : 
@@ -323,6 +325,8 @@ DBKS_TABLES = {
                 ('din_clients.brz_ops_persons_set',        'persons-set'),
             'brz_loans'           : 
                 ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
+            'brz_loan_analyzers'  : 
+                ('nayru_accounts.brz_ops_loans_analyzers', 'loan-analyzers'), 
             'brz_loan_balances'   : 
                 ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
             'brz_loan_open_items' : 
@@ -331,6 +335,8 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'brz_txns'           : 
+                ('farore_transactions.brz_ops_transactions_set', 'transactions', 'not-used'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set'), 
             'slv_loans'         : 
@@ -361,6 +367,8 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'brz_txns'           : 
+                ('farore_transactions.brz_ops_transactions_set', 'transactions', 'not-used'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set'), 
             'slv_loans'         : 
@@ -391,6 +399,8 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises'), 
+            'brz_txns'           : 
+                ('farore_transactions.brz_ops_transactions_set', 'transactions'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set'), 
             'slv_loans'         : 

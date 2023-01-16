@@ -23,8 +23,10 @@
 # COMMAND ----------
 
 from importlib import reload
-from src import core_banking
-reload(core_banking)
+import config; reload(config)
+from src import platform_resources; reload(platform_resources)
+from src import core_banking; reload(core_banking)
+
 
 # COMMAND ----------
 
@@ -33,8 +35,6 @@ from pyspark.sql import functions as F, types as T
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV
-
-CORE_ENV = 'prd-sap'
 
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
@@ -61,6 +61,10 @@ lqan_spk = spark.createDataFrame(lqan_df)
 
 # COMMAND ----------
 
+display(lqan_spk)
+
+# COMMAND ----------
+
 (persons_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
@@ -74,17 +78,14 @@ lqan_spk = spark.createDataFrame(lqan_df)
 (lqan_spk.write
     .format('delta').mode('overwrite')
     .option('overwriteSchema', True)
-    .save(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
+    .save(f"{abfss_loc}/{table_items['brz_loan_analyzers'][1]}"))
 
 
 # COMMAND ----------
 
-loans_brz = (spark.read.format('delta')
-    .load(f"{abfss_loc}/{table_items['brz_loans'][1]}"))
-display(loans_brz)
-
-# COMMAND ----------
-
-persons_brz = (spark.read.format('delta')
-    .load(f"{abfss_loc}/{table_items['brz_persons'][1]}"))
-display(persons_brz)
+write_table = False
+if write_tables: 
+    create_clause = "CREATE TABLE {} \nUSING DELTA LOCATION \"{}\";"
+    tbl_name, tbl_path, _ = table_items[write_table]
+    print(    create_clause.format(tbl_name, tbl_path))
+    spark.sql(create_clause.format(tbl_name, tbl_path))
