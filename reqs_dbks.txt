@@ -8,6 +8,7 @@ deepdiff
 azure-identity
 azure-keyvault-secrets
 
+authlib
 httpx
 python-dotenv
 

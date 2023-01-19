@@ -13,13 +13,16 @@
 
 # COMMAND ----------
 
+from collections import OrderedDict
 from datetime import datetime as dt
-import re
 from delta.tables import DeltaTable
 from pyspark.sql import functions as F, types as T, Window as W
+import re
 
-from src.platform_resources import AzureResourcer
+# COMMAND ----------
+
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from src.platform_resources import AzureResourcer
 
 tbl_items = DBKS_TABLES[ENV]['items']
 
@@ -53,7 +56,7 @@ def segregate_lastNames(s, pos):
         else:
             return s
         
-        
+
 def date_format(s):
     if s != '':
         return dt.strptime(s, '%Y%m%d').date()
@@ -94,7 +97,7 @@ date_format_udf = F.udf(date_format, T.DateType())
 
 abfss_brz = base_location.format(stage='bronze', storage=at_storage)
 abfss_slv = base_location.format(stage='silver', storage=at_storage)
-abfss_gld = base_location.format(stage='gold', storage=at_storage)
+abfss_gld = base_location.format(stage='gold',   storage=at_storage)
 promise_slv = promise_loc.format(stage='silver', storage=at_storage) 
 
 # COMMAND ----------
@@ -119,7 +122,7 @@ person_set_0 = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_pe
     .withColumn('phone_number', F.col('phone_number').cast(T.LongType()))
     .dropDuplicates())
 
-slv_persons = f"{abfss_brz}/{tbl_items['brz_persons'][1]}"
+slv_persons = f"{abfss_slv}/{tbl_items['slv_persons'][1]}"
 if DeltaTable.isDeltaTable(spark, slv_persons): 
     person_silver = spark.read.format('delta').load(slv_persons)
 
@@ -130,7 +133,7 @@ if DeltaTable.isDeltaTable(spark, slv_persons):
 else: 
     person_set_df = person_set_0
 
-display(person_set_df)
+
 
 # COMMAND ----------
 
@@ -147,7 +150,8 @@ loan_cols = ['ID', 'BankAccountID', 'InitialLoanAmount',
     'NominalInterestRate', 'BorrowerID', 'OverdueDays', 'LifeCycleStatusTxt',
     'PaymentPlanStartDate']
 
-loan_contract_df = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loans'][1]}")
+loan_contract_df = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loans'][1]}")
     .select(*loan_cols)
     .withColumn('InitialLoanAmount', F.col('InitialLoanAmount').cast(T.DoubleType()))
     .withColumn('TermSpecificationValidityPeriodDurationM', F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()))
@@ -175,10 +179,12 @@ code_cols = {
 
 code_select = [(vv).alias(kk) for kk, vv in code_cols.items()]
 
-pre_balances = spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}")
+pre_balances = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_balances'][1]}"))
 
 if pre_balances.count():
     # ['ID', 'Code', 'Name', 'Amount', 'Currency', 'BalancesTS']
+    print()
     loan_balance_df = (pre_balances
         # Set types
         .withColumn('Code', F.col('Code').cast(T.IntegerType()))
@@ -242,7 +248,7 @@ display(loan_balance_df)
 
 # COMMAND ----------
 
-# ['OpenItemTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 'DueDate', 
+# ['OpenItemsTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 'DueDate', 
 #  'ReceivableType', 'ReceivableTypeTxt', 'ReceivableDescription', 'Amount', 'Currency']
 
 # Columnas Finales. 
@@ -254,10 +260,11 @@ open_items_cols = {
     'monto_vencido'         : F.col('capital_vencido_monto') 
             + F.col('impuesto_vencido_monto') + F.col('comision_vencido_monto')}
 
-pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
-    .withColumn('OpenItemTS', F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'))
-    .withColumn('DueDate',    F.to_date(F.col('DueDate'),    'yyyyMMdd'))
-    .withColumn('Amount',     F.col('Amount').cast(T.DoubleType()))
+pre_open_items = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
+    .withColumn('OpenItemsTS', F.to_date('OpenItemsTS', 'yyyy-MM-dd'))
+    .withColumn('DueDate',     F.to_date('DueDate',     'yyyyMMdd'))
+    .withColumn('Amount',      F.col('Amount').cast(T.DoubleType()))
     # Aux 1
     .withColumn('cleared',    F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
                                .cast(T.DoubleType())).fillna(0, subset=['cleared'])
@@ -267,10 +274,12 @@ pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_
                                .when(F.col('ReceivableType').isin([511200, 990006]), 'comision')
                                .when(F.col('ReceivableType').isin([511100, 991100, 990004]), 'impuesto')) 
     .withColumn('estatus_2',  F.when(F.col('StatusCategory') == 1, 'pagado')
-                               .when((F.col('DueDate') < F.col('OpenItemTS')) 
+                               .when((F.col('DueDate') < F.col('OpenItemsTS')) 
                                     & F.col('StatusCategory').isin([2, 3]), 'vencido'))
     .withColumn('local/fgn',  F.when(F.col('Currency') == 'MXN', 'local')
-                               .when(F.col('Currency').isNotNull(), 'foreign')))
+                               .when(F.col('Currency').isNotNull(), 'foreign'))
+                 )
+
 
 
 if pre_open_items.count(): 
@@ -283,15 +292,16 @@ if pre_open_items.count():
                  F.countDistinct(F.col('OpenItemID')).alias('n'))
         .select(*['ContractID'], *open_items_slct)
         .fillna(value=0))
+    
 else: 
     pre_fields = [('ContractID', 'string'), ('parcialidades_pagadas', 'long'), 
         ('parcialidades_vencidas', 'long'), ('principal_vencido', 'double'), 
-        ('interes_ord_vencido', 'double'), ('monto_vencido', 'double')]
+        ('interes_ord_vencido', 'double'),  ('monto_vencido', 'double')]
     
     field_map = {
         'long': T.LongType, 'string': T.StringType, 'double': T.DoubleType}
     
-    schema = T.StructType([T.StructField( fld[0], field_map[fld[1]](), True)
+    schema = T.StructType([T.StructField(fld[0], field_map[fld[1]](), True)
         for fld in pre_fields])
     loan_open_df = spark.createDataFrame([], schema)
 
@@ -412,13 +422,8 @@ display(loan_payment_df)
 
 # COMMAND ----------
 
-display(person_set_df)
-
-# COMMAND ----------
-
 # Person Set utiliza Append, el resto 'overwrite' (default).
-write_dataframe(person_set_df, f"{abfss_slv}/{tbl_items['slv_persons'][1]}", 'append')
-
+write_dataframe(person_set_df,    f"{abfss_slv}/{tbl_items['slv_persons'][1]}", 'append')
 write_dataframe(loan_payment_df,  f"{abfss_slv}/{tbl_items['slv_loan_payments'][1]}")
 write_dataframe(loan_balance_df,  f"{abfss_slv}/{tbl_items['slv_loan_balances'][1]}")
 write_dataframe(loan_contract_df, f"{abfss_slv}/{tbl_items['slv_loans'][1]}")
@@ -438,6 +443,8 @@ write_dataframe(loan_open_df,     f"{abfss_slv}/{tbl_items['slv_loan_open_items'
 
 windowSpec = (W.partitionBy('attribute_loan_id')
     .orderBy(['attribute_due_date', 'promise_id']))
+
+person_silver = spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_persons'][1]}")
 
 persons_set = (spark.read.format('delta')
     .load(f"{abfss_slv}/{tbl_items['slv_persons'][1]}")
@@ -476,7 +483,8 @@ base_open = (base_df
 # COMMAND ----------
 
 full_fields = (base_open
-    .join(loan_payment_plans, how='left', on=base_open['ID'] == loan_payment_plans['ContractID'])
+    .join(loan_payment_plans, how='left', 
+        on=base_open['ID'] == loan_payment_plans['ContractID'])
     .drop(loan_payment_plans['ContractID'])
     .fillna(value=0)
     .join(promises, how='left', on=base_open['ID'] == promises['attribute_loan_id'])
@@ -488,6 +496,17 @@ the_cols = ['TermSpecificationStartDate', 'sig_pago', 'attribute_due_date']
 for a_col in the_cols:
     full_fields = full_fields.withColumn(a_col, F.date_format(F.col(a_col), 'dd-MM-yyyy'))
 
+display(full_fields)
+
 # COMMAND ----------
 
 write_dataframe(full_fields, f"{abfss_gld}/{tbl_items['gld_loans'][1]}" )
+
+# COMMAND ----------
+
+test_set = (full_fields
+    .filter(F.col('OverdueDays').between(1, 5))
+    .filter(F.col('LifeCycleStatusTxt').isin('Active, Used'))
+    .select('ID', 'monto_a_pagar', 'monto_liquidacion', 'monto_vencido'))
+
+display(test_set)

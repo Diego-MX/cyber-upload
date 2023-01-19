@@ -57,10 +57,10 @@ def str_camel_to_snake(cameled:str):
     return snaked
 
 
-def str_snake_to_camel(snaked:str, first_word_too=False):
-    first, *others = snaked.split('_')
-    first_too = first.title() if first_word_too else first.lower()
-    cameled = first_too + ''.join(word.title() for word in others)
+def str_snake_to_camel(snaked:str, first_too=False):
+    first_0, *others = snaked.split('_')
+    first = first_0.title() if first_too else first.lower()
+    cameled = first + ''.join(word.title() for word in others)
     return cameled
 
 
