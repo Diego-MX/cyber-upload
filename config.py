@@ -174,7 +174,7 @@ CORE_KEYS = {
                 'format'          : 'json',
                 'Accept-Encoding' : "gzip, deflate",
                 'Accept'          : "application/json" }, 
-            'base-url' : "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b",
+            'base-url' : "https://apiprd.apimanagement.us21.hana.ondemand.com",
             'access' : {
                 'username': (1, 'core-api-key'), 
                 'password': (1, 'core-api-secret') } }, 
@@ -186,15 +186,15 @@ CORE_KEYS = {
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
             'event-set'    : {
-                'persons'      : "v15/bp/EventSet", 
-                'accounts'     : "v1/cac/EventSet", 
-                'transactions' : "v1/bape/EventSet", 
-                'prenotes'     : "v1/bapre/EventSet"},
-            'person-set'       : {'sub-url' : "v15/bp/PersonSet"},
-            'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
-            'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
-            'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
-            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}
+                'persons'      : "/s4b/v15/bp/EventSet", 
+                'accounts'     : "/s4b/v1/cac/EventSet", 
+                'transactions' : "/s4b/v1/bape/EventSet", 
+                'prenotes'     : "/s4b/v1/bapre/EventSet"},
+            'person-set'       : {'sub-url' : "/s4b/v15/bp/PersonSet"},
+            'contract-set'     : {'sub-url' : "/s4b/v1/lacovr/ContractSet"},
+            'contract-qan'     : {'sub-url' : "/s4b/v1/lacqan/ContractSet"},
+            'contract-current' : {'sub-url' : "/s4b/v1/cac/ContractSet"},
+            'contract-loans'   : {'sub-url' : "/s4b/v1/lac/ContractSet"}
         } 
     }
 } 

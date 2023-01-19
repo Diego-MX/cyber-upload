@@ -66,14 +66,14 @@ if __name__ == '__main__':
     for each_task in cyber_tasks: 
         print(f"\nRunning task: {each_task}")
         spec_local = f"refs/catalogs/cyber_{each_task}.feather"
-        join_local = f"refs/catalogs/cyber_{each_task}_joins.feather"
+        join_local = f"refs/catalogs/cyber_{each_task}_joins.csv"
 
         now_str = dt.now(tz=timezone('America/Mexico_City')).strftime('%Y-%m-%d_%H:%M')
 
         blob_1  = f"{blobs_paths}/{each_task}_specs_latest.feather" 
         blob_2  = f"{blobs_paths}/{each_task}_specs_{now_str}.feather" 
-        blob_3  = f"{blobs_paths}/{each_task}_joins_latest.feather" 
-        blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.feather" 
+        blob_3  = f"{blobs_paths}/{each_task}_joins_latest.csv" 
+        blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.csv" 
 
         spec_ref = tools.read_excel_table(cyber_fields, each_task)
         has_join = tools.read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
@@ -84,7 +84,7 @@ if __name__ == '__main__':
         print(checks)
 
         if has_join is not None: 
-            has_join.to_feather(join_local)
+            has_join.to_csv(join_local, index=False)
             az_manager.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
             az_manager.upload_storage_blob(join_local, blob_4, 'gold')
 

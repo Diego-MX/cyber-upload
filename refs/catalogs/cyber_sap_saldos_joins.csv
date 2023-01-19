@@ -1,0 +1,8 @@
+tabla,helper,join_cols
+ContractSet,ovr_cols,"ID=loan_id,BorrowerID=person_id"
+PersonSet,person_cols,ID=person_id
+Lacqan,qan_cols,ID=loan_id
+BalancesWide,---,ID=loan_id
+OpenItemsUncleared,---,ID=loan_id
+TxnsGrouped,---,AccountID=loan_id
+_val,---,

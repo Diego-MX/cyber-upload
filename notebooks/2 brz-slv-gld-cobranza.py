@@ -17,9 +17,12 @@ from datetime import datetime as dt
 import re
 from delta.tables import DeltaTable as Δ
 from pyspark.sql import functions as F, types as T, Window as W
+import re
 
-from src.platform_resources import AzureResourcer
+# COMMAND ----------
+
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from src.platform_resources import AzureResourcer
 
 tbl_items = DBKS_TABLES[ENV]['items']
 
@@ -53,7 +56,7 @@ def segregate_lastNames(s, pos):
         else:
             return s
         
-        
+
 def date_format(s):
     if s != '':
         return dt.strptime(s, '%Y%m%d').date()
@@ -121,6 +124,8 @@ person_set_0 = (spark.read.format('delta')
     .dropDuplicates())
 
 slv_persons = f"{abfss_slv}/{tbl_items['slv_persons'][1]}"
+if Δ.isDeltaTable(spark, slv_persons): 
+    person_silver = spark.read.format('delta').load(slv_persons)
 
 if Δ.isDeltaTable(spark, slv_persons): 
     print("Person Set Delta Table")
@@ -238,7 +243,7 @@ display(loan_balance_slv)
 
 # COMMAND ----------
 
-# ['OpenItemTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 'DueDate', 
+# ['OpenItemsTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 'DueDate', 
 #  'ReceivableType', 'ReceivableTypeTxt', 'ReceivableDescription', 'Amount', 'Currency']
 
 # Columnas Finales. 
@@ -250,10 +255,11 @@ open_items_cols = {
     'monto_vencido'         : F.col('capital_vencido_monto') 
             + F.col('impuesto_vencido_monto') + F.col('comision_vencido_monto')}
 
-pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
-    .withColumn('OpenItemTS', F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'))
-    .withColumn('DueDate',    F.to_date(F.col('DueDate'),    'yyyyMMdd'))
-    .withColumn('Amount',     F.col('Amount').cast(T.DoubleType()))
+pre_open_items = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
+    .withColumn('OpenItemsTS', F.to_date('OpenItemsTS', 'yyyy-MM-dd'))
+    .withColumn('DueDate',     F.to_date('DueDate',     'yyyyMMdd'))
+    .withColumn('Amount',      F.col('Amount').cast(T.DoubleType()))
     # Aux 1
     .withColumn('cleared',    F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
                                .cast(T.DoubleType())).fillna(0, subset=['cleared'])
@@ -263,10 +269,12 @@ pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_
                                .when(F.col('ReceivableType').isin([511200, 990006]), 'comision')
                                .when(F.col('ReceivableType').isin([511100, 991100, 990004]), 'impuesto')) 
     .withColumn('estatus_2',  F.when(F.col('StatusCategory') == 1, 'pagado')
-                               .when((F.col('DueDate') < F.col('OpenItemTS')) 
+                               .when((F.col('DueDate') < F.col('OpenItemsTS')) 
                                     & F.col('StatusCategory').isin([2, 3]), 'vencido'))
     .withColumn('local/fgn',  F.when(F.col('Currency') == 'MXN', 'local')
-                               .when(F.col('Currency').isNotNull(), 'foreign')))
+                               .when(F.col('Currency').isNotNull(), 'foreign'))
+                 )
+
 
 
 open_items_slct = [vv.alias(kk) for kk, vv in open_items_cols.items()]
@@ -399,10 +407,6 @@ display(loan_payment_slv)
 
 # COMMAND ----------
 
-display(person_set_df)
-
-# COMMAND ----------
-
 # Person Set utiliza Append, el resto 'overwrite' (default).
 write_dataframe(person_slv, f"{abfss_slv}/{tbl_items['slv_persons'][1]}", 'append')
 
@@ -468,7 +472,8 @@ display(base_open)
 # COMMAND ----------
 
 full_fields = (base_open
-    .join(loan_payment_plans, how='left', on=base_open['ID'] == loan_payment_plans['ContractID'])
+    .join(loan_payment_plans, how='left', 
+        on=base_open['ID'] == loan_payment_plans['ContractID'])
     .drop(loan_payment_plans['ContractID'])
     .fillna(value=0)
     .join(promises_slv, how='left', on=base_open['ID'] == promises_slv['attribute_loan_id'])

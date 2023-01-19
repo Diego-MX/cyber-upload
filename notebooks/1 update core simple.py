@@ -23,15 +23,14 @@
 # COMMAND ----------
 
 from importlib import reload
-import config; reload(config)
-from src import platform_resources; reload(platform_resources)
-from src import core_banking; reload(core_banking)
 
 
 # COMMAND ----------
 
-from datetime import datetime as dt
-from pyspark.sql import functions as F, types as T
+import config; reload(config)
+from src import platform_resources; reload(platform_resources)
+from src import core_banking; reload(core_banking)
+
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES, CORE_ENV

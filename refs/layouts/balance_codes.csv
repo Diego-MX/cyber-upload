@@ -1,0 +1,20 @@
+17, The initial loan contracted amount
+19, An amount for which there is a binding agreement between the bank and the borrower for a term agreement fixing period. 
+18, Initial loan contracted amount plus any capital reductions and increases that have already taken place</d:Name
+20, An amount for which there is a binding agreement between the bank and the borrower for a term agreement fixing period plus any capital reductions and increases that have already taken place
+1,  Amount that is already disbursed to the borrower
+21, Remaining principal based on the original payment plan simulated by date
+5,  Remaining principal based on payments received (inclusive of redraw) as of today
+3,  Interest settled that is yet to be paid by the borrower
+22, Remaining principal based on the original payment plan as of today
+4,  Charge settled that is yet to be paid by the borrower
+2,  Amount that is not yet been disbursed to the borrower
+31, Interest paid by the borrower so far
+25, Interest accrued so far, but not yet settled
+99, Outstanding balance
+95, Outstanding Charges VAT
+96, Interests not taxed
+97, Outstanding Interest VAT
+98, Redraw balance (principal paid ahead of original payment plan)
+
+
