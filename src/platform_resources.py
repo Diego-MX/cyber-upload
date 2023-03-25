@@ -85,7 +85,7 @@ class AzureResourcer():
                 print(f"Blob uploaded: {account}, {container};\n\t{blob}")
         
         
-    def download_storage_blob(self, file, blob, container, account=None): 
+    def download_storage_blob(self, file, blob, container, account=None, verbose=0): 
         if account is None: 
             account = self.get_storage()
         

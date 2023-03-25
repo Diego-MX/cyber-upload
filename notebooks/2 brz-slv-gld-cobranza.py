@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC ## Descripción
+# MAGIC # Descripción
 # MAGIC Este _notebook_ fue escrito originalmente por Jacobo.  
 # MAGIC Para llevarlo de DEV a QAs, le hice (Diego) algunas factorizaciones:  
 # MAGIC - Indicar tablas a partir de un diccionario en `CONFIG.PY`.  
@@ -14,10 +14,8 @@
 # COMMAND ----------
 
 from datetime import datetime as dt
-import re
 from delta.tables import DeltaTable as Δ
 from pyspark.sql import functions as F, types as T, Window as W
-import re
 
 # COMMAND ----------
 
@@ -80,7 +78,7 @@ date_format_udf = F.udf(date_format, T.DateType())
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ## Bronze 🥉 to Silver 🥈
+# MAGIC # Bronze 🥉 to Silver 🥈
 
 # COMMAND ----------
 
@@ -103,7 +101,7 @@ at_promise = pms_location.format(stage='silver', storage=at_storage)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### Person Set
+# MAGIC ## Person Set
 
 # COMMAND ----------
 
@@ -147,7 +145,7 @@ display(person_slv)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Loan Contracts
+# MAGIC ## Loan Contracts
 
 # COMMAND ----------
 
@@ -159,7 +157,8 @@ loan_cols = ['ID', 'BankAccountID', 'InitialLoanAmount',
     'NominalInterestRate', 'BorrowerID', 'OverdueDays', 'LifeCycleStatusTxt',
     'PaymentPlanStartDate']
 
-loan_contract_slv = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loans'][1]}")
+loan_contract_slv = (spark.read
+    .load(f"{abfss_brz}/{tbl_items['brz_loans'][1]}")
     .select(*loan_cols)
     .withColumn('InitialLoanAmount', F.col('InitialLoanAmount').cast(T.DoubleType()))
     .withColumn('TermSpecificationValidityPeriodDurationM', F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()))
@@ -173,7 +172,7 @@ display(loan_contract_slv)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC #### Balances
+# MAGIC ## Balances
 
 # COMMAND ----------
 
@@ -204,7 +203,7 @@ display(loan_balance_slv)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC #### Open Loans 
+# MAGIC ## Open Loans 
 # MAGIC 
 # MAGIC Manipulamos la tabla Open Items, para la cual tenemos la siguiente información relacionada.  
 # MAGIC 
@@ -292,7 +291,7 @@ display(loan_open_slv)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### Payment Plans
+# MAGIC ## Payment Plans
 
 # COMMAND ----------
 
@@ -351,6 +350,12 @@ if experiment_refactor:
 
 # COMMAND ----------
 
+loan_payment_0 = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_payments'][1]}"))
+loan_payment_0.display()
+
+# COMMAND ----------
+
 # Loan Payment Plans
 
 payment_cols = ['ItemID', 'ContractID', 'Date', 'Category', 'Amount', 'PaymentPlanTS']
@@ -403,7 +408,7 @@ display(loan_payment_slv)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### Write tables
+# MAGIC ## Write tables
 
 # COMMAND ----------
 
@@ -442,7 +447,6 @@ promises_slv = (spark.read.format('delta')
     .filter(F.col('rank') == 1)
     .drop(F.col('rank')))
 
-display(persons_slv)
 
 # COMMAND ----------
 

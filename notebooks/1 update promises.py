@@ -20,13 +20,22 @@
 
 # COMMAND ----------
 
-from config import ConfigEnviron, ENV, SERVER, CRM_ENV, DBKS_TABLES
 from datetime import datetime as dt
 import json
 from pyspark.sql import functions as F, types as T
 import re
+
+# COMMAND ----------
+
+from importlib import reload
+from src import crm_platform; reload(crm_platform)
+
+# COMMAND ----------
+
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
+from config import (ConfigEnviron, 
+    ENV, SERVER, CRM_ENV, DBKS_TABLES)
 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
@@ -77,10 +86,15 @@ udf_date_format = F.udf(date_format, T.StringType())
 # COMMAND ----------
 
 promises_meta = tbl_items['brz_promises']
-promises_tbl = promises_meta[2] if len(promises_meta) > 2 else promises_meta[0]
+promises_tbl = (promises_meta[2] 
+    if len(promises_meta) > 2 else promises_meta[0])
 
-promises_df = zendesker.get_promises().drop(columns='external_id')
+promises_df = (zendesker
+    .get_promises()
+    .drop(columns='external_id'))
+
 promises_spk = spark.createDataFrame(promises_df)
+
 (promises_spk.write.mode('overwrite')
         .format('delta')
         .save(f"{abfss_brz}/promises"))
@@ -98,7 +112,8 @@ slv_promises_0 = promises_spk
 
 cols_unnest = ['comission', 'interest', 'principal']
 for a_col in cols_unnest:
-    slv_promises_0 = slv_promises_0.withColumn(a_col, udf_unnest('attribute_compensation', F.lit(a_col)))
+    slv_promises_0 = (slv_promises_0
+        .withColumn(a_col, udf_unnest('attribute_compensation', F.lit(a_col))))
 
 slv_promises = (slv_promises_0
     .withColumn('created_at', F.col('created_at').cast(T.TimestampType()))
@@ -108,7 +123,9 @@ slv_promises = (slv_promises_0
     .drop(F.col('attribute_compensation')))
 
 
-
 # COMMAND ----------
 
-slv_promises.write.mode('overwrite').format('delta').save(f"{abfss_slv}/promises")
+# Cambiemos a tablas Δ
+(slv_promises.write
+    .mode('overwrite')
+    .save(f"{abfss_slv}/promises"))

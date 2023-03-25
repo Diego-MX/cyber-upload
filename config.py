@@ -10,10 +10,10 @@ try:
     from pyspark.dbutils import DBUtils
 except ImportError: 
     DBUtils = None
-try: 
-    from dotenv import load_dotenv
-    load_dotenv(override=True)
-except ImportError:
+try:                                                                                 
+    from dotenv import load_dotenv        
+    load_dotenv(override=True)    
+except: 
     load_dotenv = None
 
 
@@ -210,25 +210,18 @@ CRM_KEYS = {
             'id'      : (1, 'crm-zis-id'), 
             'username': (1, 'crm-zis-user'), 
             'password': (1, 'crm-zis-pass')}, 
-        'calls' : {
-            'promises' : {
-                'sub-url' : "sunshine/objects/records"}, 
-            'filters'  : ("sunshine/objects/records",
-                    "services/zis/inbound_webhooks/generic/ingest") } },
+     },
      'prod-zd' : {
         'main' : {
             'url'  : "https://bineo.zendesk.com/api",
-            'username' : (1, 'crm-api-user'),   # ZNDK_USER_EMAIL
-            'password' : (1, 'crm-api-token')},   # ZNDK_API_TOKEN
+            'username' : (1, 'crm-api-user'),    # ZNDK_USER_EMAIL
+            'password' : (1, 'crm-api-token')},  # ZNDK_API_TOKEN
         'zis' : {
             'id'      : (1, 'crm-zis-id'), 
             'username': (1, 'crm-zis-user'), 
-            'password': (1, 'crm-zis-pass')}, 
-        'calls' : {
-            'promises' : {
-                'sub-url' : "sunshine/objects/records"}, 
-            'filters'  : ("sunshine/objects/records",
-                    "services/zis/inbound_webhooks/generic/ingest") } }}
+            'password': (1, 'crm-zis-pass')}
+     }
+}
 
 
 DBKS_KEYS = {
@@ -317,9 +310,10 @@ DBKS_TABLES = {
             'slv_promises'        : 'silver.zendesk_promises', 
             'gld_loans'           : 'gold.loan_contracts'} }, 
     'qas': {
-        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates', 
-        'promises' : 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects', 
-        'items': {  # table, location.
+        'events'  : "abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking",
+        'base'    : "abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates", 
+        'promises': "abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects", 
+        'items'   : {  # table, location.
             'brz_persons'         : 
                 ('din_clients.brz_ops_persons_set',        'persons-set'),
             'brz_loans'           : 
@@ -442,10 +436,11 @@ class ConfigEnviron():
             def get_secret(a_key): 
                 mod_key = re.sub('_', '-', a_key.lower())
                 the_val = dbutils.secrets.get(scope=self.config['dbks']['scope'], key=mod_key)
-                return the_val            
+                return the_val
+            
         self.get_secret = get_secret
-
-
+          
+                
     def call_dict(self, a_dict): 
         if not hasattr(self, 'get_secret'): 
             self.set_secret_getter()

@@ -95,7 +95,7 @@ async def call_all_apis(api_calls, ids_lists):
 # COMMAND ----------
 
 from json import dumps
-k_only = len(loans_ids)
+k_only = 20 # len(loans_ids)
 
 tic = time()
 pre_results = asyncio.run(

@@ -1,23 +1,36 @@
 from base64 import b64encode
+from functools import reduce
 import json 
 import pandas as pd
 from pathlib import WindowsPath
 import re
 import sys 
+from typing import Union
+
+from pyspark.sql import Column
+
 
 #%% Optional packages. 
 try: 
     from importlib import reload
 except ImportError:
     reload = None
-
 try: 
     from openpyxl import load_workbook
     from openpyxl.utils.exceptions import InvalidFileException
 except ImportError: 
     load_workbook = InvalidFileException = None
+try:
+    from delta.tables import DeltaTable as Δ
+except ImportError:
+    Δ = None
+try: 
+    from pyspark.sql import (functions as F, types as T, Window as W, 
+        Row, DataFrame as spk_DF) 
+except ImportError:
+    F = T = Row = W = spk_DF = None
 
-
+    
 #%% Define tools functions. 
 #  39 DICT_KEYS
 #  50 RELOAD_FROM_ASTERISK
@@ -114,7 +127,6 @@ def read_excel_table(file, sheet:str, table:str=None, **kwargs):
 
 
 def shortcut_target(filename, file_ext:str=None):
-    
     if file_ext is None: 
         if isinstance(filename, WindowsPath): 
             file_ext = re.findall(r"\.([A-Za-z]{3,4})\.lnk", filename.name)[0]
@@ -202,3 +214,78 @@ def curlify(resp_request):
         'data'  : resp_request.body, 
         'uri'   : resp_request.url }
     return "curl - X {method} -H {headers} -d '{data}' '{uri}'".format(**the_items)
+
+
+def column_name(a_col: Union[Column, str]) -> str: 
+    if isinstance(a_col, str): 
+        return a_col
+
+    reg_alias = r"Column\<'(.*) AS (.*)'\>"
+    non_alias = r"Column\<'(.*)'\>"
+    a_match = re.match(reg_alias, str(a_col))
+    n_match = re.match(non_alias, str(a_col))
+    
+    the_call = (a_match.group(2) if a_match is not None 
+           else n_match.group(1)) 
+    return the_call
+
+    
+def upsert_into_delta(spark, new_tbl:spk_DF, base_path, on_cols): 
+    on_str = " AND ".join(f"t1.{cc} = t0.{cc}" for cc in on_cols)
+    
+    (Δ.forPath(spark, base_path).alias('t0')
+        .merge(new_tbl.alias('t1'), on_str)
+        .whenMatchedUpdateAll()
+        .whenNotMatchedInsertAll()
+        .execute())
+    return 
+
+
+def upsert_by_group(spark, new_tbl:spk_DF, base_path, on_cols):
+    # COLS: [0]  -> número de filas. 
+    #       [1]  -> ranking de fila. 
+    #       [2:] -> join_on. 
+    c0, c1, *c2 = on_cols
+    by_groups = (new_tbl.groupBy(c2).count())
+    merger = (spark.read
+        .load(base_path)
+        .select(c1, *c2)
+        .join(by_groups, how='inner', on=c2)
+        .join(new_tbl, how='left', on=[c1, *c2])
+        .withColumn(c0, F.coalesce(c0, 'count')))
+    
+    cond_eq = ' AND '.join(f"(t1.{cc} = t0.{cc})" for cc in [c1, *c2]) 
+    cond_gr = ' AND '.join(f"(t1.{c0} < t0.{c1})", 
+                         *(f"(t1.{cc} = t0.{cc})" for cc in c2))
+    (Δ.forPath(spark, base_path).alias('Δ0')
+        .merge(merger.alias('Δ1'), cond_eq)
+        .whenMatchedDelete(cond_gr)
+        .whenMatchedUpdateAll()
+        .whenNotMatchedInsertAll()
+        .execute())
+    return
+                
+    
+def with_columns(a_df: spk_DF, cols_dict: dict) -> spk_DF: 
+    λ_with = lambda x_df, kk_vv: x_df.withColumn(*kk_vv)
+    return reduce(λ_with, cols_dict.items(), a_df)
+
+
+def with_columns(a_df, cols_dict): 
+    func = lambda dfx, col_kv: dfx.withColumn(*col_kv)
+    return reduce(func, cols_dict.items(), a_df)
+    
+    
+def pd_print(a_df: pd.DataFrame, **kwargs):
+    the_options = {
+        'max_rows'   : None, 
+        'max_columns': None, 
+        'width'      : 180}
+    the_options.update(kwargs)
+    optns_ls = sum(([f"display.{kk}", vv] 
+        for kk, vv in the_options.items()), start=[])
+    with pd.option_context(*optns_ls):
+        print(a_df)
+    return
+
+        

@@ -1,18 +1,16 @@
 # Diego Villamil, EPIC
 # CDMX, 4 de noviembre de 2021
 
-from authlib.integrations.httpx_client import AsyncOAuth2Client
 from datetime import datetime as dt, timedelta as delta, date
-from deepdiff import DeepDiff
-from httpx import (AsyncClient, Auth as AuthX, BasicAuth as BasicAuthX, 
-    post as postx, get as getx)
+from httpx import (AsyncClient, Auth as AuthX, BasicAuth as BasicAuthX, post as postx)
 from itertools import product
 from json import dumps
 import pandas as pd
 import re
-from requests import Session, auth, post
-from urllib.parse import unquote
+from requests import Session, auth, post, get
 from typing import Union
+from urllib.parse import unquote
+import xmltodict
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
@@ -290,8 +288,50 @@ class SAPSession(Session):  # REQUESTS.
             .assign(ID = lambda df: df.ID.str.pad(10, 'left', '0')))
         return persons_df
 
-    
+        
+    def set_status_hook(self, auth_tries=3): 
+        def status_hook(response, *args, **kwargs): 
+            response_1 = response
+            for ii in range(auth_tries): 
+                if response_1.status_code == 200: 
+                    break
+                elif response_1.status_code == 401: 
+                    self.set_token()
+                    response_1 = self.send(response.request)
+                    continue
+            else: 
+                response_1.raise_for_status()
+            return response_1
+        
+        self.hooks['response'].append(status_hook)
 
+        
+    def hook_d_results(self, response): 
+        hook_allowed_types = ['application/json', 'application/atom+xml']
+        
+        the_type = response.headers['Content-Type']
+        if 'application/json' in the_type: 
+            the_json = response.json()
+            the_results = the_json['d']['results']
+        elif 'application/atom+xml' in the_type: 
+            the_results = self._xml_results(response.text)
+        else: 
+            raise Exception(f"Couldn't extract results from response with content type '{the_type}'.")
+            
+        return the_results
+
+    
+    def _xml_results(self, xml_text): 
+        get_entry_ds = (lambda entry_dict: 
+            {re.sub(r'^d\:', '', k_p): v_p 
+            for k_p, v_p in entry_dict.items() if k_p.startswith('d:')})
+        
+        entry_ls = xmltodict.parse(xml_text)['feed']['entry']
+        entry_props = [entry['content']['m:properties'] for entry in entry_ls]
+        entry_rslts = [get_entry_ds(prop) for prop in entry_props]
+        return entry_rslts
+
+        
 
 
 
@@ -373,7 +413,8 @@ class SAPAuthX(AuthX):
         self.token = token_str 
     
     def auth_flow(self, a_request): 
-        repsonse = yield a_request
+        response = yield a_request
+
         if response.status_code == 401:
             posters = {
                 'url' : self.config['url' ], 
@@ -381,10 +422,10 @@ class SAPAuthX(AuthX):
                 'auth': AuthX(**self.config['access']), 
                 'headers': {'Content-Type': "application/x-www-form-urlencoded"}
             }
-            the_resp = self.post(**params)
+            the_resp = self.post(**posters)
             self.token = the_resp.json()
-            request.headers['X-Authentication'] = self.token
-            yield request
+            a_request.headers['X-Authentication'] = self.token
+            yield a_request
             
     
 def create_delta(spark, data_df: pd.DataFrame, df_location: str, tbl_name: str): 
@@ -413,6 +454,7 @@ def update_dataframe(spark, new_df: pd.DataFrame, df_location: str, id_column: s
         tbl_cols = {a_col: F.coalesce(f'new.{a_col}', f'prev.{a_col}')
                 for a_col in new_data.columns}
         tbl_values = {a_col: f'new.{a_col}' for a_col in new_data.columns}
+        
         (prev_data.alias('prev')
             .merge(source=new_data.alias('new'), condition=f"prev.{id_column} = new.{id_column}")
             .whenMatchedUpdate(set=tbl_cols)
