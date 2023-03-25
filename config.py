@@ -17,14 +17,14 @@ except ImportError:
     load_dotenv = None
 
 
-SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
-ENV  = tools.dict_get2(environ, ['ENV_TYPE', 'ENV'], 'nan-env')
+SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
+ENV      = tools.dict_get2(environ, ['ENV_TYPE', 'ENV'], 'nan-env')
 SERVER   = environ.get('SERVER_TYPE', 'wap')  # dbks, local, wap. 
 CORE_ENV = environ.get('CORE_ENV', 'qas-sap')
 CRM_ENV  = environ.get('CRM_ENV', 'sandbox-zd')
 
-
 PAGE_MAX = 1000
+
 
 SETUP_KEYS = {
     'dev' : {
@@ -39,7 +39,7 @@ SETUP_KEYS = {
             'client_id'       : (1, 'sp-core-events-client'), 
             'client_secret'   : (1, 'sp-core-events-secret'), 
             'tenant_id'       : (1, 'aad-tenant-id'), 
-            'subscription_id' : (1, 'sp-core-events-suscription') } , 
+            'subscription_id' : (1, 'sp-core-events-subscription') } , 
         'dbks': {'scope': 'eh-core-banking'}
     }, 
     'stg' : {
@@ -174,7 +174,7 @@ CORE_KEYS = {
                 'format'          : 'json',
                 'Accept-Encoding' : "gzip, deflate",
                 'Accept'          : "application/json" }, 
-            'base-url' : "https://apiprd.apimanagement.us21.hana.ondemand.com",
+            'base-url' : "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b",
             'access' : {
                 'username': (1, 'core-api-key'), 
                 'password': (1, 'core-api-secret') } }, 
@@ -186,15 +186,15 @@ CORE_KEYS = {
                     'username'   : (1, 'core-api-user'), 
                     'password'   : (1, 'core-api-password') } },
             'event-set'    : {
-                'persons'      : "/s4b/v15/bp/EventSet", 
-                'accounts'     : "/s4b/v1/cac/EventSet", 
-                'transactions' : "/s4b/v1/bape/EventSet", 
-                'prenotes'     : "/s4b/v1/bapre/EventSet"},
-            'person-set'       : {'sub-url' : "/s4b/v15/bp/PersonSet"},
-            'contract-set'     : {'sub-url' : "/s4b/v1/lacovr/ContractSet"},
-            'contract-qan'     : {'sub-url' : "/s4b/v1/lacqan/ContractSet"},
-            'contract-current' : {'sub-url' : "/s4b/v1/cac/ContractSet"},
-            'contract-loans'   : {'sub-url' : "/s4b/v1/lac/ContractSet"}
+                'persons'      : "v15/bp/EventSet", 
+                'accounts'     : "v1/cac/EventSet", 
+                'transactions' : "v1/bape/EventSet", 
+                'prenotes'     : "v1/bapre/EventSet"},
+            'person-set'       : {'sub-url' : "v15/bp/PersonSet"},
+            'contract-set'     : {'sub-url' : "v1/lacovr/ContractSet"},
+            'contract-qan'     : {'sub-url' : "v1/lacqan/ContractSet"},
+            'contract-current' : {'sub-url' : "v1/cac/ContractSet"},
+            'contract-loans'   : {'sub-url' : "v1/lac/ContractSet"}
         } 
     }
 } 
@@ -252,6 +252,7 @@ DBKS_KEYS = {
             'collections' : "gold.loan_contracts"} },
     'qas': { 
         'connect': {
+            'local': {'DSN' : (1, 'DBKS_ODBC_DSN')},
             'wap': {
                 'Driver'         : "/opt/simba/spark/lib/64/libsparkodbc_sb64.so",
                 'PORT'           : '443',
@@ -287,8 +288,6 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments',   'bronze.loan_payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises', 'bronze.crm_payment_promises'),
-            'brz_txns'           : 
-                ('farore_transactions.brz_ops_transactions_set', 'transactions', 'not-used'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set',    'silver.persons_set'), 
             'slv_loans'         : 
@@ -325,8 +324,6 @@ DBKS_TABLES = {
                 ('din_clients.brz_ops_persons_set',        'persons-set'),
             'brz_loans'           : 
                 ('nayru_accounts.brz_ops_loan_contracts',  'loan-contracts'), 
-            'brz_loan_analyzers'  : 
-                ('nayru_accounts.brz_ops_loans_analyzers', 'loan-analyzers'), 
             'brz_loan_balances'   : 
                 ('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
             'brz_loan_open_items' : 
@@ -335,8 +332,6 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises'), 
-            'brz_txns'           : 
-                ('farore_transactions.brz_ops_transactions_set', 'transactions', 'not-used'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set'), 
             'slv_loans'         : 
@@ -367,8 +362,6 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises'), 
-            'brz_txns'           : 
-                ('farore_transactions.brz_ops_transactions_set', 'transactions', 'not-used'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set'), 
             'slv_loans'         : 
@@ -399,8 +392,6 @@ DBKS_TABLES = {
                 ('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
             'brz_promises'        : 
                 ('farore_transactions.brz_cx_payment_promises', 'promises'), 
-            'brz_txns'           : 
-                ('farore_transactions.brz_ops_transactions_set', 'transactions'),
             'slv_persons'         : 
                 ('din_clients.slv_ops_persons_set',        'persons-set'), 
             'slv_loans'         : 

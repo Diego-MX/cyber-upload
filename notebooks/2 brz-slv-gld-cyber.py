@@ -12,21 +12,16 @@
 
 # COMMAND ----------
 
-from base64 import b64encode
 from collections import defaultdict, OrderedDict
 from datetime import datetime as dt, date
 from functools import reduce
-from itertools import chain
 import numpy as np
 import pandas as pd
 from pandas.core.frame import DataFrame as pd_DF
-from pathlib import Path
 from pyspark.sql import (functions as F, types as T, Window as W, Column as C)
 from pyspark.sql.dataframe import DataFrame as spk_DF
 from pytz import timezone
 import re
-from typing import Tuple
-from unicodedata import normalize
 
 # COMMAND ----------
 

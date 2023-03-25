@@ -1,6 +1,7 @@
 from datetime import datetime as dt 
 import numpy as np
-from pytz import timezone 
+from pytz import timezone
+
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
 from config import (ConfigEnviron, 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     az_manager = AzureResourcer(app_environ)
     print(f"Variables: (Env, Server)={ENV, SERVER}")
 
-    blobs_paths = f"cx/collections/cyber/spec_files"
+    blobs_paths = "cx/collections/cyber/spec_files"
     
     cyber_tasks = [
         'sap_saldos' , # 'fiserv_saldos' ,
@@ -74,11 +75,12 @@ if __name__ == '__main__':
         blob_2  = f"{blobs_paths}/{each_task}_specs_{now_str}.feather" 
         blob_3  = f"{blobs_paths}/{each_task}_joins_latest.csv" 
         blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.csv" 
-
+    
         spec_ref = tools.read_excel_table(cyber_fields, each_task)
         has_join = tools.read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
         (execs, checks) = excelref_to_feather(spec_ref)
         execs.to_feather(spec_local)
+        
         az_manager.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
         az_manager.upload_storage_blob(spec_local, blob_2, 'gold')
         print(checks)

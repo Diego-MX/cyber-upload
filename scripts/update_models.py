@@ -5,12 +5,11 @@ import pandas as pd
 
 from src.utilities import tools
 from src.lake_connector import LakehouseConnect
-from config import VaultSetter, SITE, DESTINATION, ENV
+from config import (ConfigEnviron, SITE, ENV, SERVER)
 
 
-source_file = SITE/'refs/catalogs/CX - Strategy & Communications.xlsx.lnk'
-
-
+xls_def  = SITE/"refs/catalogs/CX - Strategy & Communications.xlsx.lnk"
+ref_path = SITE/"refs/catalogs"
 
 # Meta (meta) descriptions are confusing. 
 # MSGS are queried from a table. 
@@ -24,14 +23,12 @@ metas_0 = ['nombre', 'gold_name', 'dtipo', 'filtro',
 metas_1 = ['nombre', 'filtro', 'comunicaciones', 'database', 'dtipo', 
     'comparador', '_middlename']
 
-msg_attrs_0 = (tools.read_excel_table(source_file, 'columnas', 'mensajes_cols')
+msg_attrs_0 = (tools.read_excel_table(xls_def, 'columnas', 'mensajes_cols')
     .loc[:, metas_0])
 
 tables_props = { # call:  (meta_database, table_name, _middlename)
     'contracts':   ('database',  'bronze.loan_contracts'), 
     'collections': ('gold_name', 'gold.loan_contracts', 'silver_name')}
-
-refs_catalog = SITE/"refs/catalogs"
 
 
 
@@ -39,18 +36,18 @@ refs_catalog = SITE/"refs/catalogs"
 atributos_0 = ["nombre", "gold_name", "gold_aux", "dtipo", "filtro", 
     "comunicaciones", "comparador", "database", "en_gold", "en_gold2"]
 
-msg_cols_0  = (tools.read_excel_table(source_file, "columnas", "mensajes_cols")
+msg_cols_0  = (tools.read_excel_table(xls_def, "columnas", "mensajes_cols")
     .loc[:, atributos_0]
     .astype({'gold_aux': str}))
 
-msg_cols_0.to_feather(DESTINATION/"refs/catalogs/collectionsCX.feather")
+msg_cols_0.to_feather(ref_path/"collectionsCX.feather")
 
 
 
 #%% DBase Preparation.  
 
-secretter = VaultSetter(ENV)
-lakehouser = LakehouseConnect(ENV, secretter)
+secretter = ConfigEnviron(ENV, SERVER)
+lakehouser = LakehouseConnect(secretter)
 
 db_conn = lakehouser.get_connection()
 
@@ -72,8 +69,8 @@ attrs_to_call = (msg_attrs_0
     .reset_index(drop=True))
 
 # Upload Somewhere. 
-attrs_to_call.to_feather(DESTINATION/f"refs/catalogs/contracts.feather")
-attrs_to_call.to_csv(DESTINATION/f"refs/catalogs/contracts.csv", index=False)
+attrs_to_call.to_feather(ref_path/"contracts.feather")
+attrs_to_call.to_csv(ref_path/"contracts.csv", index=False)
 
 
 #%% CallType Collections
@@ -94,8 +91,8 @@ attrs_to_call = (msg_attrs_0
     .loc[lambda df: df['_middlename'].isin(from_dbks['col_name']), metas_1]
     .reset_index(drop=True))
 
-attrs_to_call.to_feather(DESTINATION/f"refs/catalogs/collections.feather")
-attrs_to_call.to_csv(DESTINATION/f"refs/catalogs/collections.csv", index=False)
+attrs_to_call.to_feather(ref_path/"collections.feather")
+attrs_to_call.to_csv(ref_path/"collections.csv", index=False)
 
 db_conn.close()
 

@@ -76,9 +76,9 @@ class AzureResourcer():
             account = self.get_storage()
         
         the_url = f"https://{account}.blob.core.windows.net"
-        service = BlobServiceClient(the_url, credential=self.env.credential)
+        b_service = BlobServiceClient(the_url, credential=self.env.credential)
 
-        the_blob = service.get_blob_client(container, blob)
+        the_blob  = b_service.get_blob_client(container, blob)
         with open(file, 'rb') as _b:
             the_blob.upload_blob(_b, overwrite=overwrite)
             if verbose: 
@@ -90,19 +90,17 @@ class AzureResourcer():
             account = self.get_storage()
         
         the_url = f"https://{account}.blob.core.windows.net"
-        service = BlobServiceClient(the_url, credential=self.env.credential)
+        b_service = BlobServiceClient(the_url, credential=self.env.credential)
 
         if Path(file).is_file(): 
             remove(file)
-            
-        the_blob = service.get_blob_client(container, blob)
+
+        the_blob = b_service.get_blob_client(container, blob)
         with open(file, 'wb') as _b: 
-            blob_data = the_blob.download_blob()
-            blob_data.readinto(_b)
+            b_data = the_blob.download_blob()
+            b_data.readinto(_b)
     
 
-
-        
         
         
 
