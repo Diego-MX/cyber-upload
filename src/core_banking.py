@@ -2,16 +2,16 @@
 # CDMX, 4 de noviembre de 2021
 
 from datetime import datetime as dt, timedelta as delta, date
+from deepdiff import DeepDiff
+from httpx import AsyncClient, Auth as AuthX
 from itertools import product
 from json import dumps
 import pandas as pd
 import re
-from urllib.parse import unquote
-
+from requests import Session, auth, post, get
 from typing import Union
-from deepdiff import DeepDiff
-from requests import Session, auth
-from httpx import AsyncClient, Auth as AuthX
+from urllib.parse import unquote
+import xmltodict
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
@@ -88,56 +88,20 @@ class BearerAuth2(auth.AuthBase, AuthX):
         return a_request
 
     
-class BearerAuth(auth.AuthBase):
-    def __init__(self, token):
-        self.token = token
-    
-    def __call__(self, a_request):
-        a_request.headers['Authorization'] = f"Bearer {self.token}"
-        return a_request
-
-
-class BearerAuthX(AuthX): 
-    def __init__(self, token_str): 
-        self.token = token_str 
-    def auth_flow(self, a_request): 
-        a_request.headers['Authorization'] = f"Bearer {self.token}"
-        yield a_request
-        
-
-
 class SAPSession(Session): 
     def __init__(self, env, secret_env: AzureResourcer): 
         super().__init__()
         self.config     = CORE_KEYS[env]
         self.get_secret = secret_env.get_secret
         self.call_dict  = secret_env.call_dict
-        self.set_main()
-
-
-    def set_main(self): 
+        
         main_config = self.config['main']
         self.headers.update(main_config['headers'])
         self.base_url = main_config['base-url']
         self.set_token()
-
-
-    def set_token(self, auth_type=None): 
-        the_access = self.call_dict(self.config['main']['access'])
-        params = self.config['calls']['auth'].copy()
-        params['data'] = self.call_dict(params['data'])
-        if auth_type == 'basic':
-            the_auth = auth.HTTPBasicAuth(**the_access)
-            params.update({'auth': the_auth})
-        else: 
-            auth_enc = tools.encode64("{username}:{password}".format(**the_access))
-            params.update({'headers': {
-                'Authorization': f"Basic {auth_enc}", 
-                'Content-Type' : "application/x-www-form-urlencoded"}})
-        the_resp = self.post(**params)
-        self.token = the_resp.json()
-
-
+        self.set_status_hook()
+        
+        
     def get_events(self, event_type=None, date_lim: dt=None, output=None, tries=3): 
         """
         EVENT_TYPE: [persons, accounts, transactions, prenotes]
@@ -180,7 +144,7 @@ class SAPSession(Session):
             
         for _ in range(tries): 
             the_resp = self.get(f"{self.base_url}/{event_config[event_type]}", 
-                auth=BearerAuth(self.token['access_token']), 
+                auth=BearerAuth2(self.token['access_token']), 
                 params=event_params)            
             if the_resp.status_code == 200: 
                 break
@@ -260,7 +224,7 @@ class SAPSession(Session):
         
         for _ in range(tries): 
             the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-                auth=BearerAuth(self.token['access_token']), 
+                auth=BearerAuth2(self.token['access_token']), 
                 params=loan_params)
             
             if the_resp.status_code == 401: 
@@ -290,26 +254,15 @@ class SAPSession(Session):
         loan_config  = self.config['calls']['contract-qan']
         select_attrs = attributes_from_column('qan')
         params_0 = {'$top': how_many, '$skip': 0,
-            '$select': ','.join(select_attrs)}
+                    '$select': ','.join(select_attrs)}
         params_0.update(params_x)
         
         post_lqan = []
         while True: 
-            for _ in range(tries): 
-                the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
-                    auth=BearerAuth(self.token['access_token']), 
-                    params=params_0)
-
-                if the_resp.status_code == 401: 
-                    self.set_token()
-                    continue
-                elif the_resp.status_code == 200: 
-                    break
-            else: 
-                return None   
-
-            loans_ls = the_resp.json()['d']['results']    
-            # [metadata : [id, uri, type], borrowerName]
+            the_resp = self.get(f"{self.base_url}/{loan_config['sub-url']}", 
+                params=params_0)
+            
+            loans_ls = self.hook_d_results(the_resp)
             post_lqan.extend(loans_ls)
 
             params_0['$skip'] += how_many
@@ -327,23 +280,11 @@ class SAPSession(Session):
         params_0.update(params_x)
 
         post_persons = []
-
         while True:
-            for _ in range(tries): 
-                the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
-                        auth=BearerAuth(self.token['access_token']), 
+            the_resp = self.get(f"{self.base_url}/{person_conf['sub-url']}", 
                         params=params_0)
                     
-                if the_resp.status_code == 200: 
-                    break
-                if the_resp.status_code == 401: 
-                    self.set_token()
-                    continue
-            else:
-                raise "Could not call API."
-            
-            persons_ls = the_resp.json()['d']['results']  
-            # [metadata : [id, uri, type], borrowerName]
+            persons_ls = self.hook_d_results(the_resp)
             post_persons.extend(persons_ls)
 
             params_0['$skip'] += how_many
@@ -356,7 +297,66 @@ class SAPSession(Session):
             .assign(ID = lambda df: df.ID.str.pad(10, 'left', '0')))
         return persons_df
 
+    
+    def set_token(self, auth_type=None): 
+        the_access = self.call_dict(self.config['main']['access'])
+        params = self.config['calls']['auth'].copy()
+        params['data'] = self.call_dict(params['data'])
+        if auth_type == 'basic':
+            params_x = {'auth': auth.HTTPBasicAuth(**the_access)}
+        else: 
+            auth_enc = tools.encode64("{username}:{password}".format(**the_access))
+            params_x = {'headers': {
+                'Authorization': f"Basic {auth_enc}", 
+                'Content-Type' : "application/x-www-form-urlencoded"}}
+        params.update(params_x)
+        the_resp   = post(**params)
+        self.token = the_resp.json()
 
+        
+    def set_status_hook(self, auth_tries=3): 
+        def status_hook(response, *args, **kwargs): 
+            response_1 = response
+            for ii in range(auth_tries): 
+                if response_1.status_code == 200: 
+                    break
+                elif response_1.status_code == 401: 
+                    self.set_token()
+                    response_1 = self.send(response.request)
+                    continue
+            else: 
+                response_1.raise_for_status()
+            return response_1
+        
+        self.hooks['response'].append(status_hook)
+
+        
+    def hook_d_results(self, response): 
+        hook_allowed_types = ['application/json', 'application/atom+xml']
+        
+        the_type = response.headers['Content-Type']
+        if 'application/json' in the_type: 
+            the_json = response.json()
+            the_results = the_json['d']['results']
+        elif 'application/atom+xml' in the_type: 
+            the_results = self._xml_results(response.text)
+        else: 
+            raise Exception(f"Couldn't extract results from response with content type '{the_type}'.")
+            
+        return the_results
+
+    
+    def _xml_results(self, xml_text): 
+        get_entry_ds = (lambda entry_dict: 
+            {re.sub(r'^d\:', '', k_p): v_p 
+            for k_p, v_p in entry_dict.items() if k_p.startswith('d:')})
+        
+        entry_ls = xmltodict.parse(xml_text)['feed']['entry']
+        entry_props = [entry['content']['m:properties'] for entry in entry_ls]
+        entry_rslts = [get_entry_ds(prop) for prop in entry_props]
+        return entry_rslts
+
+        
 
 class SAPSessionAsync(AsyncClient):  
     def __init__(self, env, secret_env: AzureResourcer, **kwargs): 
@@ -364,32 +364,9 @@ class SAPSessionAsync(AsyncClient):
         self.get_secret = secret_env.get_secret
         self.call_dict  = secret_env.call_dict
         self.config     = CORE_KEYS[env]
-        self.set_main()
-                
-            
-    def set_main(self): 
         main_config = self.config['main']
         self.base_url = main_config['base-url']
-        # await self.set_token() no aplica por temas del AWAIT ASYNC  
-
-
-    async def set_token(self): 
-        # auth_params = self.config['calls']['auth']
-        # auth_data = self.call_dict(auth_params['data'])
-        # self.token = await self.post(auth_params['url'], **auth_data)
-        
-        the_access = self.call_dict(self.config['main']['access'])
-        params = self.config['calls']['auth'].copy()
-        params['data'] = self.call_dict(params['data'])
     
-        auth_enc = tools.encode64("{username}:{password}".format(**the_access))
-        params.update({
-            'headers': {
-            'Authorization': f"Basic {auth_enc}", 
-            'Content-Type' : "application/x-www-form-urlencoded"}})
-        the_resp = await self.post(**params)
-        self.token = the_resp.json()
-
 
     async def get_by_api(self, api_type, type_id=None, tries=3): 
         type_ref = 'ContractSet' if type_id is None else f"ContractSet('{type_id}')"
@@ -404,7 +381,7 @@ class SAPSessionAsync(AsyncClient):
         for _ in range(tries): 
             # the_hdrs['Authorization'] = f"Bearer {self.token['access_token']}"
             the_resp = await self.get(the_url, headers=the_hdrs, #) 
-                    auth=BearerAuthX(self.token['access_token']))
+                    auth=BearerAuth2(self.token['access_token']))
             if the_resp.status_code == 200: 
                 break
             await self.set_token()
@@ -419,6 +396,21 @@ class SAPSessionAsync(AsyncClient):
             .assign(ts_call = dt.now().strftime("%Y-%m-%d %H:%M:%S")))
         return results_df
 
+    
+    async def set_token(self): 
+        the_access = self.call_dict(self.config['main']['access'])
+        params = self.config['calls']['auth'].copy()
+        params['data'] = self.call_dict(params['data'])
+    
+        auth_enc = tools.encode64("{username}:{password}".format(**the_access))
+        params.update({
+            'headers': {
+            'Authorization': f"Basic {auth_enc}", 
+            'Content-Type' : "application/x-www-form-urlencoded"}})
+        the_resp = await self.post(**params)
+        self.token = the_resp.json()
+
+    
     
 def create_delta(spark, data_df: pd.DataFrame, df_location: str, tbl_name: str): 
     create_clause =  f"CREATE TABLE {tbl_name} USING DELTA LOCATION \"{df_location}\""

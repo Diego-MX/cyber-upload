@@ -12,32 +12,27 @@
 
 # COMMAND ----------
 
-from base64 import b64encode
 from collections import defaultdict, OrderedDict
-from datetime import datetime as dt, date
+from datetime import datetime as dt, date, timedelta as delta
 from functools import reduce
-from itertools import chain
 import numpy as np
+from os import makedirs, path
 import pandas as pd
-from pandas.core.frame import DataFrame as pd_DF
-from pathlib import Path
-from pyspark.sql import (functions as F, types as T, Window as W, Column as C)
-from pyspark.sql.dataframe import DataFrame as spk_DF
+from pandas import DataFrame as pd_DF
+from pyspark.sql import (functions as F, types as T, 
+    Window as W, Column, DataFrame as spk_DF)
 from pytz import timezone
 import re
-from typing import Tuple
-from unicodedata import normalize
+from typing import Union
 
 # COMMAND ----------
 
 from importlib import reload
-import config; reload(config)
-from src import platform_resources; reload(platform_resources)
-
-# COMMAND ----------
+from src.utilities import tools; reload(tools)
 
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 from src.platform_resources import AzureResourcer
+from src.utilities import tools
 
 tables      = DBKS_TABLES[ENV]['items']
 app_environ = ConfigEnviron(ENV, SERVER, spark)
@@ -46,8 +41,10 @@ az_manager  = AzureResourcer(app_environ)
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
 
-gold_dir   = f"abfss://gold@{at_storage}.dfs.core.windows.net/cx/collections/cyber"
+brz_path   = f"abfss://bronze@{at_storage}.dfs.core.windows.net/ops/core-banking/" 
+gold_path  = f"abfss://gold@{at_storage}.dfs.core.windows.net/cx/collections/cyber"
 specs_path = "cx/collections/cyber/spec_files"
+tmp_downer = "/dbfs/FileStore/cyber/specs"
 
 cyber_names = {
     'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
@@ -57,28 +54,22 @@ cyber_names = {
     'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
     'fiserv_pagos'  : ('C8BD10002', 'cms_payments' ),}
 
+now_mx = dt.now(timezone('America/Mexico_City'))
+days_back = 3 if now_mx.weekday() == 0 else 1
+to_day = (now_mx - delta(days_back)).date()
+
 # COMMAND ----------
 
-@F.pandas_udf(T.StringType())
-def udf_toascii(x_str):   # IEC-8859-1 es lo más parecido a ANSI que encontramos
-    y_str = x_str.str.normalize('NFKD').map(lambda xx: xx.encode('ascii', 'ignore')) 
-    # y_str = normalize('NFKD', x_str).encode('ascii', 'ignore').decode('ascii')
-    return y_str
+# MAGIC %md 
+# MAGIC Algunas instrucciones se ejecutaron una vez, y se tienen que automatizar.  
+# MAGIC Principalmente en lo referente a carpetas tanto de reportes como del datalake. 
 
+# COMMAND ----------
 
-def with_columns(a_df, cols_dict): 
-    func = lambda dfx, col_kv: dfx.withColumn(*col_kv)
-    return reduce(func, cols_dict.items(), a_df)
-    
-    
-def pd_print(a_df: pd.DataFrame, width=180): 
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', width):
-        print(a_df)
-
-        
-def save_as_file(a_df: spk_DF, path_dir, path_file, **kwargs):
+def save_as_file(a_df: spk_DF, path_dir:str, path_file, **kwargs):
+    # paths in abfss://container... mode. 
     std_args = {
-        'mode': 'overwrite', 
+        'mode'  : 'overwrite', 
         'header': 'false'}
     std_args.update(kwargs)
     
@@ -87,13 +78,16 @@ def save_as_file(a_df: spk_DF, path_dir, path_file, **kwargs):
          .option('header', std_args['header'])
          .text(path_dir))
     
-    f_extras = [filish for filish in dbutils.fs.ls(path_dir) 
-            if filish.name.startswith('part-')]
+    f_extras = [f_info for f_info in dbutils.fs.ls(path_dir) 
+            if f_info.name.startswith('part-')]
     
     if len(f_extras) != 1: 
         raise "Expect only one file starting with 'PART'"
     
     dbutils.fs.mv(f_extras[0].path, path_file)
+    return
+
+ 
 
 # COMMAND ----------
 
@@ -107,7 +101,8 @@ def save_as_file(a_df: spk_DF, path_dir, path_file, **kwargs):
 # MAGIC 
 # MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan algunas columnas auxiliares.  
 # MAGIC * `Person Set`: tiene algunas modificaciones personalizadas.
-# MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo. 
+# MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo.
+# MAGIC * `Transaction Set`:  tiene agrupado por contrato, y separado por fechas. 
 
 # COMMAND ----------
 
@@ -116,17 +111,20 @@ def save_as_file(a_df: spk_DF, path_dir, path_file, **kwargs):
 
 # COMMAND ----------
 
-pymt_codes  = [
-    '92703',  '92704',  '92710',  '92711',  '92798',  '92799', 
-    '500021', '500022', '500023', '500401', '500412', '500908', 
-    '550002', '550021', '550022', 
-    '650710', '650712', '650713', '650716'
-    '850003', '850005', '950401', '950404']
+# Revisar especificación en ~/refs/catalogs/cyber_txns.xlsx
+# O en User Story, o en Correos enviados.  
+pymt_codes = ["092703", "092800", "500027", "550021", "550022", "550023", 
+    "550024", "550403", "550908", "650404", "650710", "650712", "650713", 
+    "650716", "650717", "650718", "650719", "650720", "750001", "750025", 
+    "850003", "850004", "850005", "850006", "850007", "958800"]
 
 by_acct_new = W.partitionBy('AccountID').orderBy(F.col('ValueDate').desc())
 by_acct_old = W.partitionBy('AccountID').orderBy(F.col('ValueDate'))
 
-pmts_prep = (spark.read.table(tables['brz_txns'][0])
+pmts_prep = (spark.read
+    .load(f"{brz_path}/transaction-set/data") # Transactions BRZ. 
+    .filter(F.col('epic_date') > F.lit(now_mx - delta(days=7)))
+    .filter(F.col('ValueDate') == F.lit(to_day))
     .filter(F.col('TransactionTypeCode').isin(pymt_codes))
     .withColumn('by_acct_new', F.row_number().over(by_acct_new))
     .withColumn('by_acct_old', F.row_number().over(by_acct_old)))
@@ -135,15 +133,15 @@ last_pmts = (pmts_prep
     .filter(F.col('by_acct_new') == 1)
     .select('AccountID', 
         F.col('ValueDate').alias('last_date'), 
-        F.col('Amount').alias('last_amount'), 
-        F.col('AmountAc').alias('last_amount_local')))
+        F.col('Amount'   ).alias('last_amount'), 
+        F.col('AmountAc' ).alias('last_amount_local')))
                 
 txns_grpd = (pmts_prep
     .filter(F.col('by_acct_old') == 1)
     .select('AccountID', F.col('ValueDate').alias('first_date')) 
     .join(last_pmts, on='AccountID', how='inner'))
 
-display(txns_grpd)
+display(pmts_prep)
 
 # COMMAND ----------
 
@@ -152,44 +150,87 @@ display(txns_grpd)
 
 # COMMAND ----------
 
+# Prepare Open Items: 
+ids_cols = ['ContractID', 'epic_date']
 
-loan_contract_0 = (spark.read.table(tables['brz_loans'][0])
+w_next = (W.partitionBy(ids_cols)
+    .orderBy(F.col('DueDate').asc()))
+w_past = (W.partitionBy(ids_cols)
+    .orderBy(F.col('DueDate').desc()))
+
+items_cols = OrderedDict({
+    'current_date': F.date_add(F.current_date(), -1),
+    'days_diff'   : F.datediff('current_date', 'DueDate'), 
+    'capital'     : F.col('511010'),
+    'impuesto'    : F.col('991100') + F.col('990004'),
+    'comision'    : F.col('511200') + F.col('990006'), 
+    'is_past'     : F.col('current_date') > F.col('DueDate'), 
+    'is_default'  : F.col('StatusCategory').isin([2, 3]) &  F.col('is_past'), 
+    'is_paid'     :(F.col('StatusCategory') == F.lit(1)) &  F.col('is_past'),
+    'is_due'      :(F.col('StatusCategory') == F.lit(1)) & ~F.col('is_past'), 
+    'is_next_due' :(F.when(F.col('is_due'),     F.row_number().over(w_next)) == 1), 
+    'last_overdue':(F.when(F.col('is_default'), F.row_number().over(w_past)) == 1)})
+
+grp_cols = OrderedDict({
+    'parcialidades_plan'    : F.count('DueDate'), 
+    'parcialidades_pagadas' : F.sum( F.col('is_paid').cast(T.DoubleType())), 
+    'parcialidades_vencidas': F.sum( F.col('is_default').cast(T.DoubleType())), 
+    'monto_vencido'         : F.sum( F.col('amount' )*F.col('is_default').cast(T.DecimalType())), 
+    'principal_vencido'     : F.sum( F.col('capital')*F.col('is_default').cast(T.DecimalType())), 
+    'interes_ord_vencido'   : F.sum( F.col('capital')*F.col('is_default').cast(T.DecimalType())),
+})
+
+next_cols = [*ids_cols, 
+    F.col('DueDate').alias('sig_pago'), 
+    F.col('amount' ).alias('monto_a_pagar'), 
+    F.col('days_diff').alias('DaysToPayment')]
+
+overdue_cols = [*ids_cols, 
+    F.col('days_diff').alias('OverdueDays')]
+
+### Execute All. 
+# rec_types = [c_nm for c_nm in open_items_0.columns if c_nm.isnumeric()]
+rec_types = ['511010', '511080', '511100', '511200', '990004', '990006', '991100']
+    
+# Falta sap_EventDateTime en OPEN_ITEMS_WIDE, entonces copy de Loan_SLV. 
+loan_date_df = (spark.read.format('delta')
+    .load(f"{brz_path}/loan-contract/data")
+    .select(F.col('ID').alias('ContractID'), 
+            'epic_date', 'sap_EventDateTime')) 
+
+open_items_0 = (spark.read.format('delta')
+    .load(f"{brz_path}/loan-contract/aux/open-items-wide")
+    .fillna(0, subset=rec_types)
+    .join(how='left', on=ids_cols, other=loan_date_df))
+
+open_items_1 = (tools.with_columns(open_items_0, items_cols))
+
+open_items_2c = (open_items_1
+    .filter(F.col('last_overdue'))  
+    .select(overdue_cols))
+
+open_items_2c.display()
+
+
+# COMMAND ----------
+
+loan_cols = {
+    'today'    : F.current_date(), 
+    'yesterday': F.date_add(F.current_date(), -1),     
+    'status_2' : F.when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') == 0), 'VIGENTE')
+         .when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') >  0), 'VENCIDO')
+         .when( F.col('LifeCycleStatus') == 50, 'LIQUIDADO'), 
+}
+
+loan_contract_0 = (spark.read
+    .load(f"{brz_path}/loan-contract/data")
     .filter(F.col('LifeCycleStatusTxt') == 'activos, utilizados')
-    .withColumn('today', F.current_date())
-    .withColumn('yesterday', F.date_add(F.current_date(), -1))
-    .withColumn('status_2', F.when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') == 0), 'VIGENTE')
-                             .when((F.col('LifeCycleStatus').isin([20, 30])) & (F.col('OverDueDays') >  0), 'VENCIDO')
-                             .when( F.col('LifeCycleStatus') == 50, 'LIQUIDADO')) )
+    .select('*', F.col('ID').alias('ContractID'))
+    .join(open_items_2c, on=['ContractID', 'epic_date'], how='left'))
 
-def spk_sapdate(str_col, dt_type): 
-    if dt_type == '/Date': 
-        dt_col = F.to_timestamp(F.regexp_extract(F.col(str_col), '\d+', 0)/1000)
-    elif dt_type == 'ymd': 
-        dt_col = F.to_date(F.col(str_col), 'yyyyMMdd')
-    return dt_col.alias(str_col)
+loan_contract_1 = tools.with_columns(loan_contract_0, loan_cols)
 
-date_1_cols = ['CreationDateTime', 'LastChangeDateTime']
-
-date_2_cols = ['StartDate', 'CurrentPostingDate', 'EvaluationDate',
-    'TermSpecificationStartDate', 'TermSpecificationEndDate',
-    'TermAgreementFixingPeriodStartDate', 'TermAgreementFixingPeriodEndDate',
-    'PaymentPlanStartDate', 'PaymentPlanEndDate',
-    'EffectiveYieldValidityStartDate',
-    'EffectiveYieldCalculationPeriodStartDate', 'EffectiveYieldCalculationPeriodEndDate']
-
-dt_1_select = [ F.to_timestamp(F.regexp_extract(a_col, '\d+', 0)/1000).alias(a_col) 
-    for a_col in date_1_cols]
-dt_2_select = [ F.to_date(F.col(a_col), 'yyyyMMdd').alias(a_col) 
-    for a_col in date_2_cols]
-
-new_dates = (loan_contract_0
-    .select('ID', *(dt_1_select + dt_2_select)))
-
-loan_contract_nonfix = (loan_contract_0
-    .drop(*(date_1_cols + date_2_cols))
-    .join(new_dates, on='ID'))
-
-loan_contract = (loan_contract_nonfix
+loan_contract = (loan_contract_1
     .withColumn('ContractID', F.col('ID'))
     .withColumn('person_id', F.col('BorrowerID')))
 
@@ -214,18 +255,23 @@ states_data = [ {'AddressRegion': each_split[0], 'state_key': each_split[1]}
 
 states_df = spark.createDataFrame(states_data)
 
-persons_cols = OrderedDict({    
-    'split'     : F.split('LastName', ' ', 2), 
-    'LastNameP' : F.col('split').getItem(0),
-    'LastNameM' : F.col('split').getItem(1), 
-    'full_name1': F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
-    'full_name' : F.regexp_replace(F.col('full_name1'), ' +', ' '), 
-    'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID')})
+persons_cols = {    
+    #'split'     : F.split('LastName', ' ', 2), 
+    'LastNameP' : F.col('LastName'),
+    'LastNameM' : F.col('LastName2'), 
+    #'full_name1': F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
+    #'full_name' : F.regexp_replace(F.col('full_name1'), ' +', ' '), 
+    'full_name' : F.col('Name'), 
+    #'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID')
+    'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID')}
 
-persons_0 = (spark.read.table("din_clients.brz_ops_persons_set")
+persons_0 = (spark.read
+    #.table("din_clients.brz_ops_persons_set")
+    .load(f"{brz_path}/person-set/chains/person")
+    .filter(F.col('ID').isNotNull())
     .join(states_df, how='left', on='AddressRegion'))
 
-persons = with_columns(persons_0, persons_cols)
+persons = tools.with_columns(persons_0, persons_cols)
 
 display(persons)
 
@@ -237,10 +283,14 @@ display(persons)
 # COMMAND ----------
 
 loans_qan = (spark.read
-    .table(tables['brz_loan_analyzers'][0])
-    .withColumn('ID', F.col('LoanContractID')))  #Fixer
+    .load(f"{brz_path}/loan-contract/data")
+    .select(F.lit(None).alias('CurrentOldestDueDate'), F.col('ID')))
 
-display(loans_qan)
+# loans_qan = (spark.read
+#     .table(tables['brz_loan_analyzers'][0])
+#     .withColumn('ID', F.col('LoanContractID')))  #Fixer
+
+# display(loans_qan)
 
 # COMMAND ----------
 
@@ -249,17 +299,14 @@ display(loans_qan)
 
 # COMMAND ----------
 
-# Agrupar por ID, Currency, BalancesTS;
-# Pivotear por Code: sum(Amount)
+balances_0 = (spark.read
+    .load(f"{brz_path}/loan-contract/aux/balances-wide"))
 
-balances = (spark.read.table(tables['brz_loan_balances'][0])
-    # Set types
-    .withColumn('Code', F.concat(F.lit('x'), F.col('Code')))
-    .withColumn('Amount', F.col('Amount').cast(T.DoubleType()))
-    .withColumn('BalancesTS', F.col('BalancesTS').cast(T.DateType()))
-    # Pivot Code/Amount
-    .groupBy(['ID', 'Currency', 'BalancesTS']).pivot('Code')
-        .agg(F.round(F.sum(F.col('Amount')), 2)))
+bal_rename = {a_col: re.sub('code_', 'x', a_col) 
+    for a_col in balances_0.columns}
+
+λ_rename = lambda a_df, kk_vv: a_df.withColumnRenamed(*kk_vv)
+balances = reduce(λ_rename, bal_rename.items(), balances_0)
 
 display(balances)
 
@@ -286,9 +333,9 @@ display(balances)
 # 86 Suprimido 1
 
 open_cols = OrderedDict({
-    'OpenItemTS' : F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'), 
-    'DueDate'    : F.to_date(F.col('DueDate'),    'yyyyMMdd'),
-    'Amount'     : F.col('Amount').cast(T.DoubleType()),
+#     'OpenItemTS' : F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'), 
+#     'DueDate'    : F.to_date(F.col('DueDate'),    'yyyyMMdd'),
+#     'Amount'     : F.col('Amount').cast(T.DoubleType()),
     # Aux Columns
     'cleared_na' : F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
                     .cast(T.DoubleType()), 
@@ -302,7 +349,6 @@ open_cols = OrderedDict({
     'chk_vencido':(F.col('vencido') & (F.col('uncleared') >0))
                 |(~F.col('vencido') & (F.col('uncleared')==0))
 })
-
 
 open_items_0 = spark.read.table(tables['brz_loan_open_items'][0])
 
@@ -319,18 +365,47 @@ display(uncleared)
 
 # COMMAND ----------
 
+open_cols = OrderedDict({
+    'today'      : F.current_date(), 
+    'vencido'    :(F.col('DueDate') < F.col('today'))
+                 & F.col('StatusCategory').isin([2, 3]), 
+    'local/fgn'  : F.when(F.col('Currency') == 'MXN', 'local').otherwise('foreign'),
+    'interes'    : F.col('991100') + F.col('511100'), 
+    'iva'        : F.col('990004'), 
+    'interes/iva': F.col('interes') + F.col('iva'), 
+    'chk_vencido':(F.col('vencido') & (F.col('uncleared') >0))
+                |(~F.col('vencido') & (F.col('uncleared')==0))
+})
+
+open_items_0 = (spark.read
+    .load(f"{brz_path}/loan-contract/aux/open-items-wide"))
+
+sum_cols = map(lambda a_col: F.sum(a_col).alias(a_col), 
+    ['iva', 'interes'])
+
+uncleared = (tools.with_columns(open_items_0, open_cols)
+    .filter(F.col('vencido') & (F.col('interes/iva') > 0) & (F.col('uncleared') > 0))
+    .groupBy(['ContractID', 'DueDate', 'sap_AccountID', 'epic_date'])
+    .pivot('local/fgn').agg(*sum_cols)
+    .withColumn('ID', F.col('ContractID')))
+
+uncleared.display()
+
+# COMMAND ----------
+
 # MAGIC %md 
 # MAGIC # Preparación Gold 🥇 
 
 # COMMAND ----------
 
-tables_dict = OrderedDict({
+tables_dict = {
     "PersonSet"    : persons, 
     "ContractSet"  : loan_contract, 
-    "Lacqan"       : loans_qan,
     "BalancesWide" : balances,
     "OpenItemsUncleared" : uncleared, 
-    "TxnsGrouped"  : txns_grpd})
+    "TxnsGrouped"  : txns_grpd, 
+    "TxnsPayments" : pmts_prep,
+    "Lacqan"       : loans_qan}
 
 null_values = {
     'str' : '', 
@@ -349,37 +424,36 @@ c_formats = {
     'str': '%-{}.{}s', 'date': '%8.8d', 'long': '%0{}d'}
 
 
-def column_call(col: C) -> str: 
-    reg_alias = r"Column\<'(.*) AS (.*)'\>"
-    non_alias = r"Column\<'(.*)'\>"
-    a_match = re.match(reg_alias, str(col))
-    n_match = re.match(non_alias, str(col))
-    
-    the_call = (a_match.group(2) if a_match is not None 
-           else n_match.group(1)) 
-    return the_call
- 
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
 # MAGIC 
-# MAGIC Leemos los archivos `feather` que se compilaron a partir de las definiciones en Excel.  
-# MAGIC Hacemos la preparación técnica de la tabla correspondiente.  
-# MAGIC * `all_cols` es la tabla con las instrucciones técnicas.  
-# MAGIC * `sap_cols` es el subconjunto de aquellas que confirmadas (deberían ser todas, pero no) de SAP.  
+# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.  
+# MAGIC Y de ahí, se preparan los archivos. 
 
 # COMMAND ----------
 
+from pathlib import Path
+
+def is_na(val: Union[str, float]): 
+    if isinstance(val, str): 
+        is_it = (val is None)
+    elif isinstance(val, float): 
+        is_it = np.isnan(val)
+    return is_it
+        
+
 def read_cyber_specs(task_key: str): 
-    specs_file = f"../refs/catalogs/cyber_{task_key}.feather"
-    joins_file = f"../refs/catalogs/cyber_{task_key}_joins.feather"
+    # Usa TMP_DOWNER, SPECS_PATH, 
+    specs_file = f"{tmp_downer}/{task_key}.feather"
+    joins_file = f"{tmp_downer}/{task_key}_joins.csv"
     specs_blob = f"{specs_path}/{task_key}_specs_latest.feather"
-    joins_blob = f"{specs_path}/{task_key}_joins_latest.feather"
+    joins_blob = f"{specs_path}/{task_key}_joins_latest.csv"
     
-    az_manager.download_storage_blob(specs_file, specs_blob, 'gold')
-    az_manager.download_storage_blob(joins_file, joins_blob, 'gold')
+    az_manager.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
+    az_manager.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
     
     specs_0 = (pd.read_feather(specs_file)
         .set_index('nombre'))
@@ -389,7 +463,7 @@ def read_cyber_specs(task_key: str):
         width_1     = lambda df: df['width'].where(df['PyType'] != 'dbl', df['width'] + 1),
         precision_1 = specs_0['Longitud'].str.split('.').str[1], 
         precision   = lambda df: np.where(df['PyType'] == 'dbl', 
-                df['precision_1'], df['width']), 
+                                 df['precision_1'], df['width']), 
         is_na = ( specs_0['columna_valor'].isnull() 
                 | specs_0['columna_valor'].isna() 
                 |(specs_0['columna_valor'] == 'N/A').isin([True])),
@@ -400,13 +474,13 @@ def read_cyber_specs(task_key: str):
         c_format = lambda df: df['y_format'].where(df['PyType'] == 'int', df['x_format']), 
         s_format = lambda df: ["%{}.{}s".format(wth, wth) for wth in df['width']])
 
-    if joins_file.is_file(): 
-        join_df = (pd.read_feather(joins_file)
-            .set_index('tabla_origen'))
+    if Path(joins_file).is_file(): 
+        join_df = (pd.read_csv(joins_file)
+            .set_index('tabla'))
         
         joins_dict = OrderedDict()
         for tabla, rr in join_df.iterrows():
-            if rr['join_cols'] is not None:
+            if not is_na(rr['join_cols']):
                 # OldCol1=new_col_1,OldCol2=new_col_2,...
                 joiners_0 = rr['join_cols'].split(',')
                 joiners_1 = (jj.split('=') for jj in joiners_0)
@@ -414,11 +488,7 @@ def read_cyber_specs(task_key: str):
                 joins_dict[tabla] = joiners_2
     else: 
         joins_dict = None
-
-    # Ajuste manual para 'sap_saldos'
-    if task == 'sap_saldos': 
-        joins_dict['ContractSet'].append(F.col('BorrowerID').alias('person_id'))
-    
+        
     return specs_df, joins_dict
 
 # COMMAND ----------
@@ -439,7 +509,8 @@ def get_reader_specs(specs_df: pd_DF) -> dict:
                 # Fixing missing columns as NA. 
                 missing[rr['tabla']].append(rr['columna_valor'])
                 r_value = null_values[r_type]
-                fix_vals.append(F.lit(r_value).cast(cast_types[r_type]()).alias(name))
+                r_col = F.lit(r_value).cast(cast_types[r_type]()).alias(name)
+                fix_vals.append(r_col)
         else: 
             if rr['is_na']: 
                 r_value = null_values[r_type]
@@ -474,6 +545,7 @@ def get_reader_specs(specs_df: pd_DF) -> dict:
 
 # COMMAND ----------
 
+reload(tools)
 
 def _col_string_format(name, col_type, c_format, s_format): 
     if   col_type == 'str': 
@@ -494,18 +566,18 @@ def _col_string_format(name, col_type, c_format, s_format):
 def master_join_specs(spec_joins, specs_dict): 
     readers = specs_dict['readers']
     
-    iter_joins = iter(spec_joins)
-    key_0 = next(iter_joins)
+    joiner = iter(spec_joins)
+    key_0  = next(joiner)
     main_tbl = (tables_dict[key_0]
         .select(*readers[key_0], *spec_joins[key_0]))
     
-    n_key = next(iter_joins, None)
+    n_key = next(joiner, None)
     while n_key is not None: 
         next_tbl = (tables_dict[n_key]
             .select(*readers[n_key], *spec_joins[n_key]))
         main_tbl = main_tbl.join(next_tbl, how='left', 
-            on=[column_call(col) for col in spec_joins[n_key]])
-        n_key = next(iter_joins, None)
+            on=[tools.column_name(col) for col in spec_joins[n_key]])
+        n_key = next(joiner, None)
     
     master_tbl = main_tbl.select('*', *specs_dict['fix_vals'])
     return master_tbl
@@ -532,7 +604,7 @@ def gold_to_fixed_width(gold_df: spk_DF, specs_df: pd_DF) -> spk_DF:
         .fillna(0,  num_cols)
         .select(*typ_cols))
     
-    fixed_1 = (with_columns(fixed_0, date_cols)
+    fixed_1 = (tools.with_columns(fixed_0, date_cols)
         .select(*fxw_cols))
     return fixed_1
 
@@ -542,17 +614,20 @@ def gold_to_fixed_width(gold_df: spk_DF, specs_df: pd_DF) -> spk_DF:
 # Uses GOLD_DIR, CYBER_NAMES and calls NOW()
 
 def save_as_cyber(gold_df, cyber_task, explore): 
-    time_format = '%Y-%m-%d_%H:%M' if explore else '%Y-%m-%d_00:00'
+    time_format = '%Y-%m-%d_%H%M' if explore else '%Y-%m-%d_0000' # 
     file_header = 'true' if explore else 'false'
     
     now_time = dt.now(tz=timezone('America/Mexico_City')).strftime(time_format)
     
     cyber_key, cyber_name = cyber_names[cyber_task]
-    report_pre    = f"{gold_dir}/{cyber_name}/{now_time}.txt"
-    report_recent = f"{gold_dir}/recent/{cyber_key}.txt"
-    report_past   = f"{gold_dir}/last_/{cyber_key}.txt"
+    report_dir = f"{gold_path}/{cyber_name}/_spark/{now_time}"
+    report_recent = f"{gold_path}/recent/{cyber_key}.txt"
+    report_history = f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_time}.txt"
     
-    save_as_file(gold_df, report_pre, report_pos)
+    print(f"{now_time}_{cyber_key}_{cyber_task}.txt")
+    save_as_file(gold_df, report_dir, report_recent)
+    save_as_file(gold_df, report_dir, report_history)
+    
 
 
 # COMMAND ----------
@@ -563,32 +638,20 @@ def save_as_cyber(gold_df, cyber_task, explore):
 # COMMAND ----------
 
 cyber_tasks = ['sap_saldos', 'sap_pagos', 'sap_estatus']
-explore = True
+explore = False
 
-task = cyber_tasks[1]
-# for task in cyber_tasks: 
-specs_df, spec_joins = read_cyber_specs(task)
-specs_dict = get_reader_specs(specs_df)
+the_tables = {}
+for task in cyber_tasks: 
+    specs_df, spec_joins = read_cyber_specs(task)
+    specs_dict = get_reader_specs(specs_df)
 
-gold_3 = master_join_specs(spec_joins, specs_dict)
-gold_2 = gold_to_fixed_width(gold_3, specs_df)
-one_select = F.concat(*gold_2.columns).alias('|'.join(gold_2.columns))
-gold_1 = gold_1.select(one_select)
-
-save_as_file(gold_1, task, explore)
-display(gold_1)
-
+    gold_3 = master_join_specs(spec_joins, specs_dict)
+    gold_2 = gold_to_fixed_width(gold_3, specs_df)
+    one_select = F.concat(*gold_2.columns).alias('|'.join(gold_2.columns))
+    gold_1 = gold_2.select(one_select)
+    the_tables[task] = gold_1
+    # save_as_cyber(gold_1, task, explore)
 
 # COMMAND ----------
 
-(gold_df, cyber_task, explore) = (gold_1, task, explore)
-time_format = '%Y-%m-%d_%H:%M' if explore else '%Y-%m-%d_00:00'
-file_header = 'true' if explore else 'false'
 
-now_time = dt.now(tz=timezone('America/Mexico_City')).strftime(time_format)
-
-cyber_key, cyber_name = cyber_names[cyber_task]
-report_pre = f"{gold_dir}/{cyber_name}/{now_time}"
-report_pos = f"{gold_dir}/external/{cyber_key}.txt"
-
-save_as_file(gold_df, report_pre, report_pos)

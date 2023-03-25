@@ -83,7 +83,7 @@ display(lqan_spk)
 
 # COMMAND ----------
 
-write_table = False
+write_tables = False
 if write_tables: 
     create_clause = "CREATE TABLE {} \nUSING DELTA LOCATION \"{}\";"
     tbl_name, tbl_path, _ = table_items[write_table]

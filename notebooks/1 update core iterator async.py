@@ -80,7 +80,7 @@ async def call_all_apis(api_calls, ids_lists):
 # COMMAND ----------
 
 from json import dumps
-k_only = len(loans_ids)
+k_only = 20 # len(loans_ids)
 
 tic = time()
 pre_results = asyncio.run(call_all_apis(api_types, loans_ids[:k_only]))
@@ -119,6 +119,9 @@ print(f"""Lengths:
 
 # COMMAND ----------
 
+
+
+# COMMAND ----------
 
 df_cols = {
     'balances'   : ['ID', 'Code','Name','Amount','Currency','BalancesTS'], 
