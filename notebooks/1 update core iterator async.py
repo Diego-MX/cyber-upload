@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC # Setup Machine
-# MAGIC 
+# MAGIC
 # MAGIC Files in Repos now allows us to import files, and run requirements which are setup for both Databricks Jobs and local development. 
 
 # COMMAND ----------
@@ -58,8 +58,15 @@ loans_ids = (spark.read.format('delta')
 
 # MAGIC %md 
 # MAGIC # Async Tools
-# MAGIC 
+# MAGIC
 # MAGIC Following [Real Python's courses](https://realpython.com/python-concurrency/) we setup basic functionality to call the SAP engine with a thread pool executor. 
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC Las APIs de `Balance`, `Open Items` y `Payment Plan`, no están diseñadas para descargar muchos datos, sino por consulta individual.   
+# MAGIC Entonces, las llamamaos asíncronamente cuenta por cuenta.  
+# MAGIC
 
 # COMMAND ----------
 
@@ -89,7 +96,7 @@ async def call_all_apis(api_calls, ids_lists):
 
 # MAGIC %md 
 # MAGIC # Execution
-# MAGIC 
+# MAGIC
 # MAGIC Run the async, and print the execution time. 
 
 # COMMAND ----------

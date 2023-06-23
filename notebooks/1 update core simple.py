@@ -1,18 +1,18 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC ## Description
-# MAGIC 
+# MAGIC
 # MAGIC This notebook is tied to Databricks job that runs every hour.   
 # MAGIC 0. Preparation of variables `ENV_TYPE` (`dev`, `qas`, `stg`, ...) and `SERVER_TYPE` (`dbks`, `local`, `wap`).  
 # MAGIC    This is usually done at a server level, but can also be handled in a script or notebook.  
 # MAGIC    `import os; os.environ['ENV_TYPE'] = 'qas'`
-# MAGIC 
+# MAGIC
 # MAGIC 1. Check `config.py` for configuration options.  As may be anticipated, some depend on `ENV_TYPE` and `SERVER_TYPE`.  
 # MAGIC    One thing to note, the service principal in `SETUP_KEYS` must have been previously given access to the resources in `PLATFORM_KEYS`.  
 # MAGIC    Moreover, specific resource configuration may need to be handled along the way;  
 # MAGIC    Eg.1 Key Vault Access Policies for the service principal to read secrets.  
 # MAGIC    Eg.2 May require fine grained permissions in datalake. 
-# MAGIC 
+# MAGIC
 # MAGIC 2. Object classes `SAPSession`, `AzureResourcer`, `ConfigEnviron` use `config.py` under the hood.  
 # MAGIC     ... and so does this notebook.  
 
@@ -57,10 +57,6 @@ loans_spk = spark.createDataFrame(loans_df)
 
 lqan_df = core_session.get_loans_qan()
 lqan_spk = spark.createDataFrame(lqan_df)
-
-# COMMAND ----------
-
-display(lqan_spk)
 
 # COMMAND ----------
 

@@ -22,6 +22,7 @@ import re
 # COMMAND ----------
 
 from src.utilities import tools
+from src.data_managers import EpicDF
 from src.platform_resources import AzureResourcer
 from config import (ConfigEnviron, ENV, SERVER, DBKS_TABLES)
 
@@ -68,8 +69,7 @@ persons_cols = [F.col('ID').alias('BorrowerID'),
     'Gender', 'PhoneNumber', 'MobileNumber', 
     F.col('epic_date').alias('person_date')]
 
-persons_slv = (spark.read.format('delta')
-    .load(f"{events_brz}/person-set/chains/person")
+persons_slv = (EpicDF(spark, f"{events_brz}/person-set/chains/person")
     .select(*persons_cols)
     .withColumn('phone_number', F.coalesce('PhoneNumber', 'MobileNumber')))
 
@@ -79,6 +79,7 @@ display(persons_slv)
 
 # MAGIC %md 
 # MAGIC ## Current Account
+# MAGIC
 
 # COMMAND ----------
 
@@ -87,15 +88,14 @@ account_cols = [F.col('ID').alias('ContractID'),
     'ClabeAccount', 
     F.col('StatementFrequencyName').alias('RepaymentFrequency')]
 
-curr_account = (spark.read           
-    .load(f"{events_brz}/current-account/data")
+curr_account = (EpicDF(spark, f"{events_brz}/current-account/data")
     .select(*account_cols))
 
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC 
+# MAGIC
 # MAGIC ## Loan Contracts
 
 # COMMAND ----------
@@ -112,12 +112,9 @@ loan_cols_0 = [F.col('ID').alias('ContractID'),
     'sap_EventDateTime', 
     F.col('epic_date').alias('loan_date')]
 
-loans_slv = (spark.read           
-    .load(f"{events_brz}/loan-contract/data")
+loans_slv = (EpicDF(spark, f"{events_brz}/loan-contract/data")
     .select(loan_cols_0))
-#     .withColumn('TermSpecificationValidityPeriodDurationM', F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()))
-#     .withColumn('NominalInterestRate', F.round(F.col('NominalInterestRate').cast(T.DoubleType()), 2))
-#     .withColumn('TermSpecificationStartDate', spk_sapdate('TermSpecificationStartDate', 'ymd'))
+
 
 display(loans_slv)
 
@@ -149,6 +146,7 @@ display(loans_slv)
 # MAGIC | 97|Outstanding Interest VAT  |
 # MAGIC | 98|Redraw balance (principal paid ahead of original payment plan)  |
 # MAGIC | 99|Outstanding balance  |
+# MAGIC
 
 # COMMAND ----------
 
@@ -162,10 +160,8 @@ balance_cols = [*(vv.alias(kk) for kk, vv in code_cols.items()),
     F.col('ID').alias('ContractID'), 
     F.col('epic_date').alias('loan_date')]
 
-balance_0 = (spark.read
-    .load(f"{events_brz}/loan-contract/aux/balances-wide")
-    .filter(F.col('Currency') != F.lit(""))
-            )
+balance_0 = (EpicDF(spark, f"{events_brz}/loan-contract/aux/balances-wide")
+    .filter(F.col('Currency') != F.lit("")))
 
 balance_slv = (balance_0
     .select(*balance_cols))
@@ -176,18 +172,18 @@ balance_slv.display()
 
 # MAGIC %md 
 # MAGIC ## Open Items 
-# MAGIC 
+# MAGIC
 # MAGIC Manipulamos la tabla Open Items, para la cual tenemos la siguiente información relacionada.  
-# MAGIC 
+# MAGIC
 # MAGIC Sobre estatus y categorías:  
-# MAGIC 
+# MAGIC
 # MAGIC | Status | StatusTxt | StatusCategory |
 # MAGIC |--------|-----------|---|
 # MAGIC | 01     | Created   | 1 |
 # MAGIC | 01     | Created   | 2 |
 # MAGIC | 01     | Created   | 3 |
 # MAGIC | 86     | Suprimido | 1 |
-# MAGIC 
+# MAGIC
 # MAGIC | ReceivableType | ReceivableTypeTxt |
 # MAGIC |--------|-----------|
 # MAGIC | 511010 | Capital   |
@@ -197,15 +193,15 @@ balance_slv.display()
 # MAGIC | 990004 | IVA Interés |
 # MAGIC | 991100 | Int. No Gravado |
 # MAGIC | 990006 | IVA. Comisión |
-# MAGIC 
+# MAGIC
 # MAGIC Y generamos las variables intermedias: 
 # MAGIC * `es_vencido`: `StatusCategory in (2, 3) AND (DueDate < Timestamp)`  
 # MAGIC * `recibible` : `511010 => capital`,  
 # MAGIC &emsp;&emsp;&emsp;`(990004, 991100) => impuesto`,  
 # MAGIC &emsp;&emsp;&emsp;`(511200, 990006) => comision`
-# MAGIC 
+# MAGIC
 # MAGIC Para finalmente obtener las medidas:  
-# MAGIC 
+# MAGIC
 # MAGIC | Medida | recibible | StatusCat. | es_vencido |
 # MAGIC |--------|-----------|---|--|
 # MAGIC | Parcialidades pagadas | capital   | 1 |  |
@@ -261,13 +257,11 @@ rec_types = ['511010', '511080', '511100', '511200', '990004', '990006', '991100
 loan_date_df = (loans_slv
     .select('loan_date', 'ContractID', 'sap_EventDateTime')) 
 
-open_items_0 = (spark.read.format('delta')
-    .load(f"{events_brz}/loan-contract/aux/open-items-wide") 
+open_items_1 = (EpicDF(spark, f"{events_brz}/loan-contract/aux/open-items-wide") 
     .fillna(0, subset=rec_types)
     .withColumnRenamed('epic_date', 'loan_date')
-    .join(how='left', on=ids_cols, other=loan_date_df))
-
-open_items_1 = (tools.with_columns(open_items_0, items_cols))
+    .join(how='left', on=ids_cols, other=loan_date_df)
+    .with_columns(items_cols))
 
 open_items_2a = (open_items_1
     .groupBy(ids_cols)
@@ -300,8 +294,7 @@ open_items_slv.display()
 w_promises = (W.partitionBy('attribute_loan_id')
     .orderBy(F.col('attribute_due_date').desc(), 'promise_id'))
 
-promises_slv = (spark.read.format('delta')
-    .load(f"{at_promise}/promises") 
+promises_slv = (EpicDF(spark, f"{at_promise}/promises") 
     .withColumnRenamed('id', 'promise_id')
     .filter(~F.col('attribute_processed') 
           & ~F.col('attribute_accomplished'))
@@ -314,7 +307,7 @@ display(promises_slv)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC 
+# MAGIC
 # MAGIC # Silver 🥈 to Gold 🥇
 
 # COMMAND ----------

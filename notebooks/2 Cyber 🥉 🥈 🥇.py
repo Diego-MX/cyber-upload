@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC 
+# MAGIC
 # MAGIC # Preparación
-# MAGIC 
+# MAGIC
 # MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican los tipos de columnas desde el lado de la fuente. 
 # MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos de columnas especificados para crear el _output_.
 
@@ -26,6 +26,9 @@ import re
 from typing import Union
 
 # COMMAND ----------
+
+from importlib import reload
+import config; reload(config)
 
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 from src.platform_resources import AzureResourcer
@@ -79,25 +82,7 @@ def pd_print(a_df: pd.DataFrame, width=180):
         print(a_df)
 
         
-def save_as_file(a_df: spk_DF, path_dir:str, path_file, **kwargs):
-    # paths in abfss://container... mode. 
-    std_args = {
-        'mode': 'overwrite', 
-        'header': 'false'}
-    std_args.update(kwargs)
-    
-    (a_df.coalesce(1).write
-         .mode(std_args['mode'])
-         .option('header', std_args['header'])
-         .text(path_dir))
-    
-    f_extras = [f_info for f_info in dbutils.fs.ls(path_dir) 
-            if f_info.name.startswith('part-')]
-    
-    if len(f_extras) != 1: 
-        raise "Expect only one file starting with 'PART'"
-    
-    dbutils.fs.mv(f_extras[0].path, path_file)
+
 
 # COMMAND ----------
 
@@ -108,7 +93,7 @@ def save_as_file(a_df: spk_DF, path_dir:str, path_file, **kwargs):
 
 # MAGIC %md
 # MAGIC Solo 4 requieren modificación  
-# MAGIC 
+# MAGIC
 # MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan algunas columnas auxiliares.  
 # MAGIC * `Person Set`: tiene algunas modificaciones personalizadas.
 # MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo.
@@ -133,7 +118,7 @@ by_acct_old = W.partitionBy('AccountID').orderBy(F.col('ValueDate'))
 
 pmts_prep = (spark.read.table(tables['brz_txns'][0])
     .filter(F.col('TransactionTypeCode').isin(pymt_codes))
-    .filter(F.col('ValueDate') == )
+    .filter(F.col('ValueDate') == F.current_date())
     .withColumn('by_acct_new', F.row_number().over(by_acct_new))
     .withColumn('by_acct_old', F.row_number().over(by_acct_old)))
 
@@ -370,7 +355,7 @@ def column_call(col: C) -> str:
 
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
-# MAGIC 
+# MAGIC
 # MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.  
 # MAGIC Y de ahí, se preparan los archivos. 
 
@@ -467,19 +452,19 @@ def get_reader_specs(specs_df: pd_DF) -> dict:
 
 # MAGIC %md 
 # MAGIC ## Master Join and Fixed-Value Columns  
-# MAGIC 
+# MAGIC
 # MAGIC 1. Definir tipos de _Spark_, y los valores nulos para cada uno de ellos.  
 # MAGIC 2. Crear columnas para los valores fijos definidos.  
 # MAGIC 3. Convertir a los tipos definidos en (1).  
 # MAGIC 4. Las fechas se manejan por separado.  
-# MAGIC 
+# MAGIC
 # MAGIC ### Explicit conversion to string
 # MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna `str`, `date`, `dbl`, `int`.  
 # MAGIC - `STR`: Aplicar formato `c_format` y dejar ASCII.   
 # MAGIC - `DATE`: Convertir los `1900-01-01` capturados previamente y aplicar `date_format`.  
 # MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
 # MAGIC - `INT`: Aplicar `c_format`.  
-# MAGIC 
+# MAGIC
 # MAGIC Post-formatos, aplicar el `s-format`, concatenar.  
 
 # COMMAND ----------

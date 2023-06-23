@@ -4,13 +4,13 @@
 
 
 # Utilities
-deepdiff
 azure-identity
 azure-keyvault-secrets
 azure-storage-blob
+deepdiff
+toolz
 
 authlib
-httpx
 python-dotenv
 
 # Data 

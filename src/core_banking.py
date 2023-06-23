@@ -270,7 +270,7 @@ class SAPSession(Session):  # REQUESTS.
             
             ii = 0 
             the_resp = self.get(**getters)
-            while the_resp.status_code == 401 and ii < 5: 
+            while (the_resp.status_code == 401) and (ii < 5): 
                 self.update_token()  
                 the_resp = self.get(**getters)
                 ii += 1

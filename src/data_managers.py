@@ -1,0 +1,451 @@
+
+from collections import OrderedDict, defaultdict
+from datetime import datetime as dt, date, timedelta as delta
+from delta.tables import DeltaTable as Δ
+from functools import reduce 
+import numpy as np
+import pandas as pd
+from pandas import (DataFrame as pd_DF, Series as pd_S)
+from pyspark.dbutils import DBUtils
+from pyspark.sql import (functions as F, types as T, 
+    Window as W, DataFrame as spk_DF, Column, SparkSession as spk_Sn)
+from pytz import timezone
+from toolz import dicttoolz as d_toolz, functoolz as f_toolz, itertoolz as i_toolz
+import re
+from typing import Union
+
+from epic_py.delta import EpicDF, column_name #, when_plus
+from epic_py.tools import compose, partial2, MatchCase
+
+
+def when_plus(when_list:list) -> Column: 
+    ''' 
+    Depends on module F ~ pyspark.sql.functions
+    WHEN_LIST ~ [(cond, value), ..., (None, else)]
+    Returns F.when(cond, value)....otherwise(else)
+    '''
+    w_list = when_list.copy()
+    has_else = (w_list[-1][0] is None)
+    _, w_else = w_list.pop(-1) if has_else else F.lit(None)
+    
+    λ_when = lambda ff, item: ff.when(*item)
+    F_when = reduce(λ_when, w_list, F)
+    return F_when.otherwise(w_else)
+
+  
+def fill_na_plus(self, na_plus: dict): 
+    λ_default = lambda x_df, kk_vv: x_df.fillna(kk_vv[0], kk_vv[1]) 
+    λ_date    = lambda x_df, kk_vv: x_df.with_column_plus({
+            cc: F.coalesce(cc, F.lit(kk_vv[0])) for cc in kk_vv[1]})
+
+    def λ_fill(x_df, kk_vv): 
+        kk, vv = kk_vv
+        if isinstance(kk, date): 
+            return λ_date(x_df, kk_vv)
+        else: 
+            return λ_default(x_df, kk_vv)
+    return reduce(λ_fill, na_plus.items(), self)
+EpicDF.fill_na_plus = fill_na_plus
+
+
+
+class CyberData(): 
+    '''General Namespace to handle Cyber Specifications.'''
+
+    def __init__(self, spark): 
+        self.spark = spark
+        self.set_defaults()
+        
+
+    def set_defaults(self): 
+        self.reports = {
+            'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
+            'sap_estatus'   : ('C8BD1353',  'core_status'  ), 
+            'sap_pagos'     : ('C8BD1343',  'core_payments'), 
+            'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
+            'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
+            'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
+
+        self.na_types = {
+            'str' : '', 
+            'dbl' : 0, 
+            'int' : 0, 
+            'date': date(1900, 1, 1)}
+
+        self.spk_types = {
+            'str' : T.StringType, 
+            'dbl' : T.DoubleType, 
+            'int' : T.IntegerType, 
+            'date': T.DateType}
+
+        self.c_formats = {
+            'int' : '%0{}d', 
+            'dbl' : '%0{}.{}f', 
+            'dec' : '%0{}.{}d',  # Puede ser '%0{}.{}f'
+            'str' : '%-{}.{}s', 
+            'date': '%8.8d', 
+            'long': '%0{}d'}
+
+
+    def prepare_source(self, which, path, **kwargs): 
+        base_df   = EpicDF(self.spark, path)
+        
+        if   which == 'balances': 
+            bal_rename = {a_col: re.sub('code_', 'x', a_col) 
+                for a_col in base_df.columns}
+
+            x_df = (base_df
+                .dropDuplicates()
+                .with_column_renamed_plus(bal_rename))
+
+        elif which == 'loan-contracts':
+
+            if 'open_items' not in kwargs: 
+                raise Exception("Need OPEN_ITEMS reference.")
+            
+            open_items = (kwargs['open_items']
+                .select('ID', 'overdue_days'))
+
+            where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
+
+            status_dict = OrderedDict({
+                ('VIGENTE',  '303') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
+                                    & (F.col('overdue_days') == 0), 
+                ('VENCIDO',  '000') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
+                                    & (F.col('overdue_days') >  0),
+                ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
+                ('undefined','xxx') :  None})
+            
+            loan_cols = OrderedDict({
+                'ContractID'  : F.col('ID'), 
+                'person_id'   : F.col('BorrowerID'),
+                'borrower_mod': F.concat(F.lit('B'), F.col('BorrowerID')),
+                'yesterday'   : F.date_add(F.current_date(), -1),
+                'status_2'    : when_plus([(vv, kk[0]) for kk, vv in status_dict.items()]), 
+                'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()]), 
+                # Missing in Events from APIs. 
+                'total_payments': F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()), 
+                'StageLevel'  : F.col('LifeCycleStatus')
+            })
+
+            x_df = (base_df
+                .join(open_items, on='ID', how='left')
+                .filter_plus(*where_loans)
+                .with_column_plus(loan_cols))
+            
+        elif which == 'open-items-wide': 
+            id_cols   = ['ContractID', 'epic_date', 'ID']
+            rec_types = ['511010', '511100', '990004', '991100', '511200', '990006'] 
+
+            w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
+            min_date = lambda cond: (F.lit(1) == F.when(cond, 
+                    F.row_number().over(w_duedate)).otherwise(-1))
+
+            open_cols = OrderedDict({
+                'yesterday'  : F.current_date() - 1, 
+                'ID'         : F.col('ContractID'), 
+                'interest'   : F.col('991100') + F.col('511100'), 
+                'iva'        : F.col('990004'), 
+                'is_due'     : F.col('DueDate') >= F.current_date(),  
+                'is_current' : min_date(F.col('is_due')), 
+                'is_default' : F.col('StatusCategory').isin(['2','3']),
+                'is_oldest'  : min_date(F.col('is_default'))})
+                
+            group_cols = {
+                'current' : {
+                    'current_amount'   : F.col('amount')}, 
+                'oldest': OrderedDict({
+                    'oldest_date'      : F.col('DueDate'), 
+                    'oldest_uncleared' : F.col('uncleared'), 
+                    'oldest_eval_date' : F.col('DueDate') + 90, 
+                    'overdue_days'     : f_toolz.pipe(F.col('DueDate'), 
+                        lambda col: F.datediff('yesterday', col), 
+                        lambda col: F.coalesce(col, F.lit(0))), 
+                })} 
+            
+            y_df = (base_df
+                .fillna(0, subset=rec_types)
+                .with_column_plus(open_cols))
+            
+            x1_df = (y_df
+                .filter('is_current')
+                .with_column_plus(group_cols['current']))
+            
+            x2_df = (y_df
+                .filter(F.col('is_oldest'))
+                .with_column_plus(group_cols['oldest']))
+
+            x_df = (x1_df
+                .join(x2_df, on=id_cols, how='outer')
+                .select(*id_cols, 
+                    *group_cols['current'].keys(), 
+                    *group_cols['oldest' ].keys()))
+
+        elif which == 'open-items-long': 
+            id_cols   = ['ContractID', 'epic_date', 'ID']
+            
+            w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
+            
+            single_cols = OrderedDict({
+                'ID'        : F.col('ContractID'),
+                'cleared'   : f_toolz.pipe( F.col('ReceivableDescription'), 
+                    lambda col : F.regexp_extract(col, r"Cleared: ([\d\.]+)", 1),
+                    lambda col : col.cast(T.DecimalType(20, 2)),
+                    lambda col : F.coalesce(col, F.lit(0))), 
+                'uncleared'  : F.col('Amount') - F.col('cleared'), 
+                '_max_date'  : F.max('DueDate').over(w_duedate),
+                'yesterday'  : F.current_date() - 1, 
+                'is_default' : F.col('StatusCategory').isin(['2','3']),
+                'min_default': F.when(F.col('is_default'), F.col('DueDate')).otherwise(F.col('_max_date'))
+            })
+            
+            uncleared_if = lambda cond: F.sum(F.when(cond, F.col('uncleared')).otherwise(0))
+
+            group_cols = {
+                'default_uncleared' : uncleared_if(F.col('is_default')), 
+                'default_interest'  : uncleared_if(F.col('ReceivableType').isin(['991100', '511100'])), 
+                'default_iva'       : uncleared_if(F.col('ReceivableType') == '990004'), 
+            }
+                
+            x_df = (base_df
+                .with_column_plus(single_cols)
+                .filter(F.col('is_default'))
+                .groupBy(*id_cols)
+                .agg(*[vv.alias(kk) for kk, vv in group_cols.items()]))
+            
+        elif which == 'person-set':
+            states_str = [
+                "AGU,1",  "BCN,2",  "BCS,3",  "CAM,4",  "COA,5",  "COL,6",  "CHH,8",  "CHP,7", 
+                "CMX,9",  "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
+                "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
+                "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
+
+            states_data = [ {'AddressRegion': each_split[0], 'state_key': each_split[1]} 
+                for each_split in map(lambda x: x.split(','), states_str)]
+
+            states_df = self.spark.createDataFrame(states_data)
+            
+            persons_cols = {    
+                'LastNameP' : F.col('LastName'),
+                'LastNameM' : F.col('LastName2'), 
+                'full_name' : F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
+                'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID'), 
+                'yesterday' : F.date_add(F.current_date(), -1)}
+
+            x_df = (base_df
+                .filter(F.col('ID').isNotNull())
+                .join(states_df, how='left', on='AddressRegion')
+                .with_column_plus(persons_cols))
+
+        elif which == 'txns-grp': 
+            pymt_codes = [550021, 550022, 550023, 550024, 550403, 550908]
+
+            by_older = W.partitionBy('AccountID', 'is_payment').orderBy(F.col('ValueDate'))
+            by_newer = W.partitionBy('AccountID', 'is_payment').orderBy(F.col('ValueDate').desc())
+            
+            txn_cols = OrderedDict({
+                'is_payment': F.col('TransactionTypeCode').isin(pymt_codes),
+                'is_oldest' : F.row_number().over(by_older) == 1,
+                'is_newest' : F.row_number().over(by_newer) == 1})
+
+            map_cols = {
+                'oldest': {
+                    'AccountID': 'account_id', 
+                    'ValueDate': 'first_date'}, 
+                'newest': {
+                    'AccountID': 'account_id', 
+                    'ValueDate': 'last_date',
+                    'Amount'   : 'last_amount', 
+                    'AmountAc' : 'last_amount_local'} }
+
+            y_df = (base_df
+                .with_column_plus(txn_cols)
+                .filter(F.col('is_payment')))
+
+            x1_df = (y_df
+                .filter(F.col('is_newest'))
+                .with_column_renamed_plus(map_cols['newest']))
+            
+            x2_df = (y_df
+                .filter(F.col('is_oldest'))
+                .with_column_renamed_plus(map_cols['oldest']))  
+
+            x_df = (x1_df
+                .join(x2_df, on='account_id', how='inner')
+                .withColumnRenamed('account_id', 'AccountID'))
+
+        elif which == 'txns-set': 
+            txn_codes = [92703,  92800, 500027, 550021, 550022, 550023, 
+                550024, 550403, 550908, 650404, 650710, 650712, 650713, 
+                650716, 650717, 650718, 650719, 650720, 750001, 750025, 
+                850003, 850004, 850005, 850006, 850007, 958800]
+            
+            with_rename = {
+                'yesterday'         : F.current_date() - 1, 
+                'TransactionTypeTxt': F.col('TransactionTypeName') , 
+                'TransactionType'   : F.col('TransactionTypeCode'),  
+                'ContractID'        : F.col('AccountID')}
+                
+            x_df = (base_df
+                .with_column_plus(with_rename)
+                .filter_plus(
+                    F.col('TransactionTypeCode').isin(txn_codes), 
+                    F.col('ValueDate') == F.col('yesterday')))
+
+        else:  
+            raise Exception(f"WHICH (source) is not specified")
+        
+        return x_df
+
+
+    def fxw_converter(self, specs_df:pd_DF): 
+        '''
+        Input : SPECS_DF: [name; PyType, c_format, s_format]
+        Output: [FILL_NA, CAST_TYPES, DATE_COLS, FXW] 
+        ### Dates are cast before NAs, but the rest after. 
+        '''
+        
+        @F.pandas_udf('string')
+        def latinize(srs: pd.Series) -> pd.Series:
+            lat_srs = (srs.str
+                .normalize('NFKD').str
+                .encode('ascii', errors='ignore').str
+                .decode('utf-8'))
+            return lat_srs 
+
+        str_λs = {
+            'str' : lambda nn, cc: F.format_string(cc, F.col(nn)), 
+            'dbl' : lambda nn, cc: F.regexp_replace(F.format_string(cc, F.col(nn)), '[\.,]', ''), 
+            'int' : lambda nn, cc: F.format_string(str(cc), nn), 
+            'date': lambda nn, cc: F.when(F.col(nn) == self.na_types['date'], F.lit('00000000')
+                    ).otherwise(F.date_format(nn, 'MMddyyyy')) }
+
+        def row_formatter(name, a_row): 
+            py_type = a_row['PyType']
+            fmt_1 = str_λs[py_type](name, a_row['c_format'])
+            fmt_2 = F.format_string(a_row['s_format'], latinize(fmt_1))
+            return fmt_2
+
+        fill_0 = { 
+            0 : specs_df.index[specs_df['PyType'].isin(['int', 'dbl'])].tolist(), 
+            '': specs_df.index[specs_df['PyType'] == 'str' ].tolist(), 
+            date(1900, 1, 1): specs_df.index[specs_df['PyType'] == 'date'].tolist()}
+        
+        cast_1 = [F.col(nn).cast(self.spk_types[py_type]()) 
+            for nn, py_type in specs_df['PyType'].items()]
+        
+        strg_2 = [row_formatter(nn, rr).alias(nn) 
+            for nn, rr in specs_df.iterrows()]
+
+        return {'0-fill': fill_0, '1-cast': cast_1, '2-string': strg_2}
+            
+
+    def specs_setup_0(self, path):
+        # ['nombre', 'Longitud', 'Width', 'PyType', 'columna_valor'] 
+        
+        specs_0 = (pd.read_feather(path)
+            .set_index('nombre'))
+        
+        specs_df = specs_0.assign(
+            width       = specs_0['Longitud'].astype(float).astype(int), 
+            width_1     = lambda df: df['width'].where(df['PyType'] != 'dbl', df['width'] + 1),
+            precision_1 = specs_0['Longitud'].str.split('.').str[1], 
+            precision   = lambda df: np.where(df['PyType'] == 'dbl', 
+                                    df['precision_1'], df['width']), 
+            is_na = ( specs_0['columna_valor'].isnull() 
+                    | specs_0['columna_valor'].isna() 
+                    |(specs_0['columna_valor'] == 'N/A').isin([True])),
+            x_format = lambda df: [
+                self.c_formats[rr['PyType']].format(rr['width_1'], rr['precision']) 
+                for _, rr in df.iterrows()], 
+            y_format = lambda df: df['x_format'].str.replace(r'\.\d*', '', regex=True),
+            c_format = lambda df: df['y_format'].where(df['PyType'] == 'int', df['x_format']), 
+            s_format = lambda df: ["%{}.{}s".format(wth, wth) for wth in df['width']])
+
+        return specs_df
+
+
+    def specs_reader_1(self, specs_df: pd_DF, tables_dict) -> dict: 
+        # SPECS_DF: ['tabla', 'is_na']
+        readers  = defaultdict(list)
+        missing  = defaultdict(set)
+        fix_vals = []
+        
+        for name, rr in specs_df.iterrows(): 
+            # Reading and Missing
+            r_type = rr['PyType']
+            if rr['tabla'] in tables_dict: 
+                if rr['columna_valor'] in tables_dict[rr['tabla']].columns: 
+                    call_as = F.col(rr['columna_valor']).alias(name)
+
+                    readers[rr['tabla']].append(call_as)
+                else: 
+                    # Fixing missing columns as NA. 
+                    missing[rr['tabla']].add(rr['columna_valor'])
+                    r_value = self.na_types[r_type]
+                    r_col = F.lit(r_value).cast(self.spk_types[r_type]()).alias(name)
+                    
+                    fix_vals.append(r_col)
+            else: 
+                if rr['is_na']: 
+                    r_value = self.na_types[r_type]
+                else: 
+                    r_value = rr['columna_valor']
+                fix_vals.append(F.lit(r_value).cast(self.spk_types[r_type]()).alias(name))
+
+        result_specs = {
+            'readers' : dict(readers), 
+            'missing' : {k: list(v) for k, v in missing.items()}, 
+            'fix_vals': fix_vals}
+        return result_specs
+
+
+    def master_join_2(self, spec_joins, specs_dict, tables_dict): 
+        readers = specs_dict['readers']
+    
+        joiner = iter(spec_joins)
+        key_0  = next(joiner)
+        
+        main_tbl = (tables_dict[key_0]
+            .select(*readers[key_0], *spec_joins[key_0]))
+        n_key = next(joiner, None)
+        while n_key is not None: 
+            next_tbl = (tables_dict[n_key]
+                .select(*readers[n_key], *spec_joins[n_key]))
+            main_tbl = main_tbl.join(next_tbl, how='left', 
+                on=[column_name(col) for col in spec_joins[n_key]])
+            n_key = next(joiner, None)
+        
+        master_tbl = main_tbl.select('*', *specs_dict['fix_vals'])
+        return master_tbl
+
+
+    def save_task_3(self, task, gold_path, gold_table): 
+        now_time = dt.now(tz=timezone('America/Mexico_City'))
+        now_hm = now_time.strftime('%Y-%m-%d_%H%M')
+        now_00 = now_time.strftime('%Y-%m-%d_00')
+        
+        cyber_key, cyber_name = self.reports[task]
+        report_dir     = f"{gold_path}/{cyber_name}/_spark/{now_00}"
+        report_recent  = f"{gold_path}/recent/{cyber_key}.txt"
+        report_history = f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.txt"
+        
+        print(f"{now_hm}_{cyber_key}_{task}.txt")
+        gold_table.save_as_file(report_dir, report_recent,  header=False)
+        gold_table.save_as_file(report_dir, report_history, header=True)
+        return 
+
+
+
+def pd_print(a_df: pd.DataFrame, **kwargs):
+    the_options = {
+        'max_rows'   : None, 
+        'max_columns': None, 
+        'width'      : 180}
+    the_options.update(kwargs)
+    optns_ls = sum(([f"display.{kk}", vv] 
+        for kk, vv in the_options.items()), start=[])
+    with pd.option_context(*optns_ls):
+        print(a_df)
+    return
+
