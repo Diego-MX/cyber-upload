@@ -2,13 +2,14 @@
 # CDMX, 4 de noviembre de 2021
 
 from datetime import datetime as dt, timedelta as delta, date
+from delta.tables import DeltaTable as Δ
 from httpx import (AsyncClient, Auth as AuthX, BasicAuth as BasicAuthX, post as postx)
 from itertools import product
 from json import dumps
 import pandas as pd
+from pyspark.sql import (functions as F)
 import re
-from requests import Session, auth, post, get
-from typing import Union
+from requests import Session, auth, post
 from urllib.parse import unquote
 import xmltodict
 
@@ -16,10 +17,6 @@ from src.utilities import tools
 from src.platform_resources import AzureResourcer
 from config import CORE_KEYS, PAGE_MAX
 
-try: 
-    from delta.tables import DeltaTable
-except ImportError: 
-    DeltaTable = None
 
     
 def str_error(an_error): 
@@ -441,22 +438,23 @@ def create_delta(spark, data_df: pd.DataFrame, df_location: str, tbl_name: str):
 def update_dataframe(spark, new_df: pd.DataFrame, df_location: str, id_column: str, dev=False): 
     new_data = spark.createDataFrame(new_df)
     
-    prev_data = DeltaTable.forPath(spark, df_location)
+    prev_data = Δ.forPath(spark, df_location)
     tbl_cols = {a_col: f'new.{a_col}' for a_col in new_data.columns}
     
     if not dev: 
         (prev_data.alias('prev')
-            .merge(source=new_data.alias('new'), condition=f"prev.{id_column} = new.{id_column}")
+            .merge(source=new_data.alias('new'), 
+                condition=f"prev.{id_column} = new.{id_column}")
             .whenMatchedUpdate(set=tbl_cols)
             .whenNotMatchedInsert(values=tbl_cols)
             .execute())
     else: 
         tbl_cols = {a_col: F.coalesce(f'new.{a_col}', f'prev.{a_col}')
                 for a_col in new_data.columns}
-        tbl_values = {a_col: f'new.{a_col}' for a_col in new_data.columns}
         
         (prev_data.alias('prev')
-            .merge(source=new_data.alias('new'), condition=f"prev.{id_column} = new.{id_column}")
+            .merge(source=new_data.alias('new'), 
+                condition=f"prev.{id_column} = new.{id_column}")
             .whenMatchedUpdate(set=tbl_cols)
             .whenNotMatchedInsert(values=tbl_cols)
             .execute())

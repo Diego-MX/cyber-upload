@@ -1,20 +1,10 @@
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
+from dotenv import load_dotenv        
 from os import environ, getcwd, getenv
 from pathlib import Path
 import re
 
-from azure.identity import ClientSecretCredential
-from azure.identity._credentials.default import DefaultAzureCredential
 from src.utilities import tools 
-
-try: 
-    from pyspark.dbutils import DBUtils
-except ImportError: 
-    DBUtils = None
-try:                                                                                 
-    from dotenv import load_dotenv        
-    load_dotenv(override=True)    
-except: 
-    load_dotenv = None
 
 
 SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
@@ -431,7 +421,7 @@ class ConfigEnviron():
         elif self.server == 'dbks': 
             if self.spark is None: 
                 raise("Please provide a spark context on ConfigEnviron init.")
-            dbutils = DBUtils(self.spark)
+            dbutils = tools.get_dbutils(self.spark) 
             
             def get_secret(a_key): 
                 mod_key = re.sub('_', '-', a_key.lower())

@@ -1,34 +1,19 @@
 from base64 import b64encode
+from delta.tables import DeltaTable as Δ
 from functools import reduce
+from importlib import reload
 import json 
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 import pandas as pd
 from pathlib import WindowsPath
+from pyspark.sql import (functions as F, 
+    Column, SparkSession, DataFrame as spk_DF)
 import re
 import sys 
 from typing import Union
 
-from pyspark.sql import Column
 
-
-#%% Optional packages. 
-try: 
-    from importlib import reload
-except ImportError:
-    reload = None
-try: 
-    from openpyxl import load_workbook
-    from openpyxl.utils.exceptions import InvalidFileException
-except ImportError: 
-    load_workbook = InvalidFileException = None
-try:
-    from delta.tables import DeltaTable as Δ
-except ImportError:
-    Δ = None
-try: 
-    from pyspark.sql import (functions as F, types as T, Window as W, 
-        Row, DataFrame as spk_DF) 
-except ImportError:
-    F = T = Row = W = spk_DF = None
 
     
 #%% Define tools functions. 
@@ -289,3 +274,11 @@ def pd_print(a_df: pd.DataFrame, **kwargs):
     return
 
         
+
+def get_dbutils(spark:SparkSession=None):
+    try: 
+        from pyspark.dbutils import DBUtils
+        dbutils = DBUtils(spark)
+    except ModuleNotFoundError:
+        dbutils = None
+    return dbutils 

@@ -4,8 +4,7 @@ from pytz import timezone
 
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
-from config import (ConfigEnviron, 
-    ENV, SERVER, SITE)
+from config import (ConfigEnviron, ENV, SERVER, SITE)
 
 #%% Preparación
 

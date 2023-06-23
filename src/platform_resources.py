@@ -29,10 +29,10 @@ class AzureResourcer():
     def set_vault(self):
         vault_url = self.config['key-vault']['url']
         the_creds = self.env.credential
-        self.vault = SecretClient(vault_url=vault_url, credential=the_creds)
-        
-        #to_secret_or_not = self.vault.list_properties_of_secrets()
-        #next(to_secret_or_not)
+        the_vault =  SecretClient(vault_url=vault_url, credential=the_creds)
+        to_secret_or_not = the_vault.list_properties_of_secrets()
+        next(to_secret_or_not)
+        self.vault = the_vault
         
     
     def get_storage(self, account=None): 
@@ -40,7 +40,7 @@ class AzureResourcer():
             return self.config['storage']['name']
     
     
-    def set_dbks_permissions(self, blob_key):
+    def set_dbks_permissions(self, blob_key=None, gen_value='gen2'):
         # Assume account corresponding to BLOB_KEY is GEN2.  
         # and permissions are unlocked directly via CONFIG.SETUP_KEYS
         
