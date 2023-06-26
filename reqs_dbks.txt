@@ -1,0 +1,23 @@
+# DO NOT include azure-functions-worker in this file
+# The Python Worker is managed by Azure Functions platform
+# Manually managing azure-functions-worker may cause unexpected issues
+
+
+# Utilities
+azure-identity
+azure-keyvault-secrets
+azure-storage-blob
+deepdiff
+toolz
+
+authlib
+python-dotenv
+
+# Data 
+pandas
+openpyxl
+
+# Web
+requests
+httpx
+jsonschema

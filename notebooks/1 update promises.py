@@ -1,12 +1,12 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC ## Description
-# MAGIC 
+# MAGIC
 # MAGIC The Databricks table `bronze.crm_payment_promises` is updated every hour via this script.   
 # MAGIC We require access to:  
 # MAGIC - Keyvault `kv-resource-access-dbks` via Databricks scope of the same name.
 # MAGIC - This in turn yields keys towards a Service Principal, which in turn gives acces to other secrets. 
-# MAGIC 
+# MAGIC
 # MAGIC The corresponding key names are found in `config.py`.
 
 # COMMAND ----------
@@ -24,13 +24,6 @@ from datetime import datetime as dt
 import json
 from pyspark.sql import functions as F, types as T
 import re
-
-# COMMAND ----------
-
-from importlib import reload
-from src import crm_platform; reload(crm_platform)
-
-# COMMAND ----------
 
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
@@ -52,11 +45,9 @@ tbl_items = DBKS_TABLES[ENV]['items']
 # COMMAND ----------
 
 def unnest(c, s):
-    if c == '':
-        return None
-    else:
-        c = json.loads(c)
-        return c[s]
+    unn = ( None if c == '' 
+            else json.loads(c)[s])
+    return unn
 
 udf_unnest = F.udf(unnest, T.IntegerType())
 
@@ -86,8 +77,8 @@ udf_date_format = F.udf(date_format, T.StringType())
 # COMMAND ----------
 
 promises_meta = tbl_items['brz_promises']
-promises_tbl = (promises_meta[2] 
-    if len(promises_meta) > 2 else promises_meta[0])
+promises_tbl = (promises_meta[2] if len(promises_meta) > 2 
+        else promises_meta[0])
 
 promises_df = (zendesker
     .get_promises()
@@ -96,9 +87,8 @@ promises_df = (zendesker
 promises_spk = spark.createDataFrame(promises_df)
 
 (promises_spk.write.mode('overwrite')
-        .format('delta')
-        .save(f"{abfss_brz}/promises"))
-
+    .format('delta')
+    .save(f"{abfss_brz}/promises"))
 
 # COMMAND ----------
 
