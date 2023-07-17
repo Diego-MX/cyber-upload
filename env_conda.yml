@@ -22,3 +22,4 @@ dependencies:
   - pyodbc=4.0.34
   #- pyreadline=2.1  Development:
   - toolz=0.12.0
+  - pyyaml=6.0
