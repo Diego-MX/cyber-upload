@@ -193,6 +193,7 @@ display(loan_contract)
 
 # COMMAND ----------
 
+from epic_py.delta import EpicDF
 # Person Set
 states_str = [
       "AGU,1",  "BCN,2",  "BCS,3",  "CAM,4",  "COA,5",  "COL,6",  "CHH,8",  "CHP,7", 
@@ -213,10 +214,10 @@ persons_cols = OrderedDict({
     'full_name' : F.regexp_replace(F.col('full_name1'), ' +', ' '), 
     'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID', 'AddressRoomID')})
 
-persons_0 = (spark.read.table("din_clients.brz_ops_persons_set")
-    .join(states_df, how='left', on='AddressRegion'))
-
-persons = with_columns(persons_0, persons_cols)
+persons = (EpicDF(
+        spark.read.table("din_clients.brz_ops_persons_set"))
+    .join(states_df, how='left', on='AddressRegion')
+    .with_column_plus(person_cols))
 
 display(persons)
 

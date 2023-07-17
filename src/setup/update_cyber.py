@@ -2,18 +2,22 @@ from datetime import datetime as dt
 import numpy as np
 from pytz import timezone
 
+from epic_py.tools import read_excel_table
+
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
 from config import (ConfigEnviron, ENV, SERVER, SITE)
+
+
 
 #%% Preparación
 
 cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
-expect_specs = (tools.read_excel_table(cyber_fields, 'general', 'especificacion')
+expect_specs = (read_excel_table(cyber_fields, 'general', 'especificacion')
     .set_index('columna'))
 
-data_types = tools.read_excel_table(cyber_fields, 'general', 'tipo_datos')
+data_types = read_excel_table(cyber_fields, 'general', 'tipo_datos')
 
 
 def excelref_to_feather(xls_df): 
@@ -75,8 +79,8 @@ if __name__ == '__main__':
         blob_3  = f"{blobs_paths}/{each_task}_joins_latest.csv" 
         blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.csv" 
     
-        spec_ref = tools.read_excel_table(cyber_fields, each_task)
-        has_join = tools.read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
+        spec_ref = read_excel_table(cyber_fields, each_task)
+        has_join = read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
         (execs, checks) = excelref_to_feather(spec_ref)
         execs.to_feather(spec_local)
         

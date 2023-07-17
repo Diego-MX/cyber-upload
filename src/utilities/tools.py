@@ -3,7 +3,7 @@ from pyspark.sql import SparkSession
 from typing import Union
 
    
-from epic_py.tools import (MatchCase, read_excel_table, str_plus, dict_plus)
+from epic_py.tools import (str_plus, dict_plus)
 
 encode64 = lambda a_str: str_plus(a_str).encode64()
 

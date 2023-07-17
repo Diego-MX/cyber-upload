@@ -8,54 +8,80 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../reqs_dbks.txt
+# MAGIC %pip install -q -r ../reqs_dbks.txt
+
+# COMMAND ----------
+
+from pathlib import Path
+from pyspark.sql import SparkSession
+from pyspark.dbutils import DBUtils
+import subprocess
+import yaml
+
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego'}
+
+with open("../user_databricks.yml", 'r') as _f: 
+    u_dbks = yaml.safe_load(_f)
+
+
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
+epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
+url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
+subprocess.check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
 from collections import defaultdict, OrderedDict
 from datetime import datetime as dt, date, timedelta as delta
 from json import dumps
-
 import numpy as np
 from os import makedirs, path, environ
 import pandas as pd
 from pandas import DataFrame as pd_DF
 from pathlib import Path
 from pyspark.sql import (functions as F, types as T, 
-    Window as W, Column, DataFrame as spk_DF)
+    Window as W, Column, DataFrame as spk_DF, SparkSession)
 from pytz import timezone
 import re
+import subprocess
 from toolz.functoolz import reduce
 from typing import Union
+
+
 
 # COMMAND ----------
 
 from importlib import reload
-from src.utilities import tools; reload(tools)
-
 import epic_py; reload(epic_py)
-from src import data_managers as epic_data; reload(epic_data)
+import src; reload(src)
+import config; reload(config)
+
+from src import data_managers as epic_data
+from src.data_managers import EpicDF, CyberData
+from src.platform_resources import AzureResourcer
+from src.utilities import tools
+
+from config import (app_agent, app_resources,
+    ConfigEnviron, ENV, SERVER, DBKS_TABLES)
+
 
 
 # COMMAND ----------
 
-from src.utilities import tools
-from src.platform_resources import AzureResourcer
-from src import data_managers as epic_data
-from src.data_managers import EpicDF, CyberData
 
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
-
-
-tables      = DBKS_TABLES[ENV]['items']
+tables = DBKS_TABLES[ENV]['items']
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
 
 at_storage = az_manager.get_storage()
 az_manager.set_dbks_permissions(at_storage)
 
-brz_path   = f"abfss://bronze@{at_storage}.dfs.core.windows.net/ops/core-banking/" 
-gold_path  = f"abfss://gold@{at_storage}.dfs.core.windows.net/cx/collections/cyber"
+brz_path   = app_resources.get_resource_url('abfss', 'storage', container='bronze', blob_path='ops/core-banking')  
+gold_path  = app_resources.get_resource_url('abfss', 'storage', container='gold', blob_path='cx/collections/cyber') 
 specs_path = "cx/collections/cyber/spec_files"
 tmp_downer = "/dbfs/FileStore/cyber/specs"
 
@@ -88,11 +114,6 @@ def dumps2(an_obj, **kwargs):
 
 # COMMAND ----------
 
-the_loans = EpicDF(spark, f"{brz_path}/loan-contract/data")
-the_loans.display()
-
-# COMMAND ----------
-
 # Revisar especificación en ~/refs/catalogs/cyber_txns.xlsx
 # O en User Story, o en Correos enviados.  
 
@@ -107,7 +128,7 @@ open_items_wide = cyber_central.prepare_source('open-items-wide',
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
-    open_items = open_items_wide)
+    open_items=open_items_wide)
 
 persons = cyber_central.prepare_source('person-set', 
     path=f"{brz_path}/person-set/chains/person")
@@ -117,6 +138,12 @@ the_txns = cyber_central.prepare_source('txns-set',
 
 txn_pmts = cyber_central.prepare_source('txns-grp', 
     path=f"{brz_path}/transaction-set/data")
+
+# COMMAND ----------
+
+from epic_py.delta import EpicDF 
+
+txns = EpicDF(spark, f"{brz_path}/transaction-set/data").display()
 
 # COMMAND ----------
 
@@ -135,7 +162,6 @@ tables_dict = {
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns}
-
 
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items(): 
@@ -208,7 +234,9 @@ def read_cyber_specs(task_key: str):
 
 # COMMAND ----------
 
+import re
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
+re_col = r"Column<'CAST\((.*) AS [A-Z]*\)'>"
 
 the_tables   = {}
 missing_cols = {}
@@ -220,14 +248,32 @@ for task in cyber_tasks:
     missing_cols[task] = specs_dict['missing']
     
     fxd_widther = cyber_central.fxw_converter(specs_df)
+    filler = fxd_widther['0-fill']
+    caster_1 = {str(col): col for col in fxd_widther['1-cast']}
+    caster = {re.match(re_col, c_key).group(1): val 
+            for c_key, val in caster_1.items()}
     
     gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-    gold_2 = gold_3.as_fixed_width(fxd_widther)
+    
+    gold_2 = (gold_3
+        .fillna(0, filler[0])
+        .fillna('', filler[''])
+        .with_column_plus(caster)
+        .fill_na_plus({date(1900, 1, 1): filler[date(1900, 1, 1)]})
+        .select(*fxd_widther['2-string']))
     
     one_select = F.concat(*gold_2.columns).alias('|'.join(gold_2.columns))
     gold_1 = gold_2.select(one_select)
     the_tables[task] = gold_1
     cyber_central.save_task_3(task, gold_path, gold_1)
     print(f"\tRows: {gold_1.count()}")
-    
+     
 print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
+
+# COMMAND ----------
+
+the_tables['sap_estatus'].display()
+
+# COMMAND ----------
+
+

@@ -7,7 +7,7 @@ from httpx import (AsyncClient, Auth as AuthX, BasicAuth as BasicAuthX, post as 
 from itertools import product
 from json import dumps
 import pandas as pd
-from pyspark.sql import (functions as F)
+from pyspark.sql import functions as F
 import re
 from requests import Session, auth, post
 from urllib.parse import unquote
@@ -16,7 +16,6 @@ import xmltodict
 from src.utilities import tools
 from src.platform_resources import AzureResourcer
 from config import CORE_KEYS, PAGE_MAX
-
 
     
 def str_error(an_error): 

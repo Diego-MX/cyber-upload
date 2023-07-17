@@ -1,17 +1,8 @@
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
+from datetime import date
 from os import environ, getcwd, getenv
 from pathlib import Path
 import re
-
-from epic_py.identity import EpicIdentity
-from src.utilities import tools 
-
-
-SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
-ENV      = tools.dict_get2(environ, ['ENV_TYPE', 'ENV', 'nan-env'])
-SERVER   = environ.get('SERVER_TYPE', 'wap') 
-CORE_ENV = environ.get('CORE_ENV')
-CRM_ENV  = environ.get('CRM_ENV')
 
 PAGE_MAX = 1000
 
@@ -29,24 +20,99 @@ SETUP_2 = {
             'client_secret'   : 'sp-core-events-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-core-events-suscription' } , 
-        'databricks-scope': {'scope': 'eh-core-banking'}
-    }, 
+        'databricks-scope': 'eh-core-banking'}, 
     'stg' : {
         'service-principal' : {
             'client_id'       : 'sp-collections-client', 
             'client_secret'   : 'sp-collections-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
-        'databricks-scope': {'scope': 'cx-collections'}
-    },
+        'databricks-scope': 'cx-collections'},
     'prd' : {
         'service-principal' : {
             'client_id'       : 'sp-collections-client', 
             'client_secret'   : 'sp-collections-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
-        'databricks-scope': {'scope': 'cx-collections'}
-}}, 
+        'databricks-scope': 'cx-collections'}
+}
+
+PLATFORM_2 = {
+    'dev': {        
+        'keyvault': 'kv-collections-data-dev',
+        'storage' : 'lakehylia'},
+    'qas': {        
+        'keyvault': 'kv-cx-data-qas',
+        'storage' : 'stlakehyliaqas'},
+    'stg': {        
+        'keyvault': 'kv-cx-adm-stg',
+        'storage' : 'stlakehyliastg'},
+    'prd': {        
+        'keyvault': 'kv-cx-data-prd',
+        'storage' : 'stlakehyliaprd'}, 
+}
+
+CORE_2 = {
+    'dev-sap': {
+        'main': {
+            'url': "https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b",
+            'access': {
+                'username': 'core-api-key', 
+                'password': 'core-api-secret'}}, 
+        'auth': {
+            'url': "https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token", 
+            'data': {
+                'grant_type': 'password', 
+                'username'  : 'core-api-user', 
+                'password'  : 'core-api-password'}}}, 
+    'qas-sap': {
+        'main': {
+            'url': "https://apiqas.apimanagement.us21.hana.ondemand.com/s4b",
+            'access': {
+                'username': 'core-api-key', 
+                'password': 'core-api-secret'}}, 
+        'auth': {
+            'url': "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
+            'data': {
+                'grant_type': 'password', 
+                'username'  : 'core-api-user', 
+                'password'  : 'core-api-password'}}}, 
+    'prd-sap': {
+        'main': {
+            'url': "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b",
+            'access': {
+                'username': 'core-api-key', 
+                'password': 'core-api-secret'}}, 
+        'auth': {
+            'url': "https://apiprd.apimanagement.us21.hana.ondemand.com/oauth2/token", 
+            'data': {
+                'grant_type': 'password', 
+                'username'  : 'core-api-user', 
+                'password'  : 'core-api-password'}}}
+}
+
+CRM_2 = {
+    'sandbox-zd' : {
+        'main' : {
+            'url'  : "https://bineo1633010523.zendesk.com/api",
+            'username' : 'crm-api-user',   # ZNDK_USER_EMAIL
+            'password' : 'crm-api-token'},   # ZNDK_API_TOKEN
+        'zis' : {     # Zendesk Integration Services. 
+            'id'      : 'crm-zis-id', 
+            'username': 'crm-zis-user', 
+            'password': 'crm-zis-pass'}, 
+    },
+    'prod-zd' : {
+        'main' : {
+            'url'  : "https://bineo.zendesk.com/api",
+            'username' : 'crm-api-user',    # ZNDK_USER_EMAIL
+            'password' : 'crm-api-token'},  # ZNDK_API_TOKEN
+        'zis' : {
+            'id'      : 'crm-zis-id', 
+            'username': 'crm-zis-user', 
+            'password': 'crm-zis-pass'}
+    }
+}
 
 
 SETUP_KEYS = {
@@ -83,23 +149,6 @@ SETUP_KEYS = {
     }
 } 
 
-PLATFORM_2 = {
-    'dev': {        
-        'key-vault' : 'kv-collections-data-dev',
-        'storage'   : 'lakehylia',
-        'app-id'    : 'cx-collections-id'},
-    'qas': {        
-        'key-vault' : 'kv-cx-data-qas',
-        'storage'   : 'stlakehyliaqas'},
-    'stg': {        
-        'key-vault' : 'kv-cx-adm-stg',
-        'storage'   : 'stlakehyliastg'},
-    'prd': {        
-        'key-vault' : 'kv-cx-data-prd',
-        'storage'   : 'stlakehyliaprd'}, 
-}
-
-
 PLATFORM_KEYS = {
     'dev': {        
         'key-vault' : {
@@ -131,7 +180,6 @@ PLATFORM_KEYS = {
             'name'  : 'stlakehyliaprd', 
             'url'   : 'https://stlakehyliaprd.blob.core.windows.net/'} }
 }
-
 
 CORE_KEYS = {
     'default': {
@@ -237,7 +285,6 @@ CORE_KEYS = {
     }
 } 
 
-
 CRM_KEYS = {
     'sandbox-zd' : {
         'main' : {
@@ -248,8 +295,8 @@ CRM_KEYS = {
             'id'      : (1, 'crm-zis-id'), 
             'username': (1, 'crm-zis-user'), 
             'password': (1, 'crm-zis-pass')}, 
-     },
-     'prod-zd' : {
+    },
+    'prod-zd' : {
         'main' : {
             'url'  : "https://bineo.zendesk.com/api",
             'username' : (1, 'crm-api-user'),    # ZNDK_USER_EMAIL
@@ -258,9 +305,8 @@ CRM_KEYS = {
             'id'      : (1, 'crm-zis-id'), 
             'username': (1, 'crm-zis-user'), 
             'password': (1, 'crm-zis-pass')}
-     }
+    }
 }
-
 
 DBKS_KEYS = {
     'dev': {
@@ -332,10 +378,8 @@ DBKS_KEYS = {
                 'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
             'contracts'   : "bronze.loan_contracts", 
-            'collections' : "gold.loan_contracts"}   }, 
-    
+            'collections' : "gold.loan_contracts"}   },     
 } 
-
 
 DBKS_TABLES = {          
     'dev': {
@@ -479,10 +523,6 @@ DBKS_TABLES = {
 
 ## Technical objects used accross the project. 
 
-app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
-app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
-
-
 
 class ConfigEnviron():
     '''
@@ -542,3 +582,38 @@ class ConfigEnviron():
         elif self.server in ['wap']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
+
+
+from epic_py.platform import EpicIdentity
+from src.utilities import tools 
+
+
+
+SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
+ENV      = tools.dict_get2(environ, 'ENV_TYPE', 'ENV', 'nan-env')
+SERVER   = environ.get('SERVER_TYPE', 'wap') 
+CORE_ENV = environ.get('CORE_ENV')
+CRM_ENV  = environ.get('CRM_ENV')
+
+
+app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
+app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
+
+
+
+cyber_types = {
+    'int' : {
+        'NA': 0,
+        'c_format': '%0{}d',}, 
+    'dbl' : {
+        'NA': 0, 
+        'c_format': '%0{}.{}f'},
+    'str' : {
+        'NA': '',
+        'c_format': '%-{}.{}s'},
+    'date': {
+        'NA': date(1900, 1, 1), 
+        'c_format': '%8.8d'} 
+}
+ 
+ 

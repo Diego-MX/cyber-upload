@@ -101,7 +101,4 @@ class AzureResourcer():
             b_data.readinto(_b)
     
 
-        
-        
-
-
+    

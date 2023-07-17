@@ -3,6 +3,8 @@
 
 import pandas as pd
 
+from epic_py.tools import read_excel_table
+
 from src.utilities import tools
 from src.lake_connector import LakehouseConnect
 from config import (ConfigEnviron, SITE, ENV, SERVER)
@@ -23,7 +25,7 @@ metas_0 = ['nombre', 'gold_name', 'dtipo', 'filtro',
 metas_1 = ['nombre', 'filtro', 'comunicaciones', 'database', 'dtipo', 
     'comparador', '_middlename']
 
-msg_attrs_0 = (tools.read_excel_table(xls_def, 'columnas', 'mensajes_cols')
+msg_attrs_0 = (read_excel_table(xls_def, 'columnas', 'mensajes_cols')
     .loc[:, metas_0])
 
 tables_props = { # call:  (meta_database, table_name, _middlename)
@@ -36,7 +38,7 @@ tables_props = { # call:  (meta_database, table_name, _middlename)
 atributos_0 = ["nombre", "gold_name", "gold_aux", "dtipo", "filtro", 
     "comunicaciones", "comparador", "database", "en_gold", "en_gold2"]
 
-msg_cols_0  = (tools.read_excel_table(xls_def, "columnas", "mensajes_cols")
+msg_cols_0  = (read_excel_table(xls_def, "columnas", "mensajes_cols")
     .loc[:, atributos_0]
     .astype({'gold_aux': str}))
 
