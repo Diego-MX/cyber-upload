@@ -16,9 +16,15 @@
 
 # COMMAND ----------
 
-# MAGIC  %pip install -r ../reqs_dbks.txt
+# MAGIC   %pip install -q -r ../reqs_dbks.txt
 
 # COMMAND ----------
+
+from importlib import(reload)
+import epic_py; reload(epic_py)
+
+from src import platform_resources; reload(platform_resources)
+import config; reload(config)
 
 from datetime import datetime as dt
 import json
@@ -28,7 +34,12 @@ import re
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 from config import (ConfigEnviron, 
-    ENV, SERVER, CRM_ENV, DBKS_TABLES)
+    ENV, SERVER, CRM_ENV, DBKS_TABLES, 
+    app_agent, app_resources)
+
+a_storage = app_resources['storage']
+stg_permissions = app_agent.prep_dbks_permissions(a_storage, 'gen2')
+app_resources.set_dbks_permissions(stg_permissions)
 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
@@ -44,8 +55,27 @@ tbl_items = DBKS_TABLES[ENV]['items']
 
 # COMMAND ----------
 
+from inspect import getsource
+#print(getsource(app_agent.call_dict))
+from epic_py.tools import compose2
+from pydantic import SecretStr
+μ_secret = compose2(SecretStr, app_agent.get_secret)
+
+a_dict = app_agent['service-principal']
+print(a_dict.keys())
+
+kk = 'client_id'
+vv = a_dict[kk]
+ww = app_agent.get_secret(vv)
+xx = SecretStr(ww)
+
+from epic_py.tools import identity2
+identity2(vv)
+
+# COMMAND ----------
+
 def unnest(c, s):
-    unn = ( None if c == '' 
+    unn = (None if c == '' 
             else json.loads(c)[s])
     return unn
 
