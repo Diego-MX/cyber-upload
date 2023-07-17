@@ -36,22 +36,20 @@
 
 # COMMAND ----------
 
-import os, sys, pandas as pd
-#sys.path.append("/Workspace/Repos/diego.v@bineo.com/cx-collections")
-from pathlib import Path
-from datetime import datetime as dt
-from pyarrow import feather
-import pyspark.sql.types as T
-from itertools import product
-
-from requests import get as rq_get, post
-
-from azure.identity import ClientSecretCredential, DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
+from azure.identity import ClientSecretCredential
 from azure.keyvault.secrets import SecretClient
+from datetime import datetime as dt
+from itertools import product
+import pandas as pd
+import re
+from requests import get as rq_get, post
+from urllib.parse import unquote
+#sys.path.append("/Workspace/Repos/diego.v@bineo.com/cx-collections")
 
 # from src import core_banking as core
 from src.utilities import tools
+from src.core_banking import BearerAuth2  
+# antes src.utilities.tools.BearerAuth
 
 from config import SITE, ENV_KEYS, URLS
 
@@ -107,19 +105,7 @@ CRM_TOKEN = get_secret("crm-api-token")
 # MAGIC %md 
 # MAGIC #### Core Banking Functions
 
-# COMMAND ----------
 
-    attrs_indicator = "all"
-    the_token    = get_token("header")
-    
-    the_hdrs     = get_headers("apis", "headers")
-    select_attrs = attributes_from_column(attrs_indicator)
-    the_params   = { "$select" : ",".join(select_attrs) }
-
-    the_resp     = rq_get(f"{APIS_URL}/v1/lacovr/ContractSet", 
-        auth=tools.BearerAuth(the_token), headers=the_hdrs)
-
-    print(the_resp.text)
 
 # COMMAND ----------
 
@@ -172,7 +158,7 @@ def get_sap_loans(attrs_indicator=None):
     the_params   = { "$select" : ",".join(select_attrs) }
 
     the_resp     = rq_get(f"{APIS_URL}/v1/lacovr/ContractSet", 
-        auth=tools.BearerAuth(the_token), headers=the_hdrs, params=the_params)
+        auth=BearerAuth2(the_token), headers=the_hdrs, params=the_params)
 
     loans_ls     = the_resp.json()["d"]["results"]  # [metadata : [id, uri, type], borrowerName]
     post_loans   = [ tools.dict_minus(a_loan, ["__metadata"]) for a_loan in loans_ls ]
@@ -186,7 +172,7 @@ def get_person_set():
     the_hdrs     = get_headers("apis", "headers")
 
     the_resp     = rq_get(f"{APIS_URL}/v15/bp/PersonSet", 
-        auth=tools.BearerAuth(the_token), headers=the_hdrs)
+        auth=BearerAuth2(the_token), headers=the_hdrs)
 
     persons_ls     = the_resp.json()["d"]["results"]  # [metadata : [id, uri, type], borrowerName]
     dict_keys      = ["__metadata", "Roles", "TaxNumbers", "Relation", "Partner", "Correspondence"]
@@ -249,7 +235,7 @@ def get_sap_api(api_type, type_id=None):
     a_token  = get_token("header")
 
     the_resp = rq_get(f"{APIS_URL}/{api_call}", 
-            auth=tools.BearerAuth(a_token), headers=the_hdrs)
+            auth=BearerAuth2(a_token), headers=the_hdrs)
     
     d_resp_ls = the_resp.json()["d"]["results"]
     an_output = d_results(d_resp_ls, api_type)
@@ -289,7 +275,19 @@ def d_results(json_item, api_type):
     
     return result_df
 
+# COMMAND ----------
 
+attrs_indicator = "all"
+the_token    = get_token("header")
+
+the_hdrs     = get_headers("apis", "headers")
+select_attrs = attributes_from_column(attrs_indicator)
+the_params   = { "$select" : ",".join(select_attrs) }
+
+the_resp     = rq_get(f"{APIS_URL}/v1/lacovr/ContractSet", 
+    auth=BearerAuth2(the_token), headers=the_hdrs)
+
+print(the_resp.text)
 
 # COMMAND ----------
 

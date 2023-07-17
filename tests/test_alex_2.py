@@ -21,6 +21,7 @@ horarios = {
 now_time = dt.now(tz=tz("America/Mexico_City"))
 ids = horarios[now_time.hour]
 
+
 # Autenticación de la API de Zendesk
 username = 'username/token'
 password = 'password'

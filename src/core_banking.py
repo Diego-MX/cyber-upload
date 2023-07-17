@@ -330,9 +330,6 @@ class SAPSession(Session):  # REQUESTS.
 
         
 
-
-
-
 class SAPSessionAsync(AsyncClient):  # AsyncOAuth2Client
     def __init__(self, env, secret_env: AzureResourcer, **kwargs): 
         self.config     = CORE_KEYS[env]
@@ -424,7 +421,8 @@ class SAPAuthX(AuthX):
             a_request.headers['X-Authentication'] = self.token
             yield a_request
             
-    
+
+
 def create_delta(spark, data_df: pd.DataFrame, df_location: str, tbl_name: str): 
     create_clause =  f"CREATE TABLE {tbl_name} USING DELTA LOCATION \"{df_location}\""
     data_spk = spark.createDataFrame(data_df)
