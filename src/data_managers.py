@@ -10,7 +10,7 @@ from pytz import timezone
 from toolz import functoolz as f_toolz
 import re
 
-from epic_py.delta import EpicDF, column_name #, when_plus
+from epic_py.delta import EpicDF
 
 
 def when_plus(when_list:list) -> Column: 
@@ -83,7 +83,7 @@ class CyberData():
 
 
     def prepare_source(self, which, path, **kwargs): 
-        base_df   = EpicDF(self.spark, path)
+        base_df = EpicDF(self.spark, path)
         
         if   which == 'balances': 
             bal_rename = {a_col: re.sub('code_', 'x', a_col) 
