@@ -4,20 +4,15 @@
 
 
 # Utilities
+authlib
 azure-identity
 azure-keyvault-secrets
 azure-storage-blob
 deepdiff
-toolz
-
-authlib
-python-dotenv
-
-# Data 
-pandas
-openpyxl
-
-# Web
-requests
 httpx
 jsonschema
+pandas
+python-dotenv
+pyyaml
+requests
+toolz

@@ -9,7 +9,30 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../reqs_dbks.txt
+# MAGIC %pip install -q -r ../reqs_dbks.txt
+
+# COMMAND ----------
+
+from pathlib import Path
+from pyspark.sql import SparkSession
+from pyspark.dbutils import DBUtils
+import subprocess
+import yaml
+
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego'}
+
+with open("../user_databricks.yml", 'r') as _f: 
+    u_dbks = yaml.safe_load(_f)
+
+
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
+epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
+url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
+subprocess.check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
@@ -74,6 +97,13 @@ persons_slv = (EpicDF(spark, f"{events_brz}/person-set/chains/person")
     .withColumn('phone_number', F.coalesce('PhoneNumber', 'MobileNumber')))
 
 display(persons_slv)
+
+# COMMAND ----------
+
+from epic_py.delta import EpicDF
+from inspect import getsource
+a_slv = EpicDF(spark, f"{events_brz}/person-set/chains/person")
+print(getsource(a_slv.select))
 
 # COMMAND ----------
 
