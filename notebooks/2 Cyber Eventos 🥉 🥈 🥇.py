@@ -8,43 +8,47 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../reqs_dbks.txt
+# MAGIC %pip install -q -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
-from collections import defaultdict, OrderedDict
-from datetime import datetime as dt, date, timedelta as delta
-from json import dumps
+import subprocess
+import yaml
 
-import numpy as np
-from os import makedirs, path, environ
+with open("../user_databricks.yml", 'r') as _f: 
+    u_dbks = yaml.safe_load(_f)
+
+epicpy = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego', 
+    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
+
+url_call = "git+https://{token}@{url}@{branch}".format(**epicpy)
+subprocess.check_call(['pip', 'install', url_call])
+
+# COMMAND ----------
+
+from collections import OrderedDict
+from datetime import date
+from json import dumps
 import pandas as pd
 from pandas import DataFrame as pd_DF
 from pathlib import Path
-from pyspark.sql import (functions as F, types as T, 
-    Window as W, Column, DataFrame as spk_DF)
-from pytz import timezone
+from pyspark.sql import (functions as F, SparkSession)
 import re
-from toolz.functoolz import reduce
-from typing import Union
 
 # COMMAND ----------
 
-from importlib import reload
-from src.utilities import tools; reload(tools)
+from epic_py.delta import EpicDF, EpicDataBuilder
 
-import epic_py; reload(epic_py)
-from src import data_managers as epic_data; reload(epic_data)
-
-
-# COMMAND ----------
-
-from src.utilities import tools
+from src.data_managers import CyberData
 from src.platform_resources import AzureResourcer
-from src import data_managers as epic_data
-from src.data_managers import EpicDF, CyberData
+from src.utilities import tools
 
-from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+
+from config import (app_agent, app_resources,
+    DBKS_TABLES as tables, cyber_handler, 
+    ConfigEnviron, ENV, SERVER, DBKS_TABLES)
 
 
 tables      = DBKS_TABLES[ENV]['items']
@@ -60,6 +64,7 @@ specs_path = "cx/collections/cyber/spec_files"
 tmp_downer = "/dbfs/FileStore/cyber/specs"
 
 cyber_central = CyberData(spark)
+cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
 
 def dumps2(an_obj, **kwargs): 
     dump1 = dumps(an_obj, **kwargs)
@@ -88,8 +93,8 @@ def dumps2(an_obj, **kwargs):
 
 # COMMAND ----------
 
-the_loans = EpicDF(spark, f"{brz_path}/loan-contract/data")
-the_loans.display()
+balances = EpicDF(spark, f"{brz_path}/loan-contract/aux/balances-wide")
+
 
 # COMMAND ----------
 
@@ -208,26 +213,137 @@ def read_cyber_specs(task_key: str):
 
 # COMMAND ----------
 
-cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
+# MAGIC %md 
+# MAGIC ### SAP Pagos
 
-the_tables   = {}
+# COMMAND ----------
+
 missing_cols = {}
-for task in cyber_tasks: 
-    specs_df, spec_joins = read_cyber_specs(task)
-    
-    specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-    # Tiene: [readers, missing, fix_vals]
-    missing_cols[task] = specs_dict['missing']
-    
-    fxd_widther = cyber_central.fxw_converter(specs_df)
-    
-    gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-    gold_2 = gold_3.as_fixed_width(fxd_widther)
-    
-    one_select = F.concat(*gold_2.columns).alias('|'.join(gold_2.columns))
-    gold_1 = gold_2.select(one_select)
-    the_tables[task] = gold_1
-    cyber_central.save_task_3(task, gold_path, gold_1)
-    print(f"\tRows: {gold_1.count()}")
-    
-print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
+the_tables = {}
+
+# COMMAND ----------
+
+task = 'sap_pagos'
+
+specs_df, spec_joins = read_cyber_specs(task)
+
+specs_df_2 = (specs_df
+    .reset_index()
+    .rename(columns={
+        'Longitud': 'len', 'Posición inicial': 'pos', 
+        'nombre': 'name', 'PyType': 'pytype'}))
+
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+# Tiene: [readers, missing, fix_vals]
+
+missing_cols[task] = specs_dict['missing']
+
+gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+
+fxd_selector = cyber_builder.get_loader(specs_df_2, 'fixed-width')
+
+gold_2 = (gold_3
+    .with_column_plus(fxd_selector))
+
+gold_2.display()
+
+one_select = (F.concat(*specs_df['nombre'])
+    .alias('~'.join(specs_df['nombre'])))
+
+gold_pagos = gold_2.select(one_select)
+the_tables[task] = (gold_path, gold_pagos)
+
+cyber_central.save_task_3(task, gold_path, gold_pagos)
+print(f"\tRows: {gold_pagos.count()}")
+
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### SAP Estatus
+# MAGIC
+# MAGIC
+
+# COMMAND ----------
+
+task = 'sap_estatus'
+
+specs_df, spec_joins = read_cyber_specs(task)
+
+specs_df_2 = (specs_df
+    .reset_index()
+    .rename(columns={
+        'Longitud': 'len', 'Posición inicial': 'pos', 
+        'nombre'  : 'name','PyType': 'pytype'}))
+
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+# Tiene: [readers, missing, fix_vals]
+
+missing_cols[task] = specs_dict['missing']
+
+gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+
+# fxd_widther = cyber_central.fxw_converter(specs_df)
+#     [0-fill, 1-cast, 2-select]
+fxd_selector = cyber_builder.get_loader(specs_df_2, 'fixed-width')
+
+gold_2 = (gold_3
+    .with_column_plus(fxd_selector))
+
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
+
+gold_estatus = gold_2.select(one_select)
+the_tables[task] = (gold_path, gold_estatus)
+
+cyber_central.save_task_3(task, gold_path, gold_estatus)
+print(f"\tRows: {gold_estatus.count()}")
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### SAP Saldos
+
+# COMMAND ----------
+
+task = 'sap_saldos'
+
+specs_df, spec_joins = read_cyber_specs(task)
+
+specs_df_2 = (specs_df
+    .reset_index()
+    .rename(columns={
+        'Longitud': 'len', 'Posición inicial': 'pos', 
+        'nombre'  : 'name','PyType': 'pytype'}))
+
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+# Tiene: [readers, missing, fix_vals]
+
+missing_cols[task] = specs_dict['missing']
+
+gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+
+# fxd_widther = cyber_central.fxw_converter(specs_df)
+# [0-fill, 1-cast, 2-select]
+fxd_selector = cyber_builder.get_loader(specs_df_2, 'fixed-width')
+
+gold_2 = (gold_3
+    .select_plus(fxd_selector))
+
+gold_2.display()
+
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
+
+gold_saldos = gold_2.select(one_select)
+the_tables[task] = (gold_path, gold_saldos)
+
+cyber_central.save_task_3(task, gold_path, gold_saldos)
+print(f"\tRows: {gold_saldos.count()}")
+
+# COMMAND ----------
+
+missing_cols
+
+# COMMAND ----------
+
+#print(the_tables['sap_saldos'][0])
+the_tables['sap_pagos'][1].display()

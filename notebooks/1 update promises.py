@@ -16,7 +16,25 @@
 
 # COMMAND ----------
 
-# MAGIC  %pip install -r ../reqs_dbks.txt
+# MAGIC  %pip install -q -r ../reqs_dbks.txt
+
+# COMMAND ----------
+
+from pathlib import Path
+import subprocess
+import yaml
+
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego'}
+
+with open("../user_databricks.yml", 'r') as _f: 
+    u_dbks = yaml.safe_load(_f)
+
+epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
+url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
+subprocess.check_call(['pip', 'install', url_call])
+
 
 # COMMAND ----------
 
@@ -25,14 +43,20 @@ import json
 from pyspark.sql import functions as F, types as T
 import re
 
+# COMMAND ----------
+
+from importlib import reload
+import epic_py; reload(epic_py)
+import src; reload(src)
+import config; reload(config)
+
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 from config import (ConfigEnviron, 
-    ENV, SERVER, CRM_ENV, DBKS_TABLES)
+    ENV, SERVER, CRM_ENV, DBKS_TABLES, SETUP_2)
 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
-
 at_storage = azure_getter.get_storage()
 azure_getter.set_dbks_permissions(at_storage)
 

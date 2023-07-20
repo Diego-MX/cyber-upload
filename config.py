@@ -1,17 +1,13 @@
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
+from datetime import date
 from os import environ, getcwd, getenv
 from pathlib import Path
 import re
 
-from epic_py.identity import EpicIdentity
+from epic_py.delta import TypeHandler
+from epic_py.platform import EpicIdentity
+from epic_py.tools import dict_plus
 from src.utilities import tools 
-
-
-SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
-ENV      = tools.dict_get2(environ, ['ENV_TYPE', 'ENV', 'nan-env'])
-SERVER   = environ.get('SERVER_TYPE', 'wap') 
-CORE_ENV = environ.get('CORE_ENV')
-CRM_ENV  = environ.get('CRM_ENV')
 
 PAGE_MAX = 1000
 
@@ -46,7 +42,24 @@ SETUP_2 = {
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
         'databricks-scope': {'scope': 'cx-collections'}
-}}, 
+}} 
+
+
+PLATFORM_2 = {
+    'dev': {        
+        'key-vault' : 'kv-collections-data-dev',
+        'storage'   : 'lakehylia',
+        'app-id'    : 'cx-collections-id'},
+    'qas': {        
+        'key-vault' : 'kv-cx-data-qas',
+        'storage'   : 'stlakehyliaqas'},
+    'stg': {        
+        'key-vault' : 'kv-cx-adm-stg',
+        'storage'   : 'stlakehyliastg'},
+    'prd': {        
+        'key-vault' : 'kv-cx-data-prd',
+        'storage'   : 'stlakehyliaprd'}, 
+}
 
 
 SETUP_KEYS = {
@@ -82,22 +95,6 @@ SETUP_KEYS = {
         'dbks': {'scope': 'cx-collections'}
     }
 } 
-
-PLATFORM_2 = {
-    'dev': {        
-        'key-vault' : 'kv-collections-data-dev',
-        'storage'   : 'lakehylia',
-        'app-id'    : 'cx-collections-id'},
-    'qas': {        
-        'key-vault' : 'kv-cx-data-qas',
-        'storage'   : 'stlakehyliaqas'},
-    'stg': {        
-        'key-vault' : 'kv-cx-adm-stg',
-        'storage'   : 'stlakehyliastg'},
-    'prd': {        
-        'key-vault' : 'kv-cx-data-prd',
-        'storage'   : 'stlakehyliaprd'}, 
-}
 
 
 PLATFORM_KEYS = {
@@ -332,8 +329,7 @@ DBKS_KEYS = {
                 'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
             'contracts'   : "bronze.loan_contracts", 
-            'collections' : "gold.loan_contracts"}   }, 
-    
+            'collections' : "gold.loan_contracts"}   },   
 } 
 
 
@@ -477,13 +473,6 @@ DBKS_TABLES = {
   }  
 
 
-## Technical objects used accross the project. 
-
-app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
-app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
-
-
-
 class ConfigEnviron():
     '''
     This class sets up the initial authentication object.  It reads its 
@@ -542,3 +531,38 @@ class ConfigEnviron():
         elif self.server in ['wap']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
+
+## Technical objects used accross the project. 
+
+SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
+ENV = dict_plus(environ).get_plus('ENV_TYPE', 'ENV', 'nan-env')
+SERVER   = environ.get('SERVER_TYPE', 'wap') 
+CORE_ENV = environ.get('CORE_ENV')
+CRM_ENV  = environ.get('CRM_ENV')
+
+app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
+app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
+
+cyber_handler = TypeHandler({
+    'int' : {
+        'NA': 0,
+        'NA_str': '0',
+        'c_format': '%0{}d',}, 
+    'long' : {
+        'NA': 0,
+        'NA_str': '0',
+        'c_format': '%0{}d',}, 
+    'dbl' : {
+        'NA': 0, 
+        'NA_str': '0',
+        'c_format': '%0{}.{}f', 
+        'no_decimal': True},
+    'str' : {
+        'NA': '',
+        'NA_str': '',
+        'c_format': '%-{}s'},
+    'date': {
+        'NA': date(1900, 1, 1), 
+        'NA_str': '01011900',
+        'c_format': '%8.8d', 
+        'date_format': 'MMddyyyy'}})

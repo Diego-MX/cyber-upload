@@ -22,14 +22,10 @@
 
 # COMMAND ----------
 
+
 from importlib import reload
-
-
-# COMMAND ----------
-
 import config; reload(config)
-from src import platform_resources; reload(platform_resources)
-from src import core_banking; reload(core_banking)
+import src; reload(src)
 
 from src.core_banking import SAPSession
 from src.platform_resources import AzureResourcer
