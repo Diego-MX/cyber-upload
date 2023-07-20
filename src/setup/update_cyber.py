@@ -2,23 +2,6 @@ from datetime import datetime as dt
 import numpy as np
 from pytz import timezone
 
-from epic_py.tools import read_excel_table
-
-from src.utilities import tools
-from src.platform_resources import AzureResourcer
-from config import (ConfigEnviron, ENV, SERVER, SITE)
-
-
-
-#%% Preparación
-
-cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
-
-expect_specs = (read_excel_table(cyber_fields, 'general', 'especificacion')
-    .set_index('columna'))
-
-data_types = read_excel_table(cyber_fields, 'general', 'tipo_datos')
-
 
 def excelref_to_feather(xls_df): 
     expect_proc = expect_specs.loc[expect_specs['proc'].notnull(), 'proc']
@@ -56,9 +39,22 @@ def excelref_to_feather(xls_df):
 
 if __name__ == '__main__': 
 
-    app_environ = ConfigEnviron(ENV, SERVER)
-    az_manager = AzureResourcer(app_environ)
-    print(f"Variables: (Env, Server)={ENV, SERVER}")
+    from epic_py.tools import read_excel_table
+    from config import (app_resources,
+        ConfigEnviron, ENV, SERVER, SITE)
+
+
+    cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
+
+    expect_specs = (read_excel_table(cyber_fields, 'general', 'especificacion')
+        .set_index('columna'))
+
+    data_types = read_excel_table(cyber_fields, 'general', 'tipos_datos')
+
+
+    # app_environ = ConfigEnviron(ENV, SERVER)
+    # az_manager = AzureResourcer(app_environ)
+    # print(f"Variables: (Env, Server)={ENV, SERVER}")
 
     blobs_paths = "cx/collections/cyber/spec_files"
     
@@ -79,19 +75,19 @@ if __name__ == '__main__':
         blob_3  = f"{blobs_paths}/{each_task}_joins_latest.csv" 
         blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.csv" 
     
-        spec_ref = read_excel_table(cyber_fields, each_task)
+        spec_ref = read_excel_table(cyber_fields, each_task, each_task)
         has_join = read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
         (execs, checks) = excelref_to_feather(spec_ref)
         execs.to_feather(spec_local)
         
-        az_manager.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
-        az_manager.upload_storage_blob(spec_local, blob_2, 'gold')
+        app_resources.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
+        app_resources.upload_storage_blob(spec_local, blob_2, 'gold')
         print(checks)
 
         if has_join is not None: 
             has_join.to_csv(join_local, index=False)
-            az_manager.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
-            az_manager.upload_storage_blob(join_local, blob_4, 'gold')
+            app_resources.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
+            app_resources.upload_storage_blob(join_local, blob_4, 'gold')
 
 
 

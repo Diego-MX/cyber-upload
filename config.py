@@ -4,6 +4,10 @@ from os import environ, getcwd, getenv
 from pathlib import Path
 import re
 
+from epic_py.platform import EpicIdentity
+from epic_py.delta import TypeHandler
+from src.utilities import tools 
+
 PAGE_MAX = 1000
 
 SETUP_2 = {
@@ -381,6 +385,33 @@ DBKS_KEYS = {
             'collections' : "gold.loan_contracts"}   },     
 } 
 
+
+def λ_table(key): 
+    stg, obj, *extra= key.split('_', 2)
+    obj_db = {
+        'persons'   : 'din_clients', 
+        'loans'     : 'nayru_accounts', 
+        'promises'  : 'farore_transactions'}
+    
+    obj_area = {
+        'promises'  : 'cx', 
+        None        : 'ops'}
+    obj_mod = {
+        'promises'  : 'payment_promises'}
+    an_area = obj_area.get(obj, obj_area[None])
+    obj_mod = obj_mod.get(obj, obj)
+    x_suffix = f"_{extra}" if extra else ""
+
+    at_meta = f"{obj_db[obj]}.{stg}_{an_area}_{obj_mod}" + x_suffix
+    return at_meta 
+
+
+
+DBKS_TABLE_2 = {
+    'base'    : 'ops/core-banking/batch-updates', 
+    'promises': 'cx/collections/sunshine-objects',
+    'metastore': {'lambda': λ_table} }
+
 DBKS_TABLES = {          
     'dev': {
         'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
@@ -584,10 +615,6 @@ class ConfigEnviron():
         self.credential = the_creds
 
 
-from epic_py.platform import EpicIdentity
-from src.utilities import tools 
-
-
 
 SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
 ENV      = tools.dict_get2(environ, 'ENV_TYPE', 'ENV', 'nan-env')
@@ -599,9 +626,7 @@ CRM_ENV  = environ.get('CRM_ENV')
 app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
 app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
 
-
-
-cyber_types = {
+cyber_handler = TypeHandler({
     'int' : {
         'NA': 0,
         'c_format': '%0{}d',}, 
@@ -613,7 +638,9 @@ cyber_types = {
         'c_format': '%-{}.{}s'},
     'date': {
         'NA': date(1900, 1, 1), 
-        'c_format': '%8.8d'} 
-}
- 
+        'NA_str': '01011900',
+        'c_format': '%8.8d'}})
+
+
+
  

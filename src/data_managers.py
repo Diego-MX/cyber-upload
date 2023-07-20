@@ -9,41 +9,7 @@ from pytz import timezone
 from toolz import functoolz as f_toolz
 import re
 
-<<<<<<< HEAD
-from epic_py.delta import EpicDF, column_name, when_plus
-=======
-from epic_py.delta import EpicDF
-
-
-def when_plus(when_list:list) -> Column: 
-    ''' 
-    Depends on module F ~ pyspark.sql.functions
-    WHEN_LIST ~ [(cond, value), ..., (None, else)]
-    Returns F.when(cond, value)....otherwise(else)
-    '''
-    w_list = when_list.copy()
-    has_else = (w_list[-1][0] is None)
-    _, w_else = w_list.pop(-1) if has_else else F.lit(None)
-    
-    λ_when = lambda ff, item: ff.when(*item)
-    F_when = reduce(λ_when, w_list, F)
-    return F_when.otherwise(w_else)
-
-  
-def fill_na_plus(self, na_plus: dict): 
-    λ_default = lambda x_df, kk_vv: x_df.fillna(kk_vv[0], kk_vv[1]) 
-    λ_date    = lambda x_df, kk_vv: x_df.with_column_plus({
-            cc: F.coalesce(cc, F.lit(kk_vv[0])) for cc in kk_vv[1]})
-
-    def λ_fill(x_df, kk_vv): 
-        kk, vv = kk_vv
-        if isinstance(kk, date): 
-            return λ_date(x_df, kk_vv)
-        else: 
-            return λ_default(x_df, kk_vv)
-    return reduce(λ_fill, na_plus.items(), self)
-EpicDF.fill_na_plus = fill_na_plus
->>>>>>> 15f4e2cbf25207dbe70521e6b6a4e41c924d11cc
+from epic_py.delta import EpicDF, when_plus, column_name
 
 
 
