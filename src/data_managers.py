@@ -9,8 +9,9 @@ from pytz import timezone
 from toolz import functoolz as f_toolz
 import re
 
-from epic_py.delta import EpicDF, when_plus, column_name
-
+from epic_py.delta import (EpicDF, TypeHandler, 
+    column_name, when_plus)
+from epic_py.tools import MatchCase
 
 
 class CyberData(): 
@@ -34,12 +35,14 @@ class CyberData():
             'str' : '', 
             'dbl' : 0, 
             'int' : 0, 
+            'long': 0,
             'date': date(1900, 1, 1)}
 
         self.spk_types = {
             'str' : T.StringType, 
             'dbl' : T.DoubleType, 
             'int' : T.IntegerType, 
+            'long': T.LongType, 
             'date': T.DateType}
 
         self.c_formats = {
@@ -58,7 +61,7 @@ class CyberData():
             bal_rename = {a_col: re.sub('code_', 'x', a_col) 
                 for a_col in base_df.columns}
 
-            x_df = (base_df
+            x_df = (base_df   # type: ignore
                 .dropDuplicates()
                 .with_column_renamed_plus(bal_rename))
 
@@ -78,7 +81,7 @@ class CyberData():
                 ('VENCIDO',  '000') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
                                     & (F.col('overdue_days') >  0),
                 ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
-                ('undefined','xxx') :  None})
+                ('undefined','---') :  None})
             
             loan_cols = OrderedDict({
                 'ContractID'  : F.col('ID'), 
@@ -92,9 +95,9 @@ class CyberData():
                 'StageLevel'  : F.col('LifeCycleStatus')
             })
 
-            x_df = (base_df
+            x_df = (base_df   # type: ignore
                 .join(open_items, on='ID', how='left')
-                .filter_plus(*where_loans)
+                .filter_plus(*where_loans) 
                 .with_column_plus(loan_cols))
             
         elif which == 'open-items-wide': 
@@ -127,7 +130,7 @@ class CyberData():
                         lambda col: F.coalesce(col, F.lit(0))), 
                 })} 
             
-            y_df = (base_df
+            y_df = (base_df   # type: ignore
                 .fillna(0, subset=rec_types)
                 .with_column_plus(open_cols))
             
@@ -196,7 +199,7 @@ class CyberData():
                 'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID'), 
                 'yesterday' : F.date_add(F.current_date(), -1)}
 
-            x_df = (base_df
+            x_df = (base_df     # type: ignore
                 .filter(F.col('ID').isNotNull())
                 .join(states_df, how='left', on='AddressRegion')
                 .with_column_plus(persons_cols))
@@ -226,11 +229,11 @@ class CyberData():
                 .with_column_plus(txn_cols)
                 .filter(F.col('is_payment')))
 
-            x1_df = (y_df
+            x1_df = (y_df      # type: ignore
                 .filter(F.col('is_newest'))
                 .with_column_renamed_plus(map_cols['newest']))
             
-            x2_df = (y_df
+            x2_df = (y_df      # type: ignore
                 .filter(F.col('is_oldest'))
                 .with_column_renamed_plus(map_cols['oldest']))  
 
@@ -269,7 +272,7 @@ class CyberData():
         ### Dates are cast before NAs, but the rest after. 
         '''
         
-        @F.pandas_udf('string')
+        @F.pandas_udf('string')     # type: ignore
         def latinize(srs: pd.Series) -> pd.Series:
             lat_srs = (srs.str
                 .normalize('NFKD').str
@@ -278,16 +281,16 @@ class CyberData():
             return lat_srs 
 
         str_λs = {
-            'str' : lambda nn, cc: F.format_string(cc, F.col(nn)), 
-            'dbl' : lambda nn, cc: F.regexp_replace(F.format_string(cc, F.col(nn)), '[\.,]', ''), 
-            'int' : lambda nn, cc: F.format_string(str(cc), nn), 
-            'date': lambda nn, cc: F.when(F.col(nn) == self.na_types['date'], F.lit('00000000')
-                    ).otherwise(F.date_format(nn, 'MMddyyyy')) }
+            'str' : lambda rr: F.format_string(rr['c_format'], rr['nombre']), 
+            'dbl' : lambda rr: F.regexp_replace(F.format_string(rr['c_format'], rr['nombre']), '[\.,]', ''), 
+            'int' : lambda rr: F.format_string(str(rr['c_format']), rr['nombre']), 
+            'date': lambda rr: F.when(F.col(rr['nombre']) == self.na_types['date'], F.lit('00000000')
+                    ).otherwise(F.date_format(rr['nombre'], 'MMddyyyy')) }
 
-        def row_formatter(name, a_row): 
+        def row_formatter(a_row): 
             py_type = a_row['PyType']
-            fmt_1 = str_λs[py_type](name, a_row['c_format'])
-            fmt_2 = F.format_string(a_row['s_format'], latinize(fmt_1))
+            fmt_1 = str_λs[py_type](a_row)
+            fmt_2 = F.format_string(a_row['s_format'], latinize(fmt_1)) # type: ignore
             return fmt_2
 
         fill_0 = { 
@@ -295,11 +298,11 @@ class CyberData():
             '': specs_df.index[specs_df['PyType'] == 'str' ].tolist(), 
             date(1900, 1, 1): specs_df.index[specs_df['PyType'] == 'date'].tolist()}
         
-        cast_1 = [F.col(nn).cast(self.spk_types[py_type]()) 
-            for nn, py_type in specs_df['PyType'].items()]
+        cast_1 = [F.col(rr['nombre']).cast(self.spk_types[rr['PyType']]()) 
+            for _, rr in specs_df.iterrows()]
         
-        strg_2 = [row_formatter(nn, rr).alias(nn) 
-            for nn, rr in specs_df.iterrows()]
+        strg_2 = [row_formatter(rr).alias(rr['nombre']) 
+            for _, rr in specs_df.iterrows()]
 
         return {'0-fill': fill_0, '1-cast': cast_1, '2-string': strg_2}
             
@@ -307,8 +310,8 @@ class CyberData():
     def specs_setup_0(self, path):
         # ['nombre', 'Longitud', 'Width', 'PyType', 'columna_valor'] 
         
-        specs_0 = (pd.read_feather(path)
-            .set_index('nombre'))
+        specs_0 = pd.read_feather(path)
+        #    .set_index('nombre'))
         
         specs_df = specs_0.assign(
             width       = specs_0['Longitud'].astype(float).astype(int), 
@@ -335,19 +338,19 @@ class CyberData():
         missing  = defaultdict(set)
         fix_vals = []
         
-        for name, rr in specs_df.iterrows(): 
+        for _, rr in specs_df.iterrows(): 
             # Reading and Missing
             r_type = rr['PyType']
             if rr['tabla'] in tables_dict: 
                 if rr['columna_valor'] in tables_dict[rr['tabla']].columns: 
-                    call_as = F.col(rr['columna_valor']).alias(name)
+                    call_as = F.col(rr['columna_valor']).alias(rr['nombre'])
 
                     readers[rr['tabla']].append(call_as)
                 else: 
                     # Fixing missing columns as NA. 
                     missing[rr['tabla']].add(rr['columna_valor'])
                     r_value = self.na_types[r_type]
-                    r_col = F.lit(r_value).cast(self.spk_types[r_type]()).alias(name)
+                    r_col = F.lit(r_value).cast(self.spk_types[r_type]()).alias(rr['nombre'])
                     
                     fix_vals.append(r_col)
             else: 
@@ -355,7 +358,7 @@ class CyberData():
                     r_value = self.na_types[r_type]
                 else: 
                     r_value = rr['columna_valor']
-                fix_vals.append(F.lit(r_value).cast(self.spk_types[r_type]()).alias(name))
+                fix_vals.append(F.lit(r_value).cast(self.spk_types[r_type]()).alias(rr['nombre']))
 
         result_specs = {
             'readers' : dict(readers), 
@@ -397,8 +400,7 @@ class CyberData():
         print(f"{now_hm}_{cyber_key}_{task}.txt")
         gold_table.save_as_file(report_dir, report_recent,  header=False)
         gold_table.save_as_file(report_dir, report_history, header=True)
-        return 
-
+        return report_history
 
 
 def pd_print(a_df: pd.DataFrame, **kwargs):

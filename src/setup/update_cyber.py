@@ -40,7 +40,7 @@ def excelref_to_feather(xls_df):
 if __name__ == '__main__': 
 
     from epic_py.tools import read_excel_table
-    from config import (app_resources,
+    from config import (app_resources, app_agent, 
         ConfigEnviron, ENV, SERVER, SITE)
 
 

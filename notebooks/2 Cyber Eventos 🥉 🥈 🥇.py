@@ -20,7 +20,7 @@ import yaml
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego'}
+        'branch': 'dev-diego'}  
 
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
@@ -35,22 +35,14 @@ subprocess.check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
-from collections import defaultdict, OrderedDict
-from datetime import datetime as dt, date, timedelta as delta
+from collections import OrderedDict
+from datetime import date
 from json import dumps
-import numpy as np
-from os import makedirs, path, environ
 import pandas as pd
-from pandas import DataFrame as pd_DF
 from pathlib import Path
-from pyspark.sql import (functions as F, types as T, 
-    Window as W, Column, DataFrame as spk_DF, SparkSession)
-from pytz import timezone
+from pyspark.sql import (functions as F, SparkSession)
 import re
 import subprocess
-from toolz.functoolz import reduce
-from typing import Union
-
 
 
 # COMMAND ----------
@@ -60,7 +52,6 @@ import epic_py; reload(epic_py)
 import src; reload(src)
 import config; reload(config)
 
-from src import data_managers as epic_data
 from src.data_managers import EpicDF, CyberData
 from src.platform_resources import AzureResourcer
 from src.utilities import tools
@@ -73,7 +64,7 @@ from config import (app_agent, app_resources,
 # COMMAND ----------
 
 
-tables = DBKS_TABLES[ENV]['items']
+tables = DBKS_TABLES[ENV]['items'] # type: ignore
 app_environ = ConfigEnviron(ENV, SERVER, spark)
 az_manager  = AzureResourcer(app_environ)
 
@@ -143,7 +134,7 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 from epic_py.delta import EpicDF 
 
-txns = EpicDF(spark, f"{brz_path}/transaction-set/data").display()
+txns = EpicDF(spark, f"{brz_path}/transaction-set/data").display() # type: ignore
 
 # COMMAND ----------
 
@@ -255,7 +246,7 @@ for task in cyber_tasks:
     
     gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
     
-    gold_2 = (gold_3
+    gold_2 = (gold_3   # type: ignore
         .fillna(0, filler[0])
         .fillna('', filler[''])
         .with_column_plus(caster)

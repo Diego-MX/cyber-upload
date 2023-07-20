@@ -4,8 +4,9 @@ from os import environ, getcwd, getenv
 from pathlib import Path
 import re
 
-from epic_py.platform import EpicIdentity
 from epic_py.delta import TypeHandler
+from epic_py.platform import EpicIdentity
+from epic_py.tools import dict_plus
 from src.utilities import tools 
 
 PAGE_MAX = 1000
@@ -38,85 +39,8 @@ SETUP_2 = {
             'client_secret'   : 'sp-collections-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
-        'databricks-scope': 'cx-collections'}
-}
-
-PLATFORM_2 = {
-    'dev': {        
-        'keyvault': 'kv-collections-data-dev',
-        'storage' : 'lakehylia'},
-    'qas': {        
-        'keyvault': 'kv-cx-data-qas',
-        'storage' : 'stlakehyliaqas'},
-    'stg': {        
-        'keyvault': 'kv-cx-adm-stg',
-        'storage' : 'stlakehyliastg'},
-    'prd': {        
-        'keyvault': 'kv-cx-data-prd',
-        'storage' : 'stlakehyliaprd'}, 
-}
-
-CORE_2 = {
-    'dev-sap': {
-        'main': {
-            'url': "https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b",
-            'access': {
-                'username': 'core-api-key', 
-                'password': 'core-api-secret'}}, 
-        'auth': {
-            'url': "https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token", 
-            'data': {
-                'grant_type': 'password', 
-                'username'  : 'core-api-user', 
-                'password'  : 'core-api-password'}}}, 
-    'qas-sap': {
-        'main': {
-            'url': "https://apiqas.apimanagement.us21.hana.ondemand.com/s4b",
-            'access': {
-                'username': 'core-api-key', 
-                'password': 'core-api-secret'}}, 
-        'auth': {
-            'url': "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
-            'data': {
-                'grant_type': 'password', 
-                'username'  : 'core-api-user', 
-                'password'  : 'core-api-password'}}}, 
-    'prd-sap': {
-        'main': {
-            'url': "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b",
-            'access': {
-                'username': 'core-api-key', 
-                'password': 'core-api-secret'}}, 
-        'auth': {
-            'url': "https://apiprd.apimanagement.us21.hana.ondemand.com/oauth2/token", 
-            'data': {
-                'grant_type': 'password', 
-                'username'  : 'core-api-user', 
-                'password'  : 'core-api-password'}}}
-}
-
-CRM_2 = {
-    'sandbox-zd' : {
-        'main' : {
-            'url'  : "https://bineo1633010523.zendesk.com/api",
-            'username' : 'crm-api-user',   # ZNDK_USER_EMAIL
-            'password' : 'crm-api-token'},   # ZNDK_API_TOKEN
-        'zis' : {     # Zendesk Integration Services. 
-            'id'      : 'crm-zis-id', 
-            'username': 'crm-zis-user', 
-            'password': 'crm-zis-pass'}, 
-    },
-    'prod-zd' : {
-        'main' : {
-            'url'  : "https://bineo.zendesk.com/api",
-            'username' : 'crm-api-user',    # ZNDK_USER_EMAIL
-            'password' : 'crm-api-token'},  # ZNDK_API_TOKEN
-        'zis' : {
-            'id'      : 'crm-zis-id', 
-            'username': 'crm-zis-user', 
-            'password': 'crm-zis-pass'}
-    }
-}
+        'databricks-scope': {'scope': 'cx-collections'}
+}}, 
 
 
 SETUP_KEYS = {
@@ -152,6 +76,7 @@ SETUP_KEYS = {
         'dbks': {'scope': 'cx-collections'}
     }
 } 
+
 
 PLATFORM_KEYS = {
     'dev': {        
@@ -382,7 +307,7 @@ DBKS_KEYS = {
                 'HTTPPath'       : (1, 'dbks-odbc-http')} }, 
         'tables' : {  # NOMBRE_DBKS, COLUMNA_EXCEL
             'contracts'   : "bronze.loan_contracts", 
-            'collections' : "gold.loan_contracts"}   },     
+            'collections' : "gold.loan_contracts"}   },   
 } 
 
 
@@ -613,6 +538,41 @@ class ConfigEnviron():
         elif self.server in ['wap']: 
             the_creds = DefaultAzureCredential()
         self.credential = the_creds
+
+## Technical objects used accross the project. 
+
+SITE = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
+ENV = dict_plus(environ).get_plus('ENV_TYPE', 'ENV', 'nan-env')
+SERVER   = environ.get('SERVER_TYPE', 'wap') 
+CORE_ENV = environ.get('CORE_ENV')
+CRM_ENV  = environ.get('CRM_ENV')
+
+app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
+app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
+
+cyber_handler = TypeHandler({
+    'int' : {
+        'NA': 0,
+        'NA_str': '0',
+        'c_format': '%0{}d',}, 
+    'long' : {
+        'NA': 0,
+        'NA_str': '0',
+        'c_format': '%0{}d',}, 
+    'dbl' : {
+        'NA': 0, 
+        'NA_str': '0',
+        'c_format': '%0{}.{}f', 
+        'no_decimal': True},
+    'str' : {
+        'NA': '',
+        'NA_str': '',
+        'c_format': '%-{}s'},
+    'date': {
+        'NA': date(1900, 1, 1), 
+        'NA_str': '01011900',
+        'c_format': '%8.8d', 
+        'date_format': 'MMddyyyy'}})
 
 
 
