@@ -16,10 +16,7 @@
 
 # COMMAND ----------
 
-<<<<<<< HEAD
-# MAGIC   %pip install -q -r ../reqs_dbks.txt
-=======
-# MAGIC  %pip install -q -r ../reqs_dbks.txt
+# MAGIC %pip install -q -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
@@ -38,7 +35,6 @@ epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_to
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
 
->>>>>>> 23a4e395a7758c6969ab9449a1058dc8a31ee88f
 
 # COMMAND ----------
 
@@ -59,19 +55,6 @@ subprocess.check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
-from importlib import(reload)
-import epic_py; reload(epic_py)
-
-from src import platform_resources; reload(platform_resources)
-import config; reload(config)
-
-from datetime import datetime as dt
-import json
-from pyspark.sql import functions as F, types as T
-import re
-
-# COMMAND ----------
-
 from importlib import reload
 import epic_py; reload(epic_py)
 import src; reload(src)
@@ -80,16 +63,12 @@ import config; reload(config)
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
 from config import (ConfigEnviron, 
-<<<<<<< HEAD
     ENV, SERVER, CRM_ENV, DBKS_TABLES, 
     app_agent, app_resources)
 
 a_storage = app_resources['storage']
 stg_permissions = app_agent.prep_dbks_permissions(a_storage, 'gen2')
 app_resources.set_dbks_permissions(stg_permissions)
-=======
-    ENV, SERVER, CRM_ENV, DBKS_TABLES, SETUP_2)
->>>>>>> 23a4e395a7758c6969ab9449a1058dc8a31ee88f
 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)

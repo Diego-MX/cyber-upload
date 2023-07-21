@@ -40,7 +40,7 @@ SETUP_2 = {
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
         'databricks-scope': {'scope': 'cx-collections'}
-}}, 
+}}
 
 
 SETUP_KEYS = {
@@ -331,8 +331,7 @@ def λ_table(key):
     return at_meta 
 
 
-
-DBKS_TABLE_2 = {
+DBKS_TABLES_2 = {
     'base'    : 'ops/core-banking/batch-updates', 
     'promises': 'cx/collections/sunshine-objects',
     'metastore': {'lambda': λ_table} }
@@ -547,6 +546,7 @@ SERVER   = environ.get('SERVER_TYPE', 'wap')
 CORE_ENV = environ.get('CORE_ENV')
 CRM_ENV  = environ.get('CRM_ENV')
 
+
 app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
 app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
 
@@ -573,34 +573,6 @@ cyber_handler = TypeHandler({
         'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
-
-
-
-SITE     = Path(__file__).parent if '__file__' in globals() else Path(getcwd())
-ENV      = tools.dict_get2(environ, 'ENV_TYPE', 'ENV', 'nan-env')
-SERVER   = environ.get('SERVER_TYPE', 'wap') 
-CORE_ENV = environ.get('CORE_ENV')
-CRM_ENV  = environ.get('CRM_ENV')
-
-
-app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
-app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
-
-cyber_handler = TypeHandler({
-    'int' : {
-        'NA': 0,
-        'c_format': '%0{}d',}, 
-    'dbl' : {
-        'NA': 0, 
-        'c_format': '%0{}.{}f'},
-    'str' : {
-        'NA': '',
-        'c_format': '%-{}.{}s'},
-    'date': {
-        'NA': date(1900, 1, 1), 
-        'NA_str': '01011900',
-        'c_format': '%8.8d'}})
-
 
 
  
