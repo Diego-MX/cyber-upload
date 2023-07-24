@@ -1,12 +1,12 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC ## Description
-# MAGIC 
+# MAGIC
 # MAGIC The Databricks table `bronze.crm_payment_promises` is updated every hour via this script.   
 # MAGIC We require access to:  
 # MAGIC - Keyvault `kv-resource-access-dbks` via Databricks scope of the same name.
 # MAGIC - This in turn yields keys towards a Service Principal, which in turn gives acces to other secrets. 
-# MAGIC 
+# MAGIC
 # MAGIC The corresponding key names are found in `config.py`.
 
 # COMMAND ----------
@@ -92,7 +92,6 @@ promises_spk = spark.createDataFrame(promises_df)
 # MAGIC # Bronze to Silver 
 
 # COMMAND ----------
-
 
 slv_promises_0 = promises_spk
 

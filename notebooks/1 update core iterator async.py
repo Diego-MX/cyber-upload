@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC # Setup Machine
-# MAGIC 
+# MAGIC
 # MAGIC Files in Repos now allows us to import files, and run requirements which are setup for both Databricks Jobs and local development. 
 
 # COMMAND ----------
@@ -47,7 +47,7 @@ loans_ids = (spark.read.format('delta')
 
 # MAGIC %md 
 # MAGIC # Async Tools
-# MAGIC 
+# MAGIC
 # MAGIC Following [Real Python's courses](https://realpython.com/python-concurrency/) we setup basic functionality to call the SAP engine with a thread pool executor. 
 
 # COMMAND ----------
@@ -74,7 +74,7 @@ async def call_all_apis(api_calls, ids_lists):
 
 # MAGIC %md 
 # MAGIC # Execution
-# MAGIC 
+# MAGIC
 # MAGIC Run the async, and print the execution time. 
 
 # COMMAND ----------
@@ -119,7 +119,6 @@ print(f"""Lengths:
 
 # COMMAND ----------
 
-
 df_cols = {
     'balances'   : ['ID', 'Code','Name','Amount','Currency','BalancesTS'], 
     'open_items' : ['OpenItemTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 
@@ -130,8 +129,7 @@ df_cols = {
 item_keys = {
     'balances'     : 'brz_loan_balances', 
     'open_items'   : 'brz_loan_open_items', 
-    'payment_plan' : 'brz_loan_payments'  # Esta es diferente. 
-}
+    'payment_plan' : 'brz_loan_payments' }
 
 spark_tables = {}
 for table_type in ['balances', 'open_items', 'payment_plan']: 

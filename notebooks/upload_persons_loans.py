@@ -1,24 +1,24 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC ## Runbook
-# MAGIC 
+# MAGIC
 # MAGIC This notebook is a rescripture of the script `src/refresh_core.py`, as well as its dependencies to be compiled as one. 
-# MAGIC 
+# MAGIC
 # MAGIC It should be associated with a databricks-job to be executed **every hour** or less. 
-# MAGIC 
+# MAGIC
 # MAGIC Access to the key-vault `kv-resource-access-dbks` is required, where key-values are obtained towards a service-principal, which in turn gives access to a second key-vault.
-# MAGIC 
+# MAGIC
 # MAGIC The latter's name, `kv-collections-data-dev`, is not as relevant since it can be obtained from the (secret-less) configuration file `./config.py`. 
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC 
+# MAGIC
 # MAGIC ## Preparation
-# MAGIC 
+# MAGIC
 # MAGIC The cells are executed as follows:   
 # MAGIC 1. Setup Libraries, utility functions, and a path token for caching.  
-# MAGIC 
+# MAGIC
 # MAGIC 2. Define some Env variables:  
 # MAGIC     a. From Config File,  
 # MAGIC     b. Using Databricks secrets, Key Vault is for Databricks access.  
@@ -26,7 +26,7 @@
 # MAGIC     d. And use a specific Key Vault, which is defined specific for Collections app.   
 # MAGIC     
 # MAGIC 3. Core Banking functions to retrieve Loan Contracts, Person Set, and Tokens in between. 
-# MAGIC 
+# MAGIC
 # MAGIC 4. Execution. 
 
 # COMMAND ----------
@@ -122,8 +122,6 @@ CRM_TOKEN = get_secret("crm-api-token")
     print(the_resp.text)
 
 # COMMAND ----------
-
-
 
 def get_token(auth_method=None):
     if auth_method == "basic":  # Auth as a POST argument. 
@@ -315,10 +313,10 @@ persons_df.to_feather("/tmp/persons.feather")
 # MAGIC promesas_cols <- c("num_prestamo", "promesa_id", "promesa_activa", "promesa_descuento_principal", 
 # MAGIC               "promesa_descuento_intereses", "promesa_descuento_comisiones", "promesa_monto", "promesa_fecha_inicio", 
 # MAGIC               "promesa_fecha_vencimiento", "promesa_procesada", "promesa_cumplida", "promesa_ejecutivo")
-# MAGIC 
+# MAGIC
 # MAGIC loans_df   <- read_csv("/tmp/loan_contracts.csv", col_types=cols())
 # MAGIC k_promesas <- nrow(loans_df)/2
-# MAGIC 
+# MAGIC
 # MAGIC set.seed(42)
 # MAGIC promesas_df <- tibble(
 # MAGIC     num_prestamo   = sample(loans_df$ID, k_promesas),
@@ -421,7 +419,6 @@ promises_cols = {  # external_id, compensation: (comission, interest, principal)
 
 # COMMAND ----------
 
-
 def flatten(t):
     return [item for sublist in t for item in sublist]
 
@@ -469,5 +466,5 @@ pymntplans_spk.write.mode("overwrite").saveAsTable("bronze.loan_payment_plans")
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC 
+# MAGIC
 # MAGIC SELECT BankAccountID, InitialLoanAmount, TermSpecificationStartDate, ClabeAccount, parcialidades_pagadas, parcialidades_vencidas, monto_principal, ord_interes, comisiones, monto_liquidacion, TermSpecificationValidityPeriodDurationM, NominalInterestRate, monto_vencido, principal_vencido, interes_ord_vencido, BorrowerID, FirstName, LastName, LastName2, AddressRegion, AddressCity, AddressDistrictName, AddressStreet, AddressHouseID, AddressPostalCode, Gender FROM gold.loan_contracts WHERE 1 = 1 and (`AddressPostalCode` == '06720')
