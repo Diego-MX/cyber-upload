@@ -20,8 +20,13 @@
 
 # COMMAND ----------
 
+from pyspark.sql import SparkSession
+from pyspark.dbutils import DBUtils
 import subprocess
 import yaml
+
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
@@ -34,6 +39,13 @@ with open("../user_databricks.yml", 'r') as _f:
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
 
+# COMMAND ----------
+
+from datetime import datetime as dt
+import json
+from pyspark.sql import functions as F, types as T
+import re
+
 
 # COMMAND ----------
 
@@ -42,11 +54,6 @@ import epic_py; reload(epic_py)
 
 from src import platform_resources; reload(platform_resources)
 import config; reload(config)
-
-from datetime import datetime as dt
-import json
-from pyspark.sql import functions as F, types as T
-import re
 
 from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
@@ -65,29 +72,12 @@ at_storage = azure_getter.get_storage()
 azure_getter.set_dbks_permissions(at_storage)
 
 zendesker = ZendeskSession(CRM_ENV, azure_getter)
-abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
-abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage)
+abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage) # type: ignore
+abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage) # type: ignore
 
-tbl_items = DBKS_TABLES[ENV]['items']
+tbl_items = DBKS_TABLES[ENV]['items'] # type: ignore
 
-# COMMAND ----------
 
-from inspect import getsource
-#print(getsource(app_agent.call_dict))
-from epic_py.tools import compose2
-from pydantic import SecretStr
-μ_secret = compose2(SecretStr, app_agent.get_secret)
-
-a_dict = app_agent['service-principal']
-print(a_dict.keys())
-
-kk = 'client_id'
-vv = a_dict[kk]
-ww = app_agent.get_secret(vv)
-xx = SecretStr(ww)
-
-from epic_py.tools import identity2
-identity2(vv)
 
 # COMMAND ----------
 
@@ -131,7 +121,7 @@ promises_df = (zendesker
     .get_promises()
     .drop(columns='external_id'))
 
-promises_spk = spark.createDataFrame(promises_df)
+promises_spk = spark.createDataFrame(promises_df) # type: ignore
 
 (promises_spk.write.mode('overwrite')
     .format('delta')
