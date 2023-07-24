@@ -28,13 +28,15 @@ import yaml
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
 
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego'}
+
 
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
-    epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
+
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego', 
+    'token' :  dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
@@ -51,8 +53,7 @@ import re
 
 from importlib import(reload)
 import epic_py; reload(epic_py)
-
-from src import platform_resources; reload(platform_resources)
+import src; reload(src)
 import config; reload(config)
 
 from src.platform_resources import AzureResourcer
@@ -76,7 +77,6 @@ abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_stora
 abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage) # type: ignore
 
 tbl_items = DBKS_TABLES[ENV]['items'] # type: ignore
-
 
 
 # COMMAND ----------

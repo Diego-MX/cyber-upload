@@ -3,7 +3,6 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 
-# Utilities
 authlib
 azure-identity
 azure-keyvault-secrets
@@ -11,6 +10,7 @@ azure-storage-blob
 deepdiff
 httpx
 jsonschema
+openpyxl
 pandas
 python-dotenv
 pyyaml

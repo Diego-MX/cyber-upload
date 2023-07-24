@@ -40,8 +40,13 @@ SETUP_2 = {
             'client_secret'   : 'sp-collections-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
+<<<<<<< HEAD
         'databricks-scope': 'cx-collections'}
 }, 
+=======
+        'databricks-scope': {'scope': 'cx-collections'}
+}}
+>>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
 
 
 PLATFORM_2 = {
@@ -57,6 +62,7 @@ PLATFORM_2 = {
     'prd': {        
         'key-vault' : 'kv-cx-data-prd',
         'storage'   : 'stlakehyliaprd'}, 
+<<<<<<< HEAD
 }
 
 
@@ -73,6 +79,8 @@ CRM_2 = {
         'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}, 
     'prod-zd': {
         'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}
+=======
+>>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
 }
 
 
@@ -349,6 +357,13 @@ DBKS_KEYS = {
 
 
 
+<<<<<<< HEAD
+=======
+DBKS_TABLES_2 = {
+    'base'    : 'ops/core-banking/batch-updates', 
+    'promises': 'cx/collections/sunshine-objects',
+    'metastore': {'lambda': λ_table} }
+>>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
 
 DBKS_TABLES = {          
     'dev': {
@@ -586,6 +601,7 @@ cyber_handler = TypeHandler({
         'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
+<<<<<<< HEAD
 
 
 
@@ -594,6 +610,8 @@ cyber_handler = TypeHandler({
 
 
 
+=======
+>>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
 
 
  
