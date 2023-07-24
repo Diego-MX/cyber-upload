@@ -72,9 +72,6 @@ CRM_2 = {
 }
 
 
-
-
-
 SETUP_KEYS = {
     'dev' : {
         'service-principal' : {
@@ -580,3 +577,7 @@ cyber_handler = TypeHandler({
         'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
+cyber_rename = {'nombre': 'name', 
+    'Posición inicial': 'pos', 
+    'Longitud': 'len', 
+    'PyType': 'pytype'}

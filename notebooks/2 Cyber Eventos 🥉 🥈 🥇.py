@@ -18,18 +18,17 @@ from pyspark.dbutils import DBUtils
 import subprocess
 import yaml
 
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-        'branch': 'dev-diego'}  
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
 
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego', 
+    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
 
-spark = SparkSession.builder.getOrCreate()
-dbutils = DBUtils(spark)
-
-epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
 
@@ -52,17 +51,15 @@ import epic_py; reload(epic_py)
 import src; reload(src)
 import config; reload(config)
 
+from epic_py.delta import EpicDataBuilder
+
 from src.data_managers import EpicDF, CyberData
 from src.platform_resources import AzureResourcer
 from src.utilities import tools
 
-from config import (app_agent, app_resources,
+from config import (app_agent, app_resources, 
+    cyber_handler, cyber_rename,
     ConfigEnviron, ENV, SERVER, DBKS_TABLES)
-
-
-
-# COMMAND ----------
-
 
 tables = DBKS_TABLES[ENV]['items'] # type: ignore
 app_environ = ConfigEnviron(ENV, SERVER, spark)
@@ -77,6 +74,7 @@ specs_path = "cx/collections/cyber/spec_files"
 tmp_downer = "/dbfs/FileStore/cyber/specs"
 
 cyber_central = CyberData(spark)
+cyber_builder = EpicDataBuilder(typehandler = cyber_handler)
 
 def dumps2(an_obj, **kwargs): 
     dump1 = dumps(an_obj, **kwargs)
@@ -101,7 +99,7 @@ def dumps2(an_obj, **kwargs):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Mandar llamar todos. 
+# MAGIC ## Construir pre-tablas 
 
 # COMMAND ----------
 
@@ -129,12 +127,6 @@ the_txns = cyber_central.prepare_source('txns-set',
 
 txn_pmts = cyber_central.prepare_source('txns-grp', 
     path=f"{brz_path}/transaction-set/data")
-
-# COMMAND ----------
-
-from epic_py.delta import EpicDF 
-
-txns = EpicDF(spark, f"{brz_path}/transaction-set/data").display() # type: ignore
 
 # COMMAND ----------
 
@@ -225,46 +217,100 @@ def read_cyber_specs(task_key: str):
 
 # COMMAND ----------
 
-import re
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
 re_col = r"Column<'CAST\((.*) AS [A-Z]*\)'>"
 
 the_tables   = {}
 missing_cols = {}
-for task in cyber_tasks: 
-    specs_df, spec_joins = read_cyber_specs(task)
-    
-    specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-    # Tiene: [readers, missing, fix_vals]
-    missing_cols[task] = specs_dict['missing']
-    
-    fxd_widther = cyber_central.fxw_converter(specs_df)
-    filler = fxd_widther['0-fill']
-    caster_1 = {str(col): col for col in fxd_widther['1-cast']}
-    caster = {re.match(re_col, c_key).group(1): val 
-            for c_key, val in caster_1.items()}
-    
-    gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-    
-    gold_2 = (gold_3   # type: ignore
-        .fillna(0, filler[0])
-        .fillna('', filler[''])
-        .with_column_plus(caster)
-        .fill_na_plus({date(1900, 1, 1): filler[date(1900, 1, 1)]})
-        .select(*fxd_widther['2-string']))
-    
-    one_select = F.concat(*gold_2.columns).alias('|'.join(gold_2.columns))
-    gold_1 = gold_2.select(one_select)
-    the_tables[task] = gold_1
-    cyber_central.save_task_3(task, gold_path, gold_1)
-    print(f"\tRows: {gold_1.count()}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### SAP Saldos
+
+# COMMAND ----------
+
+task = 'sap_saldos'
+specs_df, spec_joins = read_cyber_specs(task)
+specs_df_2 = specs_df.rename(columns=cyber_rename)
+
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+# Tiene: [readers, missing, fix_vals]
+missing_cols[task] = specs_dict['missing']
+
+widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
+
+gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+
+gold_2 = gold_3.with_column_plus(widther_2)
+
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
+gold_saldos = gold_2.select(one_select)
+the_tables[task] = gold_saldos
+cyber_central.save_task_3(task, gold_path, gold_saldos)
+print(f"\tRows: {gold_saldos.count()}")
      
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### SAP Estatus
+
+# COMMAND ----------
+
+task = 'sap_estatus'
+specs_df, spec_joins = read_cyber_specs(task)
+
+specs_df_2 = specs_df.rename(columns=cyber_rename)
+
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+# Tiene: [readers, missing, fix_vals]
+missing_cols[task] = specs_dict['missing']
+
+widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
+
+gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+
+gold_2 = gold_3.with_column_plus(widther_2)
+
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
+gold_estatus = gold_2.select(one_select)
+the_tables[task] = gold_estatus
+cyber_central.save_task_3(task, gold_path, gold_estatus)
+print(f"\tRows: {gold_estatus.count()}")
+     
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### SAP Pagos
+
+# COMMAND ----------
+
+task = 'sap_pagos'
+specs_df, spec_joins = read_cyber_specs(task)
+
+specs_df_2 = specs_df.rename(columns=cyber_rename)
+
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+# Tiene: [readers, missing, fix_vals]
+missing_cols[task] = specs_dict['missing']
+
+widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
+
+gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+
+gold_2 = gold_3.with_column_plus(widther_2)
+
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
+gold_pagos = gold_2.select(one_select)
+the_tables[task] = gold_pagos
+cyber_central.save_task_3(task, gold_path, gold_pagos)
+print(f"\tRows: {gold_pagos.count()}")
+
+
+
+# COMMAND ----------
+
 print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
-
-# COMMAND ----------
-
 the_tables['sap_estatus'].display()
-
-# COMMAND ----------
-
-
