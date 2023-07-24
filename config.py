@@ -43,6 +43,22 @@ SETUP_2 = {
 }}
 
 
+PLATFORM_2 = {
+    'dev': {        
+        'key-vault' : 'kv-collections-data-dev',
+        'storage'   : 'lakehylia'},
+    'qas': {        
+        'key-vault' : 'kv-cx-data-qas',
+        'storage'   : 'stlakehyliaqas'},
+    'stg': {        
+        'key-vault' : 'kv-cx-adm-stg',
+        'storage'   : 'stlakehyliastg'},
+    'prd': {        
+        'key-vault' : 'kv-cx-data-prd',
+        'storage'   : 'stlakehyliaprd'}, 
+}
+
+
 SETUP_KEYS = {
     'dev' : {
         'service-principal' : {

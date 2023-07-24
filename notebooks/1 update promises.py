@@ -24,30 +24,13 @@ from pathlib import Path
 import subprocess
 import yaml
 
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego'}
-
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
 
-epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-subprocess.check_call(['pip', 'install', url_call])
-
-
-# COMMAND ----------
-
-import subprocess
-import yaml
-
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego'}
-
-with open("../user_databricks.yml", 'r') as _f: 
-    u_dbks = yaml.safe_load(_f)
-    epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
+    'branch': 'dev-diego', 
+    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
@@ -80,25 +63,6 @@ abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_stora
 abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage)
 
 tbl_items = DBKS_TABLES[ENV]['items']
-
-# COMMAND ----------
-
-from inspect import getsource
-#print(getsource(app_agent.call_dict))
-from epic_py.tools import compose2
-from pydantic import SecretStr
-μ_secret = compose2(SecretStr, app_agent.get_secret)
-
-a_dict = app_agent['service-principal']
-print(a_dict.keys())
-
-kk = 'client_id'
-vv = a_dict[kk]
-ww = app_agent.get_secret(vv)
-xx = SecretStr(ww)
-
-from epic_py.tools import identity2
-identity2(vv)
 
 # COMMAND ----------
 
@@ -154,7 +118,6 @@ promises_spk = spark.createDataFrame(promises_df)
 # MAGIC # Bronze to Silver 
 
 # COMMAND ----------
-
 
 slv_promises_0 = promises_spk
 
