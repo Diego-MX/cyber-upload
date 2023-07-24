@@ -134,7 +134,6 @@ promises_spk = spark.createDataFrame(promises_df) # type: ignore
 
 # COMMAND ----------
 
-
 slv_promises_0 = promises_spk
 
 cols_unnest = ['comission', 'interest', 'principal']

@@ -40,14 +40,8 @@ SETUP_2 = {
             'client_secret'   : 'sp-collections-secret', 
             'tenant_id'       : 'aad-tenant-id', 
             'subscription_id' : 'sp-collections-subscription' } , 
-<<<<<<< HEAD
         'databricks-scope': 'cx-collections'}
-}, 
-=======
-        'databricks-scope': {'scope': 'cx-collections'}
-}}
->>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
-
+}
 
 PLATFORM_2 = {
     'dev': {        
