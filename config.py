@@ -56,11 +56,7 @@ PLATFORM_2 = {
     'prd': {        
         'key-vault' : 'kv-cx-data-prd',
         'storage'   : 'stlakehyliaprd'}, 
-<<<<<<< HEAD
 }
-
-
-
 
 CORE_2 = {
     'dev-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'}, 
@@ -73,8 +69,6 @@ CRM_2 = {
         'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}, 
     'prod-zd': {
         'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}
-=======
->>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
 }
 
 
@@ -350,15 +344,6 @@ DBKS_KEYS = {
 
 
 
-
-<<<<<<< HEAD
-=======
-DBKS_TABLES_2 = {
-    'base'    : 'ops/core-banking/batch-updates', 
-    'promises': 'cx/collections/sunshine-objects',
-    'metastore': {'lambda': λ_table} }
->>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
-
 DBKS_TABLES = {          
     'dev': {
         'base' : 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
@@ -595,17 +580,3 @@ cyber_handler = TypeHandler({
         'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
-<<<<<<< HEAD
-
-
-
-
-
-
-
-
-=======
->>>>>>> 6844c62f2b0ee3f653d50f16aa93182be54be4b4
-
-
- 
