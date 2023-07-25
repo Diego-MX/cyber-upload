@@ -71,6 +71,27 @@ CRM_2 = {
         'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}
 }
 
+DATA_2 = {
+    'paths': {
+        'core': 'ops/core-banking/batch-updates', 
+        'events': 'ops/core-banking',  # ¿Se usa para algo? 
+        'collections': 'cx/collections/sunshine-objects'}, 
+    'tables': {
+        'brz_persons'       :('din_clients.brz_ops_persons_set',    'persons-set'),
+        'brz_loan_payments' :('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+        'brz_loans'     :('nayru_accounts.brz_ops_loan_contracts',      'loan-contracts'), 
+        'brz_loan_balances' :('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
+        'brz_loan_open_items'   :('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
+        'brz_promises'      :('farore_transactions.brz_cx_payment_promises',    'promises'),
+        'slv_loans'         :('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
+        'slv_loan_balances' :('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
+        'slv_loan_open_items'   :('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
+        'slv_loan_payments' :('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
+        'slv_persons'   :('din_clients.slv_ops_persons_set',    'persons-set'), 
+        'slv_promises'  :('farore_transactions.slv_cx_payment_promises',    'promises'), 
+        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts')}
+}  
+
 
 SETUP_KEYS = {
     'dev' : {
@@ -105,7 +126,6 @@ SETUP_KEYS = {
         'dbks': {'scope': 'cx-collections'}
     }
 } 
-
 
 PLATFORM_KEYS = {
     'dev': {        
@@ -338,8 +358,6 @@ DBKS_KEYS = {
             'contracts'   : "bronze.loan_contracts", 
             'collections' : "gold.loan_contracts"}   },   
 } 
-
-
 
 DBKS_TABLES = {          
     'dev': {
@@ -577,7 +595,9 @@ cyber_handler = TypeHandler({
         'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
-cyber_rename = {'nombre': 'name', 
-    'Posición inicial': 'pos', 
-    'Longitud': 'len', 
-    'PyType': 'pytype'}
+
+cyber_rename = {
+    'nombre'    : 'name', 
+    'PyType'    : 'pytype',
+    'Longitud'  : 'len', 
+    'Posición inicial' : 'pos'}

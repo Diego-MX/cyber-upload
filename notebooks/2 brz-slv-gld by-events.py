@@ -13,24 +13,22 @@
 
 # COMMAND ----------
 
-from pathlib import Path
 from pyspark.sql import SparkSession
 from pyspark.dbutils import DBUtils
 import subprocess
 import yaml
 
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego'}
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
 
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego'
+    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
 
-spark = SparkSession.builder.getOrCreate()
-dbutils = DBUtils(spark)
-
-epicpy_load['token'] = dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
 
@@ -47,7 +45,8 @@ import re
 from src.utilities import tools
 from src.data_managers import EpicDF
 from src.platform_resources import AzureResourcer
-from config import (ConfigEnviron, ENV, SERVER, DBKS_TABLES)
+from config import (app_agent, app_resources,
+    ConfigEnviron, ENV, SERVER, DBKS_TABLES)
 
 tables = DBKS_TABLES[ENV]
 
