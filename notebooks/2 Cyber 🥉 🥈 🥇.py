@@ -470,7 +470,6 @@ def get_reader_specs(specs_df: pd_DF) -> dict:
 
 # COMMAND ----------
 
-
 def _col_string_format(name, col_type, c_format, s_format): 
     if   col_type == 'str': 
         format_1 = F.format_string(c_format, F.col(name))
