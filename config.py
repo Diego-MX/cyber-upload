@@ -74,7 +74,7 @@ CRM_2 = {
 DATA_2 = {
     'paths': {
         'core': 'ops/core-banking/batch-updates', 
-        'events': 'ops/core-banking',  # ¿Se usa para algo? 
+        'events': 'ops/core-banking',  
         'collections': 'cx/collections/sunshine-objects'}, 
     'tables': {
         'brz_persons'       :('din_clients.brz_ops_persons_set',    'persons-set'),

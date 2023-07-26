@@ -26,7 +26,7 @@ with open("../user_databricks.yml", 'r') as _f:
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego'
+    'branch': 'dev-diego',
     'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
