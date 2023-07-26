@@ -12,7 +12,6 @@
 
 # COMMAND ----------
 
-from pathlib import Path
 from pyspark.sql import SparkSession
 from pyspark.dbutils import DBUtils
 import subprocess
@@ -41,40 +40,45 @@ import pandas as pd
 from pathlib import Path
 from pyspark.sql import (functions as F, SparkSession)
 import re
-import subprocess
 
 
 # COMMAND ----------
 
 from importlib import reload
 import epic_py; reload(epic_py)
-import src; reload(src)
+from src import data_managers; reload(data_managers)
 import config; reload(config)
 
-from epic_py.delta import EpicDataBuilder
+from epic_py.delta import EpicDF, EpicDataBuilder
 
-from src.data_managers import EpicDF, CyberData
-from src.platform_resources import AzureResourcer
+from src.data_managers import CyberData
+#from src.platform_resources import AzureResourcer
 from src.utilities import tools
 
 from config import (app_agent, app_resources, 
     cyber_handler, cyber_rename,
     ConfigEnviron, ENV, SERVER, DBKS_TABLES)
 
-tables = DBKS_TABLES[ENV]['items'] # type: ignore
-app_environ = ConfigEnviron(ENV, SERVER, spark)
-az_manager  = AzureResourcer(app_environ)
+stg_account = app_resources['storage']
+stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
+app_resources.set_dbks_permissions(stg_permissions)
 
-at_storage = az_manager.get_storage()
-az_manager.set_dbks_permissions(at_storage)
+#tables = DBKS_TABLES[ENV]['items'] 
+#app_environ = ConfigEnviron(ENV, SERVER, spark)
+#az_manager  = AzureResourcer(app_environ)
 
-brz_path   = app_resources.get_resource_url('abfss', 'storage', container='bronze', blob_path='ops/core-banking')  
-gold_path  = app_resources.get_resource_url('abfss', 'storage', container='gold', blob_path='cx/collections/cyber') 
+#at_storage = az_manager.get_storage()
+#az_manager.set_dbks_permissions(at_storage)
+
+brz_path   = app_resources.get_resource_url('abfss', 'storage', 
+        container='bronze', blob_path='ops/core-banking')  
+gold_path  = app_resources.get_resource_url('abfss', 'storage', 
+        container='gold', blob_path='cx/collections/cyber') 
 specs_path = "cx/collections/cyber/spec_files"
 tmp_downer = "/dbfs/FileStore/cyber/specs"
 
 cyber_central = CyberData(spark)
-cyber_builder = EpicDataBuilder(typehandler = cyber_handler)
+cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
 
 def dumps2(an_obj, **kwargs): 
     dump1 = dumps(an_obj, **kwargs)
@@ -100,6 +104,11 @@ def dumps2(an_obj, **kwargs):
 
 # MAGIC %md
 # MAGIC ## Construir pre-tablas 
+
+# COMMAND ----------
+
+loans = EpicDF(spark, f"{brz_path}/loan-contract/data")
+loans.display()
 
 # COMMAND ----------
 
@@ -169,8 +178,8 @@ def read_cyber_specs(task_key: str):
     specs_blob = f"{specs_path}/{task_key}_specs_latest.feather"
     joins_blob = f"{specs_path}/{task_key}_joins_latest.csv"
     
-    az_manager.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
-    az_manager.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
+    app_resources.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
+    app_resources.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
     
     specs_df = cyber_central.specs_setup_0(specs_file)
     
@@ -250,6 +259,10 @@ the_tables[task] = gold_saldos
 cyber_central.save_task_3(task, gold_path, gold_saldos)
 print(f"\tRows: {gold_saldos.count()}")
      
+
+# COMMAND ----------
+
+gold_saldos.display()
 
 # COMMAND ----------
 

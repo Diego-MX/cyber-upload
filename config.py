@@ -11,7 +11,6 @@ from src.utilities import tools
 
 PAGE_MAX = 1000
 
-
 SETUP_2 = {
     'dev': {
         'service-principal' : {
@@ -64,12 +63,38 @@ CORE_2 = {
     'prd-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'}
 }
 
+
 CRM_2 = {
     'sandbox-zd': {
-        'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}, 
+        'url': "https://bineo1633010523.zendesk.com/api", 
+        'main-user': 'crm-api-user', 'main-token': 'crm-api-token', 
+        'zis-id': 'crm-zis-id', 'zis-user': 'crm-zis-user', 'zis-pass': 'crm-zis-pass'}, 
     'prod-zd': {
-        'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}
+        'url': "https://bineo.zendesk.com/api", 
+        'main-user': 'crm-api-user', 'main-token': 'crm-api-token', 
+        'zis-id': 'crm-zis-id', 'zis-user': 'crm-zis-user', 'zis-pass': 'crm-zis-pass'}, 
 }
+
+DATA_2 = {
+    'paths': {
+        'core': 'ops/core-banking/batch-updates', 
+        'events': 'ops/core-banking',  # ¿Se usa para algo? 
+        'collections': 'cx/collections/sunshine-objects'}, 
+    'tables': {
+        'brz_persons'       :('din_clients.brz_ops_persons_set',    'persons-set'),
+        'brz_loan_payments' :('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
+        'brz_loans'     :('nayru_accounts.brz_ops_loan_contracts',      'loan-contracts'), 
+        'brz_loan_balances' :('nayru_accounts.brz_ops_loan_balances',   'loan-balances'), 
+        'brz_loan_open_items'   :('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),  
+        'brz_promises'      :('farore_transactions.brz_cx_payment_promises',    'promises'),
+        'slv_loans'         :('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'), 
+        'slv_loan_balances' :('nayru_accounts.slv_ops_loan_balances',   'loan-balances'), 
+        'slv_loan_open_items'   :('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),  
+        'slv_loan_payments' :('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
+        'slv_persons'   :('din_clients.slv_ops_persons_set',    'persons-set'), 
+        'slv_promises'  :('farore_transactions.slv_cx_payment_promises',    'promises'), 
+        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts')}
+}  
 
 
 SETUP_KEYS = {
@@ -577,6 +602,7 @@ cyber_handler = TypeHandler({
         'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
+        
 cyber_rename = {'nombre': 'name', 
     'Posición inicial': 'pos', 
     'Longitud': 'len', 

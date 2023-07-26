@@ -26,9 +26,7 @@ import subprocess
 import yaml
 
 spark = SparkSession.builder.getOrCreate()
-dbutils = DBUtils(spark)
-
-
+dbks_secrets = DBUtils(spark).secrets
 
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
@@ -36,7 +34,7 @@ with open("../user_databricks.yml", 'r') as _f:
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
     'branch': 'dev-diego', 
-    'token' :  dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
+    'token' :  dbks_secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
@@ -48,35 +46,33 @@ import json
 from pyspark.sql import functions as F, types as T
 import re
 
-
 # COMMAND ----------
 
-from importlib import(reload)
-import epic_py; reload(epic_py)
-import src; reload(src)
+from importlib import reload
 import config; reload(config)
 
-from src.platform_resources import AzureResourcer
 from src.crm_platform import ZendeskSession
-from config import (ConfigEnviron, 
-    ENV, SERVER, CRM_ENV, DBKS_TABLES, 
-    app_agent, app_resources)
+from src.platform_resources import AzureResourcer
+from config import (app_agent, app_resources, DATA_2, 
+    ConfigEnviron, 
+    ENV, SERVER, CRM_ENV, DBKS_TABLES, )
 
-a_storage = app_resources['storage']
-stg_permissions = app_agent.prep_dbks_permissions(a_storage, 'gen2')
+data_paths  = DATA_2['paths']
+data_tables = DATA_2['tables']
+
+stg_permissions = app_agent.prep_dbks_permissions(app_resources['storage'], 'gen2')
 app_resources.set_dbks_permissions(stg_permissions)
 
+abfss_brz = app_resources.get_resource_url('abfss', 'storage', 
+    container='bronze', blob_path=data_paths['collections']) 
+abfss_slv = app_resources.get_resource_url('abfss', 'storage', 
+    container='silver', blob_path=data_paths['collections'])     
+
+# Para cambiar estos elementos, requerimos habilitar CRMSession en EpicPy. 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
-
-at_storage = azure_getter.get_storage()
-azure_getter.set_dbks_permissions(at_storage)
-
 zendesker = ZendeskSession(CRM_ENV, azure_getter)
-abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage) # type: ignore
-abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage) # type: ignore
 
-tbl_items = DBKS_TABLES[ENV]['items'] # type: ignore
 
 
 # COMMAND ----------
@@ -113,9 +109,7 @@ udf_date_format = F.udf(date_format, T.StringType())
 
 # COMMAND ----------
 
-promises_meta = tbl_items['brz_promises']
-promises_tbl = (promises_meta[2] if len(promises_meta) > 2 
-        else promises_meta[0])
+promises_tbl = data_tables['brz_promises'][0]
 
 promises_df = (zendesker
     .get_promises()
