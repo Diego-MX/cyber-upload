@@ -15,18 +15,28 @@
 
 from pyspark.sql import SparkSession
 from pyspark.dbutils import DBUtils
-import subprocess
-import yaml
-
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
 
+import subprocess
+import yaml
+
+<<<<<<< HEAD
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
+=======
+>>>>>>> 6313e3e34e67135463c9a99c060c46d1ca3a203a
 with open("../user_databricks.yml", 'r') as _f: 
     u_dbks = yaml.safe_load(_f)
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
+<<<<<<< HEAD
     'branch': 'dev-diego',
+=======
+    'branch': 'dev-diego', 
+>>>>>>> 6313e3e34e67135463c9a99c060c46d1ca3a203a
     'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
@@ -42,23 +52,33 @@ import re
 
 # COMMAND ----------
 
+from importlib import reload
+import config; reload(config)
+
+from epic_py.delta import EpicDF
+
 from src.utilities import tools
-from src.data_managers import EpicDF
 from src.platform_resources import AzureResourcer
+<<<<<<< HEAD
 from config import (app_agent, app_resources,
     ConfigEnviron, ENV, SERVER, DBKS_TABLES)
+=======
+from config import (app_agent, app_resources, DATA_2)
+>>>>>>> 6313e3e34e67135463c9a99c060c46d1ca3a203a
 
-tables = DBKS_TABLES[ENV]
+data_paths = DATA_2['paths']
 
-app_environ = ConfigEnviron(ENV, SERVER, spark)
-az_manager  = AzureResourcer(app_environ)
-at_storage  = az_manager.get_storage()
-az_manager.set_dbks_permissions(at_storage)
+stg_permissions = app_agent.prep_dbks_permissions(app_resources['storage'], 'gen2')
+app_resources.set_dbks_permissions(stg_permissions)
 
-events_brz = tables['events'].format(stage='bronze', storage=at_storage)
-abfss_slv  = tables['base'  ].format(stage='silver', storage=at_storage)
-abfss_gld  = tables['base'  ].format(stage='gold',   storage=at_storage)
-at_promise = tables['promises'].format(stage='silver', storage=at_storage) 
+events_brz = app_resources.get_resource_url('abfss', 'storage', 
+    container='bronze', blob_path=data_paths['events'])
+abfss_slv  =app_resources.get_resource_url('abfss', 'storage', 
+    container='silver', blob_path=data_paths['core'])
+abfss_gld  = app_resources.get_resource_url('abfss', 'storage', 
+    container='gold', blob_path=data_paths['core'])
+at_promise = app_resources.get_resource_url('abfss', 'storage', 
+    container='silver', blob_path=data_paths['collections'])
 
 # COMMAND ----------
 
@@ -99,13 +119,6 @@ display(persons_slv)
 
 # COMMAND ----------
 
-from epic_py.delta import EpicDF
-from inspect import getsource
-a_slv = EpicDF(spark, f"{events_brz}/person-set/chains/person")
-print(getsource(a_slv.select))
-
-# COMMAND ----------
-
 # MAGIC %md 
 # MAGIC ## Current Account
 # MAGIC
@@ -143,7 +156,6 @@ loan_cols_0 = [F.col('ID').alias('ContractID'),
 
 loans_slv = (EpicDF(spark, f"{events_brz}/loan-contract/data")
     .select(loan_cols_0))
-
 
 display(loans_slv)
 

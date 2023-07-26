@@ -11,7 +11,6 @@ from src.utilities import tools
 
 PAGE_MAX = 1000
 
-
 SETUP_2 = {
     'dev': {
         'service-principal' : {
@@ -64,11 +63,16 @@ CORE_2 = {
     'prd-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'}
 }
 
+
 CRM_2 = {
     'sandbox-zd': {
-        'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}, 
+        'url': "https://bineo1633010523.zendesk.com/api", 
+        'main-user': 'crm-api-user', 'main-token': 'crm-api-token', 
+        'zis-id': 'crm-zis-id', 'zis-user': 'crm-zis-user', 'zis-pass': 'crm-zis-pass'}, 
     'prod-zd': {
-        'url', 'main-user', 'main-token', 'zis-id', 'zis-user', 'zis-pass'}
+        'url': "https://bineo.zendesk.com/api", 
+        'main-user': 'crm-api-user', 'main-token': 'crm-api-token', 
+        'zis-id': 'crm-zis-id', 'zis-user': 'crm-zis-user', 'zis-pass': 'crm-zis-pass'}, 
 }
 
 DATA_2 = {

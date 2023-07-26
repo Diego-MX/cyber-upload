@@ -86,7 +86,7 @@ class CyberData():
             loan_cols = OrderedDict({
                 'ContractID'  : F.col('ID'), 
                 'person_id'   : F.col('BorrowerID'),
-                'borrower_mod': F.concat(F.lit('B'), F.col('BorrowerID')),
+                'borrower_mod': F.concat(F.lit('B0'), F.col('BorrowerID')),
                 'yesterday'   : F.date_add(F.current_date(), -1),
                 'status_2'    : when_plus([(vv, kk[0]) for kk, vv in status_dict.items()]), 
                 'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()]), 
@@ -114,8 +114,8 @@ class CyberData():
                 'interest'   : F.col('991100') + F.col('511100'), 
                 'iva'        : F.col('990004'), 
                 'is_due'     : F.col('DueDate') >= F.current_date(),  
-                'is_current' : min_date(F.col('is_due')), 
                 'is_default' : F.col('StatusCategory').isin(['2','3']),
+                'is_current' : min_date(F.col('is_due')), 
                 'is_oldest'  : min_date(F.col('is_default'))})
                 
             group_cols = {
