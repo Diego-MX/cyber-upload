@@ -574,7 +574,7 @@ CORE_ENV = environ.get('CORE_ENV')
 CRM_ENV  = environ.get('CRM_ENV')
 
 app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV]) 
-app_resources = app_agent.get_resourcer(PLATFORM_2[ENV])
+app_resources = app_agent.get_resourcer(PLATFORM_2[ENV], check_all=False)
 
 cyber_handler = TypeHandler({
     'int' : {
