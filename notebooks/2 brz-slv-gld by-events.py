@@ -13,8 +13,14 @@
 
 # COMMAND ----------
 
-from pyspark.sql import SparkSession
+from collections import OrderedDict
+from datetime import datetime as dt, date, timedelta as delta
+from delta.tables import DeltaTable as Δ
+from pyspark.sql import (functions as F, 
+    types as T, Window as W, SparkSession)
 from pyspark.dbutils import DBUtils
+import re
+
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
 
@@ -37,14 +43,6 @@ subprocess.check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
-from collections import OrderedDict
-from datetime import datetime as dt, date, timedelta as delta
-from delta.tables import DeltaTable as Δ
-from pyspark.sql import functions as F, types as T, Window as W
-import re
-
-# COMMAND ----------
-
 from importlib import reload
 import config; reload(config)
 
@@ -60,14 +58,13 @@ data_paths = DATA_2['paths']
 stg_permissions = app_agent.prep_dbks_permissions(app_resources['storage'], 'gen2')
 app_resources.set_dbks_permissions(stg_permissions)
 
-events_brz = app_resources.get_resource_url('abfss', 'storage', 
-    container='bronze', blob_path=data_paths['events'])
-abfss_slv  =app_resources.get_resource_url('abfss', 'storage', 
-    container='silver', blob_path=data_paths['core'])
-abfss_gld  = app_resources.get_resource_url('abfss', 'storage', 
-    container='gold', blob_path=data_paths['core'])
-at_promise = app_resources.get_resource_url('abfss', 'storage', 
-    container='silver', blob_path=data_paths['collections'])
+λ_path = lambda cc, pp: app_resources.get_resource_url(
+    'abfss', 'storage', container=cc, blob_path=pp)
+
+events_brz = λ_path('bronze', data_paths['events'])
+abfss_slv  = λ_path('silver', data_paths['core'])
+abfss_gld  = λ_path('gold',   data_paths['core'])
+at_promise = λ_path('silver', data_paths['collections'])
 
 # COMMAND ----------
 
