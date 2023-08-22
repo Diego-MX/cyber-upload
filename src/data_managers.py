@@ -6,12 +6,16 @@ import pandas as pd
 from pandas import DataFrame as pd_DF
 from pyspark.sql import (functions as F, types as T, Window as W)
 from pytz import timezone
-from toolz import functoolz as f_toolz
+from toolz import compose, curry, pipe, valmap
 import re
 
 from epic_py.delta import (EpicDF, TypeHandler, 
     column_name, when_plus)
-from epic_py.tools import MatchCase
+from epic_py.tools import MatchCase, partial2
+
+caster = lambda tt: (lambda a_col: a_col.cast(tt))
+item_namer = lambda names: compose(dict, partial2(zip, names))
+## (kk, vv) -> {nm[0]: kk, nm[1]: vv}
 
 
 class CyberData(): 
@@ -52,29 +56,20 @@ class CyberData():
             'date': '%8.8d', 
             'long': '%0{}d'}
 
+
     def prepare_source(self, which, path, **kwargs): 
         base_df = EpicDF(self.spark, path)
         
         if   which == 'balances': 
-            bal_rename = {a_col: re.sub('code_', 'x', a_col) 
-                for a_col in base_df.columns}
-
             bal_cols = {
-                'x3_x96': F.col('x3') + F.col('x96')}
+                'x3_x96': F.col('code_3') + F.col('code_96')}
 
             x_df = (base_df   # type: ignore
                 .dropDuplicates()
-                .with_column_renamed_plus(bal_rename)
                 .with_column_plus(bal_cols))
 
         elif which == 'loan-contracts':
-
-            if 'open_items' not in kwargs: 
-                raise Exception("Need OPEN_ITEMS reference.")
             
-            open_items = (kwargs['open_items']
-                .select('ID', 'overdue_days'))
-
             where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
 
             status_dict = OrderedDict({
@@ -85,25 +80,21 @@ class CyberData():
                 ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
                 ('undefined','---') :  None})
             
-            repayments = [
-                ('MENSUAL'  , F.col('RepaymentFrequency') == 'MT'), 
-                ('SEMANAL'  , F.col('RepaymentFrequency') == 'WK'), 
-                ('QUINCENAL', F.col('RepaymentFrequency') == 'FN'),
-                (F.col('RepaymentFrequency'), None)]
+            repay_dict = {'MENSUAL': 'MT', 'SEMANAL': 'WK', 'QUINCENAL': 'FT'}
+            repay_rows = map(item_namer(['repay_freq', 'RepaymentFrequency']), repay_dict)
+            repay_df   = self.spark.createDataFrame(repay_rows)
 
             loan_cols = OrderedDict({
                 'ContractID'  : F.col('ID'), 
                 'person_id'   : F.col('BorrowerID'),
                 'borrower_mod': F.concat(F.lit('B0'), F.col('BorrowerID')),
                 'yesterday'   : F.date_add(F.current_date(), -1),
-                'repymnt_freq': when_plus(repayments, reverse=True), 
                 'status_2'    : when_plus([(vv, kk[0]) for kk, vv in status_dict.items()]), 
-                'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()]), 
-            })
+                'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()])})
 
             x_df = (base_df   # type: ignore
-                .join(open_items, on='ID', how='left')
                 .filter_plus(*where_loans) 
+                .join(repay_df, on='RepaymentFrequency', how='left')
                 .with_column_plus(loan_cols))
             
         elif which == 'open-items-wide': 
@@ -131,9 +122,9 @@ class CyberData():
                     'oldest_date'      : F.col('DueDate'), 
                     'oldest_uncleared' : F.col('uncleared'), 
                     'oldest_eval_date' : F.col('DueDate') + 90, 
-                    'overdue_days'     : f_toolz.pipe(F.col('DueDate'), 
-                        lambda col: F.datediff('yesterday', col), 
-                        lambda col: F.coalesce(col, F.lit(0))), 
+                    'overdue_days'     : pipe(F.col('DueDate'), 
+                        curry(F.datediff)('yesterday'), 
+                        partial2(F.coalesce, ..., F.lit(0))), 
                 })} 
             
             y_df = (base_df   # type: ignore
@@ -159,18 +150,20 @@ class CyberData():
             w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
             single_cols = OrderedDict({
                 'ID'        : F.col('ContractID'),
-                'cleared'   : f_toolz.pipe( F.col('ReceivableDescription'), 
-                    lambda col : F.regexp_extract(col, r"Cleared: ([\d\.]+)", 1),
-                    lambda col : col.cast(T.DecimalType(20, 2)),
-                    lambda col : F.coalesce(col, F.lit(0))), 
+                'cleared'   : pipe(F.col('ReceivableDescription'), 
+                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
+                    caster(T.DecimalType(20, 2)), 
+                    partial2(F.coalesce, ..., F.lit(0))), 
                 'uncleared'  : F.col('Amount') - F.col('cleared'), 
                 '_max_date'  : F.max('DueDate').over(w_duedate),
                 'yesterday'  : F.current_date() - 1, 
                 'is_default' : F.col('StatusCategory').isin(['2','3']),
-                'min_default': F.when(F.col('is_default'), F.col('DueDate')).otherwise(F.col('_max_date'))
+                'min_default': F.when(F.col('is_default'), F.col('DueDate'))
+                    .otherwise(F.col('_max_date'))
             })
             
-            uncleared_if = lambda cond: F.sum(F.when(cond, F.col('uncleared')).otherwise(0))
+            uncleared_if = (lambda cond: 
+                F.sum(F.when(cond, F.col('uncleared')).otherwise(0)))
 
             group_cols = {
                 'default_uncleared' : uncleared_if(F.col('is_default')), 

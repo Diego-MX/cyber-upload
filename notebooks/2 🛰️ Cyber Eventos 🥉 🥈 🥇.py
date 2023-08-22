@@ -50,14 +50,14 @@ from epic_py.delta import EpicDF, EpicDataBuilder
 from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import (app_agent, app_resources, 
+from config import (app_agent, app_resourcer, 
     cyber_handler, cyber_rename)
 
-stg_account = app_resources['storage']
+stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
-app_resources.set_dbks_permissions(stg_permissions)
+app_resourcer.set_dbks_permissions(stg_permissions)
 
-λ_path = (lambda cc, pp: app_resources.get_resource_url(
+λ_path = (lambda cc, pp: app_resourcer.get_resource_url(
         'abfss', 'storage', container=cc, blob_path=pp))
 
 brz_path  = λ_path('bronze', 'ops/core-banking')  
