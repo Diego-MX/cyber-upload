@@ -24,7 +24,7 @@ SETUP_2 = {
             'client_id'       : 'sp-core-events-client', 
             'client_secret'   : 'sp-core-events-secret', 
             'tenant_id'       : 'aad-tenant-id', 
-            'subscription_id' : 'sp-core-events-suscription' } , 
+            'subscription_id' : 'sp-core-events-subscription' } , 
         'databricks-scope': 'eh-core-banking'}, 
     'stg' : {
         'service-principal' : {

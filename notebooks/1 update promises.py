@@ -20,8 +20,12 @@
 
 # COMMAND ----------
 
-from pyspark.sql import SparkSession
+from datetime import datetime as dt
+import json
+from pyspark.sql import (functions as F, types as T, 
+    SparkSession)
 from pyspark.dbutils import DBUtils
+import re
 import subprocess
 import yaml
 
@@ -38,13 +42,6 @@ epicpy_load = {
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 subprocess.check_call(['pip', 'install', url_call])
-
-# COMMAND ----------
-
-from datetime import datetime as dt
-import json
-from pyspark.sql import functions as F, types as T
-import re
 
 # COMMAND ----------
 

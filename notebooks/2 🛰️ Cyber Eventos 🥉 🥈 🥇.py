@@ -12,8 +12,16 @@
 
 # COMMAND ----------
 
-from pyspark.sql import SparkSession
+from collections import OrderedDict
+from datetime import date
+from functools import partial
+from json import dumps
+import os
+import pandas as pd
+from pathlib import Path
+from pyspark.sql import (functions as F, SparkSession)
 from pyspark.dbutils import DBUtils
+import re
 import subprocess
 import yaml
 
@@ -33,49 +41,30 @@ subprocess.check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
-from collections import OrderedDict
-from datetime import date
-from json import dumps
-import pandas as pd
-from pathlib import Path
-from pyspark.sql import (functions as F, SparkSession)
-import re
-
-
-# COMMAND ----------
-
 from importlib import reload
-import epic_py; reload(epic_py)
 from src import data_managers; reload(data_managers)
 import config; reload(config)
 
 from epic_py.delta import EpicDF, EpicDataBuilder
 
 from src.data_managers import CyberData
-#from src.platform_resources import AzureResourcer
 from src.utilities import tools
 
 from config import (app_agent, app_resources, 
-    cyber_handler, cyber_rename,
-    ConfigEnviron, ENV, SERVER, DBKS_TABLES)
+    cyber_handler, cyber_rename)
 
 stg_account = app_resources['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
 app_resources.set_dbks_permissions(stg_permissions)
 
-#tables = DBKS_TABLES[ENV]['items'] 
-#app_environ = ConfigEnviron(ENV, SERVER, spark)
-#az_manager  = AzureResourcer(app_environ)
+λ_path = (lambda cc, pp: app_resources.get_resource_url(
+        'abfss', 'storage', container=cc, blob_path=pp))
 
-#at_storage = az_manager.get_storage()
-#az_manager.set_dbks_permissions(at_storage)
+brz_path  = λ_path('bronze', 'ops/core-banking')  
+gold_path = λ_path('gold', 'cx/collections/cyber') 
 
-brz_path   = app_resources.get_resource_url('abfss', 'storage', 
-        container='bronze', blob_path='ops/core-banking')  
-gold_path  = app_resources.get_resource_url('abfss', 'storage', 
-        container='gold', blob_path='cx/collections/cyber') 
-specs_path = "cx/collections/cyber/spec_files"
-tmp_downer = "/dbfs/FileStore/cyber/specs"
+specs_path = "cx/collections/cyber/spec_files"  # @
+tmp_downer = "/FileStore/cyber/specs"
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
@@ -84,6 +73,10 @@ def dumps2(an_obj, **kwargs):
     dump1 = dumps(an_obj, **kwargs)
     dump2 = re.sub(r'(,)\n *', r'\1 ', dump1)
     return dump2
+
+if not os.path.isdir(tmp_downer): 
+    os.makedirs(tmp_downer)
+    # dbutils.fs.mkdirs(f"file://{tmp_downer}")
 
 # COMMAND ----------
 
@@ -104,11 +97,6 @@ def dumps2(an_obj, **kwargs):
 
 # MAGIC %md
 # MAGIC ## Construir pre-tablas 
-
-# COMMAND ----------
-
-loans = EpicDF(spark, f"{brz_path}/loan-contract/data")
-loans.display()
 
 # COMMAND ----------
 
@@ -171,15 +159,22 @@ for kk, vv in tables_dict.items():
 
 # COMMAND ----------
 
-def read_cyber_specs(task_key: str): 
+from pathlib import Path
+from collections import OrderedDict
+
+def read_cyber_specs(task_key: str, downer='blob'): 
     # Usa TMP_DOWNER, SPECS_PATH, 
-    specs_file = f"{tmp_downer}/{task_key}.feather"
-    joins_file = f"{tmp_downer}/{task_key}_joins.csv"
-    specs_blob = f"{specs_path}/{task_key}_specs_latest.feather"
-    joins_blob = f"{specs_path}/{task_key}_joins_latest.csv"
+    dir_at = tmp_downer if downer == 'blob' else '../refs/catalogs'
+    file_nm = task_key if downer == 'blob' else f'cyber_{task_key}'
+
+    specs_file = f"{dir_at}/{file_nm}.feather"
+    joins_file = f"{dir_at}/{file_nm}_joins.csv"
     
-    app_resources.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
-    app_resources.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
+    if downer == 'blob': 
+        specs_blob = f"{dir_at}/{file_nm}_specs_latest.feather"
+        joins_blob = f"{dir_at}/{file_nm}_joins_latest.csv"
+        app_resources.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
+        app_resources.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
     
     specs_df = cyber_central.specs_setup_0(specs_file)
     
@@ -190,7 +185,6 @@ def read_cyber_specs(task_key: str):
         joins_dict = OrderedDict()
         for tabla, rr in join_df.iterrows():
             if not tools.is_na(rr['join_cols']):
-                # OldCol1=new_col_1,OldCol2=new_col_2,...
                 joiners_0 = rr['join_cols'].split(',')
                 joiners_1 = (jj.split('=') for jj in joiners_0)
                 joiners_2 = [F.col(j0).alias(j1) for j0, j1 in joiners_1]
@@ -229,6 +223,8 @@ def read_cyber_specs(task_key: str):
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
 re_col = r"Column<'CAST\((.*) AS [A-Z]*\)'>"
 
+exportar = True
+
 the_tables   = {}
 missing_cols = {}
 
@@ -240,29 +236,27 @@ missing_cols = {}
 # COMMAND ----------
 
 task = 'sap_saldos'
-specs_df, spec_joins = read_cyber_specs(task)
-specs_df_2 = specs_df.rename(columns=cyber_rename)
 
+specs_df, spec_joins = read_cyber_specs(task, 'repo')
+specs_df_2 = specs_df.rename(columns=cyber_rename)
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 # Tiene: [readers, missing, fix_vals]
+
 missing_cols[task] = specs_dict['missing']
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
 
 widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
 
 gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-
 gold_2 = gold_3.with_column_plus(widther_2)
 
-one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
 gold_saldos = gold_2.select(one_select)
 the_tables[task] = gold_saldos
 cyber_central.save_task_3(task, gold_path, gold_saldos)
-print(f"\tRows: {gold_saldos.count()}")
-     
 
-# COMMAND ----------
-
-gold_saldos.display()
+if exportar:
+    print(f"\tRows: {gold_saldos.count()}")
+    gold_saldos.display()
 
 # COMMAND ----------
 
@@ -272,7 +266,7 @@ gold_saldos.display()
 # COMMAND ----------
 
 task = 'sap_estatus'
-specs_df, spec_joins = read_cyber_specs(task)
+specs_df, spec_joins = read_cyber_specs(task, 'repo')
 
 specs_df_2 = specs_df.rename(columns=cyber_rename)
 
@@ -291,7 +285,13 @@ gold_estatus = gold_2.select(one_select)
 the_tables[task] = gold_estatus
 cyber_central.save_task_3(task, gold_path, gold_estatus)
 print(f"\tRows: {gold_estatus.count()}")
+if exportar: 
+    gold_estatus.display()
      
+
+# COMMAND ----------
+
+gold_estatus.display()
 
 # COMMAND ----------
 
@@ -301,7 +301,7 @@ print(f"\tRows: {gold_estatus.count()}")
 # COMMAND ----------
 
 task = 'sap_pagos'
-specs_df, spec_joins = read_cyber_specs(task)
+specs_df, spec_joins = read_cyber_specs(task, 'repo')
 
 specs_df_2 = specs_df.rename(columns=cyber_rename)
 
@@ -320,8 +320,7 @@ gold_pagos = gold_2.select(one_select)
 the_tables[task] = gold_pagos
 cyber_central.save_task_3(task, gold_path, gold_pagos)
 print(f"\tRows: {gold_pagos.count()}")
-
-
+gold_pagos.display()
 
 # COMMAND ----------
 

@@ -21,7 +21,6 @@ class CyberData():
         self.spark = spark
         self.set_defaults()
         
-
     def set_defaults(self): 
         self.reports = {
             'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
@@ -53,7 +52,6 @@ class CyberData():
             'date': '%8.8d', 
             'long': '%0{}d'}
 
-
     def prepare_source(self, which, path, **kwargs): 
         base_df = EpicDF(self.spark, path)
         
@@ -61,9 +59,13 @@ class CyberData():
             bal_rename = {a_col: re.sub('code_', 'x', a_col) 
                 for a_col in base_df.columns}
 
+            bal_cols = {
+                'x3_x96': F.col('x3') + F.col('x96')}
+
             x_df = (base_df   # type: ignore
                 .dropDuplicates()
-                .with_column_renamed_plus(bal_rename))
+                .with_column_renamed_plus(bal_rename)
+                .with_column_plus(bal_cols))
 
         elif which == 'loan-contracts':
 
@@ -77,22 +79,26 @@ class CyberData():
 
             status_dict = OrderedDict({
                 ('VIGENTE',  '303') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
-                                    & (F.col('overdue_days') == 0), 
+                                    & (F.col('OverdueDays') == 0), 
                 ('VENCIDO',  '000') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
-                                    & (F.col('overdue_days') >  0),
+                                    & (F.col('OverdueDays') >  0),
                 ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
                 ('undefined','---') :  None})
             
+            repayments = [
+                ('MENSUAL'  , F.col('RepaymentFrequency') == 'MT'), 
+                ('SEMANAL'  , F.col('RepaymentFrequency') == 'WK'), 
+                ('QUINCENAL', F.col('RepaymentFrequency') == 'FN'),
+                (F.col('RepaymentFrequency'), None)]
+
             loan_cols = OrderedDict({
                 'ContractID'  : F.col('ID'), 
                 'person_id'   : F.col('BorrowerID'),
                 'borrower_mod': F.concat(F.lit('B0'), F.col('BorrowerID')),
                 'yesterday'   : F.date_add(F.current_date(), -1),
+                'repymnt_freq': when_plus(repayments, reverse=True), 
                 'status_2'    : when_plus([(vv, kk[0]) for kk, vv in status_dict.items()]), 
                 'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()]), 
-                # Missing in Events from APIs. 
-                'total_payments': F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()), 
-                'StageLevel'  : F.col('LifeCycleStatus')
             })
 
             x_df = (base_df   # type: ignore
@@ -150,9 +156,7 @@ class CyberData():
 
         elif which == 'open-items-long': 
             id_cols   = ['ContractID', 'epic_date', 'ID']
-            
             w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-            
             single_cols = OrderedDict({
                 'ID'        : F.col('ContractID'),
                 'cleared'   : f_toolz.pipe( F.col('ReceivableDescription'), 
@@ -171,8 +175,7 @@ class CyberData():
             group_cols = {
                 'default_uncleared' : uncleared_if(F.col('is_default')), 
                 'default_interest'  : uncleared_if(F.col('ReceivableType').isin(['991100', '511100'])), 
-                'default_iva'       : uncleared_if(F.col('ReceivableType') == '990004'), 
-            }
+                'default_iva'       : uncleared_if(F.col('ReceivableType') == '990004')}
                 
             x_df = (base_df
                 .with_column_plus(single_cols)
@@ -192,7 +195,7 @@ class CyberData():
 
             states_df = self.spark.createDataFrame(states_data)
             
-            persons_cols = {    
+            persons_cols = {   
                 'LastNameP' : F.col('LastName'),
                 'LastNameM' : F.col('LastName2'), 
                 'full_name' : F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
