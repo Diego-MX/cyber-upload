@@ -1,8 +1,8 @@
-tabla,helper,join_cols
-ContractSet,ovr_cols,"ID=loan_id,BorrowerID=person_id"
-PersonSet,person_cols,ID=person_id
-BalancesWide,---,ID=loan_id
-OpenItems,---,ID=loan_id
-TxnsGrouped,---,AccountID=loan_id
-_val,---,
-OpenItemsLong,---,ContractID=loan_id
+tabla,helper,join_cols,comentario
+ContractSet,ovr_cols,"ID=loan_id,BorrowerID=person_id",
+PersonSet,person_cols,ID=person_id,
+BalancesWide,---,ID=loan_id,
+OpenItems,---,ID=loan_id,formato Wide. 
+TxnsGrouped,---,AccountID=loan_id,
+_val,---,,
+OpenItemsLong,---,ContractID=loan_id,

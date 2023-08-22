@@ -21,7 +21,7 @@ def excelref_to_feather(xls_df):
                               as_lgl(df0['lon_dec'] == 8), True), 
         chk_mand   = np.where(as_lgl(df0['Mandatorio']), 
                               as_lgl(df0['columna_valor'] != ''), True), 
-        chk_aplica = np.where(as_lgl(df0['Aplica'] == 'N'  ), 
+        chk_aplica = np.where(as_lgl(df0['Aplica'] == 'N'), 
                               as_lgl(df0['columna_valor'] == 'N/A'), True),
         chk_len    = as_lgl(df0['Posición inicial'] + np.floor(df0['lon_dec']) 
                          == df0['Posición inicial'].shift(-1)), 
@@ -38,12 +38,12 @@ def excelref_to_feather(xls_df):
 
 
 if __name__ == '__main__': 
-
     from epic_py.tools import read_excel_table
-    from config import (app_resources, app_agent, 
-        ConfigEnviron, ENV, SERVER, SITE)
+    from dotenv import load_dotenv
 
-
+    load_dotenv(override=True)
+    from config import app_resourcer, app_agent, SITE
+    
     cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
     expect_specs = (read_excel_table(cyber_fields, 'general', 'especificacion')
@@ -80,14 +80,14 @@ if __name__ == '__main__':
         (execs, checks) = excelref_to_feather(spec_ref)
         execs.to_feather(spec_local)
         
-        app_resources.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
-        app_resources.upload_storage_blob(spec_local, blob_2, 'gold')
+        app_resourcer.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
+        app_resourcer.upload_storage_blob(spec_local, blob_2, 'gold')
         print(checks)
 
         if has_join is not None: 
             has_join.to_csv(join_local, index=False)
-            app_resources.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
-            app_resources.upload_storage_blob(join_local, blob_4, 'gold')
+            app_resourcer.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
+            app_resourcer.upload_storage_blob(join_local, blob_4, 'gold')
 
 
 
