@@ -63,8 +63,8 @@ app_resources.set_dbks_permissions(stg_permissions)
 brz_path  = λ_path('bronze', 'ops/core-banking')  
 gold_path = λ_path('gold', 'cx/collections/cyber') 
 
-specs_path = "cx/collections/cyber/spec_files"  # @
-tmp_downer = "/FileStore/cyber/specs"
+specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
+tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS 
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
