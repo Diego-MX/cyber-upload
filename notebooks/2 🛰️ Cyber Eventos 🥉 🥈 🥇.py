@@ -22,7 +22,7 @@ from pathlib import Path
 from pyspark.sql import (functions as F, SparkSession)
 from pyspark.dbutils import DBUtils
 import re
-import subprocess
+from subprocess import check_call
 import yaml
 
 spark = SparkSession.builder.getOrCreate()
@@ -37,7 +37,13 @@ epicpy_load = {
     'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-subprocess.check_call(['pip', 'install', url_call])
+check_call(['pip', 'install', url_call])
+
+# COMMAND ----------
+
+read_specs_from = 'blob'  # blob, repo
+# Repo es la forma formal, como se lee en PRD. 
+# Blob es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
 # COMMAND ----------
 
@@ -111,6 +117,7 @@ open_items_long = cyber_central.prepare_source('open-items-long',
 
 open_items_wide = cyber_central.prepare_source('open-items-wide', 
     path=f"{brz_path}/loan-contract/aux/open-items-wide")
+    # tiene muchos CURRENT_AMOUNT : NULL
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
@@ -173,8 +180,8 @@ def read_cyber_specs(task_key: str, downer='blob'):
     if downer == 'blob': 
         specs_blob = f"{dir_at}/{file_nm}_specs_latest.feather"
         joins_blob = f"{dir_at}/{file_nm}_joins_latest.csv"
-        app_resources.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
-        app_resources.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
+        app_resourcer.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
+        app_resourcer.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
     
     specs_df = cyber_central.specs_setup_0(specs_file)
     
@@ -237,7 +244,7 @@ missing_cols = {}
 
 task = 'sap_saldos'
 
-specs_df, spec_joins = read_cyber_specs(task, 'repo')
+specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_2 = specs_df.rename(columns=cyber_rename)
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 # Tiene: [readers, missing, fix_vals]
@@ -266,7 +273,7 @@ if exportar:
 # COMMAND ----------
 
 task = 'sap_estatus'
-specs_df, spec_joins = read_cyber_specs(task, 'repo')
+specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 
 specs_df_2 = specs_df.rename(columns=cyber_rename)
 
@@ -301,7 +308,7 @@ gold_estatus.display()
 # COMMAND ----------
 
 task = 'sap_pagos'
-specs_df, spec_joins = read_cyber_specs(task, 'repo')
+specs_df, spec_joins = read_cyber_specs(task, read_specs_fromt)
 
 specs_df_2 = specs_df.rename(columns=cyber_rename)
 

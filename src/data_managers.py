@@ -24,45 +24,14 @@ class CyberData():
     def __init__(self, spark): 
         self.spark = spark
         self.set_defaults()
-        
-    def set_defaults(self): 
-        self.reports = {
-            'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
-            'sap_estatus'   : ('C8BD1353',  'core_status'  ), 
-            'sap_pagos'     : ('C8BD1343',  'core_payments'), 
-            'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
-            'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
-            'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
-
-        self.na_types = {
-            'str' : '', 
-            'dbl' : 0, 
-            'int' : 0, 
-            'long': 0,
-            'date': date(1900, 1, 1)}
-
-        self.spk_types = {
-            'str' : T.StringType, 
-            'dbl' : T.DoubleType, 
-            'int' : T.IntegerType, 
-            'long': T.LongType, 
-            'date': T.DateType}
-
-        self.c_formats = {
-            'int' : '%0{}d', 
-            'dbl' : '%0{}.{}f', 
-            'dec' : '%0{}.{}d',  # Puede ser '%0{}.{}f'
-            'str' : '%-{}.{}s', 
-            'date': '%8.8d', 
-            'long': '%0{}d'}
-
-
+  
+  
     def prepare_source(self, which, path, **kwargs): 
         base_df = EpicDF(self.spark, path)
         
         if   which == 'balances': 
             bal_cols = {
-                'x3_x96': F.col('code_3') + F.col('code_96')}
+                'x3_96': F.col('code_3') + F.col('code_96')}
 
             x_df = (base_df   # type: ignore
                 .dropDuplicates()
@@ -70,6 +39,9 @@ class CyberData():
 
         elif which == 'loan-contracts':
             
+            open_items = (kwargs['open_items']
+                .select('ID', 'oldest_date'))
+
             where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
 
             status_dict = OrderedDict({
@@ -79,6 +51,12 @@ class CyberData():
                                     & (F.col('OverdueDays') >  0),
                 ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
                 ('undefined','---') :  None})
+            
+            usgaap = [
+                ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
+                ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_date')+90), 
+                ((F.col('StageLevel') == 3), F.col('EvaluationDate')), 
+                (None, F.lit(None))]
             
             repay_dict = {'MENSUAL': 'MT', 'SEMANAL': 'WK', 'QUINCENAL': 'FT'}
             repay_rows = map(item_namer(['repay_freq', 'RepaymentFrequency']), repay_dict)
@@ -90,10 +68,13 @@ class CyberData():
                 'borrower_mod': F.concat(F.lit('B0'), F.col('BorrowerID')),
                 'yesterday'   : F.date_add(F.current_date(), -1),
                 'status_2'    : when_plus([(vv, kk[0]) for kk, vv in status_dict.items()]), 
-                'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()])})
+                'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()]), 
+                #'usgaap_date' : when_plus(usgaap)
+                })
 
             x_df = (base_df   # type: ignore
                 .filter_plus(*where_loans) 
+                .join(open_items, on='ID', how='left')
                 .join(repay_df, on='RepaymentFrequency', how='left')
                 .with_column_plus(loan_cols))
             
@@ -397,6 +378,40 @@ class CyberData():
         gold_table.save_as_file(report_dir, report_recent,  header=False)
         gold_table.save_as_file(report_dir, report_history, header=True)
         return report_history
+    
+          
+    def set_defaults(self): 
+        self.reports = {
+            'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
+            'sap_estatus'   : ('C8BD1353',  'core_status'  ), 
+            'sap_pagos'     : ('C8BD1343',  'core_payments'), 
+            'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
+            'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
+            'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
+
+        self.na_types = {
+            'str' : '', 
+            'dbl' : 0, 
+            'int' : 0, 
+            'long': 0,
+            'date': date(1900, 1, 1)}
+
+        self.spk_types = {
+            'str' : T.StringType, 
+            'dbl' : T.DoubleType, 
+            'int' : T.IntegerType, 
+            'long': T.LongType, 
+            'date': T.DateType}
+
+        self.c_formats = {
+            'int' : '%0{}d', 
+            'dbl' : '%0{}.{}f', 
+            'dec' : '%0{}.{}d',  # Puede ser '%0{}.{}f'
+            'str' : '%-{}.{}s', 
+            'date': '%8.8d', 
+            'long': '%0{}d'}
+
+
 
 
 def pd_print(a_df: pd.DataFrame, **kwargs):
