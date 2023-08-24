@@ -11,9 +11,8 @@ import re
 
 from epic_py.delta import (EpicDF, TypeHandler, 
     column_name, when_plus)
-from epic_py.tools import MatchCase, partial2
+from epic_py.tools import MatchCase, partial2, method_getter
 
-caster = lambda tt: (lambda a_col: a_col.cast(tt))
 item_namer = lambda names: compose(dict, partial2(zip, names))
 ## (kk, vv) -> {nm[0]: kk, nm[1]: vv}
 
@@ -25,11 +24,9 @@ class CyberData():
         self.spark = spark
         self.set_defaults()
   
-  
     def prepare_source(self, which, path, **kwargs): 
         base_df = EpicDF(self.spark, path)
-        
-        if   which == 'balances': 
+        if which == 'balances': 
             bal_cols = {
                 'x3_96': F.col('code_3') + F.col('code_96')}
 
@@ -55,22 +52,26 @@ class CyberData():
             usgaap = [
                 ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
                 ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_date')+90), 
-                ((F.col('StageLevel') == 3), F.col('EvaluationDate')), 
+                ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
                 (None, F.lit(None))]
             
-            repay_dict = {'MENSUAL': 'MT', 'SEMANAL': 'WK', 'QUINCENAL': 'FT'}
-            repay_rows = map(item_namer(['repay_freq', 'RepaymentFrequency']), repay_dict)
-            repay_df   = self.spark.createDataFrame(repay_rows)
-
             loan_cols = OrderedDict({
-                'ContractID'  : F.col('ID'), 
-                'person_id'   : F.col('BorrowerID'),
-                'borrower_mod': F.concat(F.lit('B0'), F.col('BorrowerID')),
-                'yesterday'   : F.date_add(F.current_date(), -1),
-                'status_2'    : when_plus([(vv, kk[0]) for kk, vv in status_dict.items()]), 
-                'status_3'    : when_plus([(vv, kk[1]) for kk, vv in status_dict.items()]), 
-                #'usgaap_date' : when_plus(usgaap)
-                })
+                'ContractID'   : F.col('ID'), 
+                'person_id'    : F.col('BorrowerID'),
+                'borrower_mod' : F.concat(F.lit('B0'), F.col('BorrowerID')),
+                'interes_amort': F.col('NextPaymentInterestAmt')
+                               + F.col('NextExemptInterestAmount'), 
+                'yesterday'    : F.date_add(F.current_date(), -1), 
+                'usgaap_date'  : when_plus(usgaap),
+                'status_2' : when_plus([(vv, kk[0]) 
+                            for kk, vv in status_dict.items()]), 
+                'status_3' : when_plus([(vv, kk[1]) 
+                            for kk, vv in status_dict.items()])})
+
+            repay_nmer = item_namer(['RepaymentFrequency', 'repay_freq'])
+            repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
+            repay_rows = map(repay_nmer, repay_dict.items())
+            repay_df   = self.spark.createDataFrame(repay_rows)
 
             x_df = (base_df   # type: ignore
                 .filter_plus(*where_loans) 
@@ -104,9 +105,8 @@ class CyberData():
                     'oldest_uncleared' : F.col('uncleared'), 
                     'oldest_eval_date' : F.col('DueDate') + 90, 
                     'overdue_days'     : pipe(F.col('DueDate'), 
-                        curry(F.datediff)('yesterday'), 
-                        partial2(F.coalesce, ..., F.lit(0))), 
-                })} 
+                        partial2(F.datediff, 'yesterday'), 
+                        partial2(F.coalesce, ..., F.lit(0)))})} 
             
             y_df = (base_df   # type: ignore
                 .fillna(0, subset=rec_types)
@@ -132,9 +132,9 @@ class CyberData():
             single_cols = OrderedDict({
                 'ID'        : F.col('ContractID'),
                 'cleared'   : pipe(F.col('ReceivableDescription'), 
-                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
-                    caster(T.DecimalType(20, 2)), 
-                    partial2(F.coalesce, ..., F.lit(0))), 
+                        partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
+                        method_getter('cast', T.DecimalType(20, 2)), 
+                        partial2(F.coalesce, ..., F.lit(0))), 
                 'uncleared'  : F.col('Amount') - F.col('cleared'), 
                 '_max_date'  : F.max('DueDate').over(w_duedate),
                 'yesterday'  : F.current_date() - 1, 
@@ -155,7 +155,7 @@ class CyberData():
                 .with_column_plus(single_cols)
                 .filter(F.col('is_default'))
                 .groupBy(*id_cols)
-                .agg(*[vv.alias(kk) for kk, vv in group_cols.items()]))
+                .agg_plus(group_cols))
             
         elif which == 'person-set':
             states_str = [
@@ -164,8 +164,8 @@ class CyberData():
                 "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
                 "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
 
-            states_data = [ {'AddressRegion': each_split[0], 'state_key': each_split[1]} 
-                for each_split in map(lambda x: x.split(','), states_str)]
+            states_data = [ item_namer(['AddressRegion', 'state_key'])(split)
+                for split in map(method_getter('split', ','), states_str)]
 
             states_df = self.spark.createDataFrame(states_data)
             
@@ -327,19 +327,23 @@ class CyberData():
                     # Fixing missing columns as NA. 
                     missing[rr['tabla']].add(rr['columna_valor'])
                     r_value = self.na_types[r_type]
-                    r_col = F.lit(r_value).cast(self.spk_types[r_type]()).alias(rr['nombre'])
-                    
+                    r_col = (F.lit(r_value)
+                        .cast(self.spk_types[r_type]())
+                        .alias(rr['nombre']))
                     fix_vals.append(r_col)
             else: 
                 if rr['is_na']: 
                     r_value = self.na_types[r_type]
                 else: 
                     r_value = rr['columna_valor']
-                fix_vals.append(F.lit(r_value).cast(self.spk_types[r_type]()).alias(rr['nombre']))
+                r_col = (F.lit(r_value)
+                    .cast(self.spk_types[r_type]())
+                    .alias(rr['nombre']))
+                fix_vals.append(r_col)
 
         result_specs = {
             'readers' : dict(readers), 
-            'missing' : {k: list(v) for k, v in missing.items()}, 
+            'missing' : valmap(list, missing), 
             'fix_vals': fix_vals}
         return result_specs
 
@@ -357,7 +361,7 @@ class CyberData():
             next_tbl = (tables_dict[n_key]
                 .select(*readers[n_key], *spec_joins[n_key]))
             main_tbl = main_tbl.join(next_tbl, how='left', 
-                on=[column_name(col) for col in spec_joins[n_key]])
+                on=list(map(column_name, spec_joins[n_key])))
             n_key = next(joiner, None)
         
         master_tbl = main_tbl.select('*', *specs_dict['fix_vals'])
@@ -410,7 +414,6 @@ class CyberData():
             'str' : '%-{}.{}s', 
             'date': '%8.8d', 
             'long': '%0{}d'}
-
 
 
 

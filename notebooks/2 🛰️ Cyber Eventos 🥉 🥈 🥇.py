@@ -12,9 +12,9 @@
 
 # COMMAND ----------
 
-read_specs_from = 'blob'  # blob, repo
-# Repo es la forma formal, como se lee en PRD. 
-# Blob es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
+read_specs_from = 'repo'    # blob, repo
+# REPO es la forma formal, como se lee en PRD. 
+# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
 # COMMAND ----------
 
@@ -80,7 +80,7 @@ def dumps2(an_obj, **kwargs):
 
 if not os.path.isdir(tmp_downer): 
     os.makedirs(tmp_downer)
-    # dbutils.fs.mkdirs(f"file://{tmp_downer}")
+    
 
 # COMMAND ----------
 
@@ -169,17 +169,20 @@ from collections import OrderedDict
 
 def read_cyber_specs(task_key: str, downer='blob'): 
     # Usa TMP_DOWNER, SPECS_PATH, 
-    dir_at = tmp_downer if downer == 'blob' else '../refs/catalogs'
-    file_nm = task_key if downer == 'blob' else f'cyber_{task_key}'
-
-    specs_file = f"{dir_at}/{file_nm}.feather"
-    joins_file = f"{dir_at}/{file_nm}_joins.csv"
-    
     if downer == 'blob': 
-        specs_blob = f"{dir_at}/{file_nm}_specs_latest.feather"
-        joins_blob = f"{dir_at}/{file_nm}_joins_latest.csv"
+        dir_at = tmp_downer # and no prefix
+        specs_file = f"{dir_at}/{task_key}.feather"
+        joins_file = f"{tmp_downer}/{task_key}_joins.csv"
+
+        specs_blob = f"{specs_path}/{task_key}_specs_latest.feather"
+        joins_blob = f"{specs_path}/{task_key}_joins_latest.csv"
         app_resourcer.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
         app_resourcer.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
+
+    elif downer == 'repo': 
+        dir_at = "../refs/catalogs"  # prefix: "cyber_"
+        specs_file = f"{dir_at}/cyber_{task_key}.feather"
+        joins_file = f"{dir_at}/cyber_{task_key}_joins.csv"
     
     specs_df = cyber_central.specs_setup_0(specs_file)
     
@@ -296,17 +299,13 @@ if exportar:
 
 # COMMAND ----------
 
-gold_estatus.display()
-
-# COMMAND ----------
-
 # MAGIC %md 
 # MAGIC ### SAP Pagos
 
 # COMMAND ----------
 
 task = 'sap_pagos'
-specs_df, spec_joins = read_cyber_specs(task, read_specs_fromt)
+specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 
 specs_df_2 = specs_df.rename(columns=cyber_rename)
 
