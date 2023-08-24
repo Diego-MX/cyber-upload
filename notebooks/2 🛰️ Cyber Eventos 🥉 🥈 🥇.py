@@ -12,9 +12,14 @@
 
 # COMMAND ----------
 
+read_specs_from = 'blob'  # blob, repo
+# Repo es la forma formal, como se lee en PRD. 
+# Blob es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
+
+# COMMAND ----------
+
 from collections import OrderedDict
 from datetime import date
-from functools import partial
 from json import dumps
 import os
 import pandas as pd
@@ -41,12 +46,6 @@ check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
-read_specs_from = 'blob'  # blob, repo
-# Repo es la forma formal, como se lee en PRD. 
-# Blob es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
-
-# COMMAND ----------
-
 from importlib import reload
 from src import data_managers; reload(data_managers)
 import config; reload(config)
@@ -56,8 +55,7 @@ from epic_py.delta import EpicDF, EpicDataBuilder
 from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import (app_agent, app_resourcer, 
-    cyber_handler, cyber_rename)
+from config import (app_agent, app_resourcer, cyber_handler, cyber_rename)
 
 stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
