@@ -68,8 +68,9 @@ class CyberData():
                 'status_3' : when_plus([(vv, kk[1]) 
                             for kk, vv in status_dict.items()])})
 
-            repay_dict = {'MENSUAL': 'MT', 'SEMANAL': 'WK', 'QUINCENAL': 'FT'}
-            repay_rows = map(item_namer(['repay_freq', 'RepaymentFrequency']), repay_dict)
+            repay_nmer = item_namer(['RepaymentFrequency', 'repay_freq'])
+            repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
+            repay_rows = map(repay_nmer, repay_dict.items())
             repay_df   = self.spark.createDataFrame(repay_rows)
 
             x_df = (base_df   # type: ignore

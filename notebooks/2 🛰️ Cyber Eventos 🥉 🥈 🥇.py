@@ -12,9 +12,14 @@
 
 # COMMAND ----------
 
+read_specs_from = 'repo'    # blob, repo
+# REPO es la forma formal, como se lee en PRD. 
+# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
+
+# COMMAND ----------
+
 from collections import OrderedDict
 from datetime import date
-from functools import partial
 from json import dumps
 import os
 import pandas as pd
@@ -38,12 +43,6 @@ epicpy_load = {
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
 check_call(['pip', 'install', url_call])
-
-# COMMAND ----------
-
-read_specs_from = 'blob'  # blob, repo
-# Repo es la forma formal, como se lee en PRD. 
-# Blob es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
 # COMMAND ----------
 
@@ -82,7 +81,7 @@ def dumps2(an_obj, **kwargs):
 
 if not os.path.isdir(tmp_downer): 
     os.makedirs(tmp_downer)
-    # dbutils.fs.mkdirs(f"file://{tmp_downer}")
+    
 
 # COMMAND ----------
 
