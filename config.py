@@ -580,28 +580,23 @@ app_resourcer = app_agent.get_resourcer(PLATFORM_2[ENV], check_all=False)
 cyber_handler = TypeHandler({
     'int' : {
         'NA': 0,
-        'NA_str': '0',
         'c_format': '%0{}d',}, 
     'long' : {
         'NA': 0,
-        'NA_str': '0',
         'c_format': '%0{}d',}, 
     'dbl' : {
         'NA': 0, 
-        'NA_str': '0',
         'c_format': '%0{}.{}f', 
         'no_decimal': True},
     'str' : {
         'NA': '',
-        'NA_str': '',
         'c_format': '%-{}s'},
     'date': {
         'NA': date(1900, 1, 1), 
-        'NA_str': '01011900',
         'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
 
-cyber_rename = {
+specs_rename = {
     'nombre'    : 'name', 
     'PyType'    : 'pytype',
     'Longitud'  : 'len', 
