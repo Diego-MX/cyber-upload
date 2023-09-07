@@ -55,7 +55,7 @@ from epic_py.delta import EpicDF, EpicDataBuilder
 from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import (app_agent, app_resourcer, cyber_handler, cyber_rename)
+from config import (app_agent, app_resourcer, cyber_handler, specs_rename)
 
 stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
@@ -101,6 +101,13 @@ if not os.path.isdir(tmp_downer):
 
 # MAGIC %md
 # MAGIC ## Construir pre-tablas 
+
+# COMMAND ----------
+
+(loan_contracts
+    .join(persons.withColumnRenamed('ID', 'person_id'), 
+        on='person_id')
+    .display())
 
 # COMMAND ----------
 
@@ -246,7 +253,7 @@ missing_cols = {}
 task = 'sap_saldos'
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-specs_df_2 = specs_df.rename(columns=cyber_rename)
+specs_df_2 = specs_df.rename(columns=specs_rename)
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 # Tiene: [readers, missing, fix_vals]
 
@@ -255,16 +262,20 @@ one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
 
 widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
 
-gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-gold_2 = gold_3.with_column_plus(widther_2)
+saldos_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+saldos_2 = saldos_3.with_column_plus(widther_2)
 
-gold_saldos = gold_2.select(one_select)
+gold_saldos = saldos_2.select(one_select)
 the_tables[task] = gold_saldos
 cyber_central.save_task_3(task, gold_path, gold_saldos)
 
 if exportar:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
+
+# COMMAND ----------
+
+saldos_2.display()
 
 # COMMAND ----------
 
@@ -276,7 +287,7 @@ if exportar:
 task = 'sap_estatus'
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 
-specs_df_2 = specs_df.rename(columns=cyber_rename)
+specs_df_2 = specs_df.rename(columns=specs_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 # Tiene: [readers, missing, fix_vals]
@@ -307,7 +318,7 @@ if exportar:
 task = 'sap_pagos'
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 
-specs_df_2 = specs_df.rename(columns=cyber_rename)
+specs_df_2 = specs_df.rename(columns=specs_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 # Tiene: [readers, missing, fix_vals]
@@ -329,4 +340,3 @@ gold_pagos.display()
 # COMMAND ----------
 
 print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
-the_tables['sap_estatus'].display()

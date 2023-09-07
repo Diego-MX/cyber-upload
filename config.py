@@ -443,8 +443,10 @@ DBKS_TABLES = {
             'gld_loans'           :
                 ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
     'stg': {
-        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
-        'promises': 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects',
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/'
+                'ops/core-banking/batch-updates',
+        'promises': 'abfss://{stage}@{storage}.dfs.core.windows.net/'
+                    'cx/collections/sunshine-objects',
         'items': { # table, location.
             'brz_persons'         :
                 ('din_clients.brz_ops_persons_set',        'persons-set'),
@@ -473,8 +475,10 @@ DBKS_TABLES = {
             'gld_loans'           :
                 ('nayru_accounts.gld_cx_collections_loans', 'loan-contracts')}},
     'prd': {
-        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/ops/core-banking/batch-updates',
-        'promises': 'abfss://{stage}@{storage}.dfs.core.windows.net/cx/collections/sunshine-objects',
+        'base': 'abfss://{stage}@{storage}.dfs.core.windows.net/'
+                'ops/core-banking/batch-updates',
+        'promises': 'abfss://{stage}@{storage}.dfs.core.windows.net/'
+                    'cx/collections/sunshine-objects',
         'items': {  # table, location.
             'brz_persons'         :
                 ('din_clients.brz_ops_persons_set',        'persons-set'),
@@ -582,29 +586,24 @@ app_resourcer = app_agent.get_resourcer(PLATFORM_2[ENV], check_all=False)
 cyber_handler = TypeHandler({
     'int' : {
         'NA': 0,
-        'NA_str': '0',
-        'c_format': '%0{}d'},
+        'c_format': '%0{}d',}, 
     'long' : {
         'NA': 0,
-        'NA_str': '0',
-        'c_format': '%0{}d'},
+        'c_format': '%0{}d',}, 
     'dbl' : {
-        'NA': 0,
-        'NA_str': '0',
-        'c_format': '%0{}.{}f',
+        'NA': 0, 
+        'c_format': '%0{}.{}f', 
         'no_decimal': True},
     'str' : {
         'NA': '',
-        'NA_str': '',
         'c_format': '%-{}s'},
     'date': {
-        'NA': date(1900, 1, 1),
-        'NA_str': '01011900',
-        'c_format': '%8.8d',
+        'NA': date(1900, 1, 1), 
+        'c_format': '%8.8d', 
         'date_format': 'MMddyyyy'}})
 
-cyber_rename = {
-    'nombre'   : 'name',
-    'PyType'   : 'pytype',
-    'Longitud' : 'len',
+specs_rename = {
+    'nombre'    : 'name', 
+    'PyType'    : 'pytype',
+    'Longitud'  : 'len', 
     'Posición inicial' : 'pos'}
