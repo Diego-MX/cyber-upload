@@ -50,27 +50,25 @@ import config; reload(config)
 
 from src.crm_platform import ZendeskSession
 from src.platform_resources import AzureResourcer
-from config import (app_agent, app_resources, DATA_2, 
+from config import (app_agent, app_resourcer, DATA_2, 
     ConfigEnviron, 
-    ENV, SERVER, CRM_ENV, DBKS_TABLES, )
+    ENV, SERVER, CRM_ENV, DBKS_TABLES)
 
 data_paths  = DATA_2['paths']
 data_tables = DATA_2['tables']
 
-stg_permissions = app_agent.prep_dbks_permissions(app_resources['storage'], 'gen2')
-app_resources.set_dbks_permissions(stg_permissions)
+stg_permissions = app_agent.prep_dbks_permissions(app_resourcer['storage'], 'gen2')
+app_resourcer.set_dbks_permissions(stg_permissions)
 
-abfss_brz = app_resources.get_resource_url('abfss', 'storage', 
+abfss_brz = app_resourcer.get_resource_url('abfss', 'storage', 
     container='bronze', blob_path=data_paths['collections']) 
-abfss_slv = app_resources.get_resource_url('abfss', 'storage', 
+abfss_slv = app_resourcer.get_resource_url('abfss', 'storage', 
     container='silver', blob_path=data_paths['collections'])     
 
 # Para cambiar estos elementos, requerimos habilitar CRMSession en EpicPy. 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
 zendesker = ZendeskSession(CRM_ENV, azure_getter)
-
-
 
 # COMMAND ----------
 

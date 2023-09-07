@@ -12,7 +12,7 @@
 
 # COMMAND ----------
 
-read_specs_from = 'repo'
+read_specs_from = 'repo'    
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
@@ -22,16 +22,15 @@ read_specs_from = 'repo'
 from collections import OrderedDict
 from datetime import date
 from json import dumps
-from operator import methodcaller
 import os
 from pathlib import Path
 import re
 from subprocess import check_call
 
 import pandas as pd
-from pyspark.sql import (functions as F, SparkSession)
+from pyspark.sql import (functions as F, SparkSession, Window as W)
 from pyspark.dbutils import DBUtils
-from toolz import compose_left, curried, pipe
+from toolz import compose_left, curried
 import yaml
 
 spark = SparkSession.builder.getOrCreate()
@@ -54,9 +53,9 @@ from importlib import reload
 from src import data_managers; reload(data_managers)
 import config; reload(config)
 
-from epic_py.delta import EpicDF, EpicDataBuilder, F_latinize
-from epic_py.tools import partial2, packed
-from src.data_managers import CyberData
+from epic_py.delta import EpicDF, EpicDataBuilder
+from epic_py.tools import method_getter, partial2
+from src.data_managers import CyberData     # , set_specs_file, read_cyber_specs
 from src.utilities import tools
 
 from config import app_agent, app_resourcer, cyber_handler, specs_rename
@@ -88,26 +87,6 @@ if not os.path.isdir(tmp_downer):
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC # Modificaciones Silver 🥈
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Solo 4 requieren modificación  
-# MAGIC
-# MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan algunas columnas auxiliares.  
-# MAGIC * `Person Set`: tiene algunas modificaciones personalizadas.
-# MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo.
-# MAGIC * `Transaction Set`:  tiene agrupado por contrato, y separado por fechas. 
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Construir pre-tablas 
-
-# COMMAND ----------
-
 # Revisar especificación en ~/refs/catalogs/cyber_txns.xlsx
 # O en User Story, o en Correos enviados.  
 
@@ -136,11 +115,6 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC # Preparación Gold 🥇 
-
-# COMMAND ----------
-
 # Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario. 
 
 tables_dict = {
@@ -159,14 +133,12 @@ for kk, vv in tables_dict.items():
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Tabla de instrucciones
-# MAGIC
-# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.  
-# MAGIC Y de ahí, se preparan los archivos. 
-# MAGIC
+cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
 
-# COMMAND ----------
+exportar = True
+
+the_tables = {}
+missing_cols = {}
 
 
 def set_specs_file(task_key: str, downer='blob'): 
@@ -191,8 +163,8 @@ def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
 
     splitter = compose_left(
-        methodcaller('split', ','), 
-        partial2(map, methodcaller('split', '=')), 
+        method_getter('split', ','), 
+        partial2(map, method_getter('split', '=')), 
         partial2(map, λ_col_alias), 
         list)
     joiner = OrderedDict((rr['tabla'], splitter(rr['join_cols']))
@@ -213,174 +185,146 @@ def read_cyber_specs(task_key: str, downer='blob'):
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC ## Master Join and Fixed-Value Columns  
-# MAGIC
-# MAGIC 1. Definir tipos de _Spark_, y los valores nulos para cada uno de ellos.  
-# MAGIC 2. Crear columnas para los valores fijos definidos.  
-# MAGIC 3. Convertir a los tipos definidos en (1).  
-# MAGIC 4. Las fechas se manejan por separado.  
-# MAGIC
-# MAGIC ### Explicit conversion to string
-# MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna `str`, `date`, `dbl`, `int`.  
-# MAGIC - `STR`: Aplicar formato `c_format` y dejar ASCII.   
-# MAGIC - `DATE`: Convertir los `1900-01-01` capturados previamente y aplicar `date_format`.  
-# MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
-# MAGIC - `INT`: Aplicar `c_format`.  
-# MAGIC
-# MAGIC Post-formatos, aplicar el `s-format`, concatenar.  
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Execution
-
-# COMMAND ----------
-
-cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
-
-exportar = True
-
-the_tables = {}
-missing_cols = {}
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### SAP Saldos
-
-# COMMAND ----------
-
-import epic_py
-from inspect import getsource
-print(epic_py.__version__)
-print(getsource(cyber_builder.typehandler['str'].fixed_width_string))
-
-# COMMAND ----------
-
 task = 'sap_saldos'
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-specs_df_ii = specs_df.rename(columns=specs_rename)
-specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
-
-missing_cols[task] = specs_dict['missing']
-the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
-    F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
-
-widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
-
-saldos_2 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-saldos_3 = saldos_2.with_column_plus(widther)
-
-gold_saldos = saldos_3.select(one_select)
-
-the_tables[task] = gold_saldos
-
-cyber_central.save_task_3(task, gold_path, gold_saldos)
-
-if exportar:
-    print(f"\tRows: {gold_saldos.count()}")
-    gold_saldos.display()
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC ### SAP Estatus
-
-# COMMAND ----------
-
-task = 'sap_estatus'
-specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
-    F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
-
 specs_df_2 = specs_df.rename(columns=specs_rename)
-
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
 
 missing_cols[task] = specs_dict['missing']
+one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
 
 widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
 
-estatus_2 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+saldos_tbls = (cyber_central
+    .master_join_2(spec_joins, specs_dict, tables_dict, tables_only=True))
+    
 
-estatus_3 = estatus_2.with_column_plus(widther_2)
 
-gold_estatus = estatus_3.select(one_select)
-the_tables[task] = gold_estatus
-cyber_central.save_task_3(task, gold_path, gold_estatus)
-print(f"\tRows: {gold_estatus.count()}")
-if exportar: 
-    gold_estatus.display()
-     
+# COMMAND ----------
+
+saldos_tbls.display()
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### SAP Pagos
-
-# COMMAND ----------
-
-task = 'sap_pagos'
-specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
-    F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
-
-specs_df_2 = specs_df.rename(columns=specs_rename)
-
-specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
-
-missing_cols[task] = specs_dict['missing']
-
-widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
-
-gold_3 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
-gold_2 = gold_3.with_column_plus(widther_2)
-
-gold_pagos = gold_2.select(one_select)
-the_tables[task] = gold_pagos
-cyber_central.save_task_3(task, gold_path, gold_pagos)
-
-print(f"\tRows: {gold_pagos.count()}")
-gold_pagos.display()
-
-# COMMAND ----------
-
-gold_2.display()
-
-# COMMAND ----------
-
-print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
+# MAGIC
+# MAGIC # Exploration
+# MAGIC
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ## Exploración de archivos
+# MAGIC ## PersonSet
 
 # COMMAND ----------
 
-from datetime import datetime as dt, timedelta as delta
-a_dir = f"{gold_path}/recent"
-print(a_dir)
-for x in dbutils.fs.ls(a_dir): 
-    x_time = dt.fromtimestamp(x.modificationTime/1000) - delta(hours=6)
-    print(f"{x.name} \t=> {x_time.strftime('%d-%m-%y %H:%M')}")
+person_weird0 = saldos_tbls.filter(F.col('PersonSet').isNull())
+
+person_weird1 = (EpicDF(spark, f"{brz_path}/person-set/chains/person")
+    .withColumn('person_id', F.col('ID'))
+    .join(person_weird0, on='person_id', how='semi'))
+
+person_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
+    .withColumn('loan_id', F.col('ID'))
+    .join(person_weird0, on='loan_id', how='semi'))
+
+person_weird2.display()
 
 
 # COMMAND ----------
 
+person_weird1.display()
 
+# COMMAND ----------
 
+# MAGIC %md 
+# MAGIC ## BalancesWide
+# MAGIC
+# MAGIC Este está OK, lo dejamos por completez. 
+
+# COMMAND ----------
+
+balances_weird0 = saldos_tbls.filter(F.col('BalancesWide').isNull())
+
+balances_weird1 = (EpicDF(spark, f"{brz_path}/loan-contract/aux/balances-wide")
+    .withColumn('loan_id', F.col('ID'))
+    .join(balances_weird0, on='loan_id', how='semi'))
+
+balances_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
+    .withColumn('loan_id', F.col('ID'))
+    .join(balances_weird0, on='loan_id', how='semi'))
+
+balances_weird2.display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## OpenItems
+# MAGIC
+
+# COMMAND ----------
+
+items_weird0 = saldos_tbls.filter(F.col('OpenItems').isNull())
+
+items_weird1 = (EpicDF(spark, f"{brz_path}/loan-contract/aux/open-items-wide")
+    .withColumn('loan_id', F.col('ContractID'))
+    .join(items_weird0, on='loan_id', how='semi'))
+
+items_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
+    .withColumn('loan_id', F.col('ID'))
+    .join(items_weird0, on='loan_id', how='semi'))
+
+items_weird2.display()
+
+# COMMAND ----------
+
+items_weird1.display()
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ## TxnsGrouped
+# MAGIC
+
+# COMMAND ----------
+
+tgrp_weird0 = saldos_tbls.filter(F.col('TxnsGrouped').isNull())
+
+tgrp_weird1 = (EpicDF(spark, f"{brz_path}/transaction-set/data")
+    .withColumn('loan_id', F.col('AccountID'))
+    .join(tgrp_weird0, on='loan_id', how='semi'))
+
+tgrp_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
+    .withColumn('loan_id', F.col('ID'))
+    .join(tgrp_weird0, on='loan_id', how='semi'))
+
+tgrp_weird2.display()
+
+# COMMAND ----------
+
+tgrp_weird1.display()
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ## OpenItemsLong
+
+# COMMAND ----------
+
+items_l_weird0 = saldos_tbls.filter(F.col('OpenItemsLong').isNull())
+
+items_l_weird1 = (EpicDF(spark, f"{brz_path}/loan-contract/chains/open-items")
+    .withColumn('loan_id', F.col('ContractID'))
+    .join(items_l_weird0, on='loan_id', how='semi'))
+
+items_l_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
+    .withColumn('loan_id', F.col('ID'))
+    .join(items_l_weird0, on='loan_id', how='semi'))
+
+items_l_weird2.display()
+    
+
+# COMMAND ----------
+
+items_l_weird1.display()
