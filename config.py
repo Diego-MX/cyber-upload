@@ -60,8 +60,14 @@ PLATFORM_2 = {
 }
 
 CORE_2 = {
-    'dev-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'},
-    'qas-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'},
+    'dev-sap': {
+        'base_url'  : '', 
+        'auth_url'  : '', 
+        'client_id' : 'core-api-key', 
+        'client_secret' : 'core-api-secret', 
+        'sap_username'  : 'core-api-user', 
+        'sap_password'  : 'core-api-pass'}, 
+    'qas-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'}, 
     'prd-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 'sap_username', 'sap_password'}
 }
 
@@ -596,7 +602,9 @@ cyber_handler = TypeHandler({
         'no_decimal': True},
     'str' : {
         'NA': '',
-        'c_format': '%-{}s'},
+        'c_format': '%-{}s', 
+        #'encoding': 'ascii'
+        },
     'date': {
         'NA': date(1900, 1, 1), 
         'c_format': '%8.8d', 
