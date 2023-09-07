@@ -4,5 +4,5 @@ PersonSet,person_cols,ID=person_id,
 BalancesWide,---,ID=loan_id,
 OpenItems,---,ID=loan_id,formato Wide. 
 TxnsGrouped,---,AccountID=loan_id,
-_val,---,,
 OpenItemsLong,---,ContractID=loan_id,
+_val,---,,
