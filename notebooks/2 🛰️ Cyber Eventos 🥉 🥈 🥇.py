@@ -20,7 +20,7 @@ read_specs_from = 'repo'
 # COMMAND ----------
 
 from collections import OrderedDict
-from datetime import date
+from datetime import date, datetime as dt, timedelta as delta
 from json import dumps
 from operator import methodcaller
 import os
@@ -31,6 +31,7 @@ from subprocess import check_call
 import pandas as pd
 from pyspark.sql import (functions as F, SparkSession)
 from pyspark.dbutils import DBUtils
+from pytz import timezone as tz
 from toolz import compose_left, curried, pipe
 import yaml
 
@@ -168,7 +169,6 @@ for kk, vv in tables_dict.items():
 
 # COMMAND ----------
 
-
 def set_specs_file(task_key: str, downer='blob'): 
      # Usa TMP_DOWNER, SPECS_PATH, 
     if downer == 'blob': 
@@ -251,13 +251,6 @@ missing_cols = {}
 
 # COMMAND ----------
 
-import epic_py
-from inspect import getsource
-print(epic_py.__version__)
-print(getsource(cyber_builder.typehandler['str'].fixed_width_string))
-
-# COMMAND ----------
-
 task = 'sap_saldos'
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
@@ -297,6 +290,7 @@ if exportar:
 task = 'sap_estatus'
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 the_names = specs_df['nombre']
+
 one_select = pipe(the_names, 
     packed(F.concat), 
     F_latinize,
@@ -355,11 +349,8 @@ the_tables[task] = gold_pagos
 cyber_central.save_task_3(task, gold_path, gold_pagos)
 
 print(f"\tRows: {gold_pagos.count()}")
-gold_pagos.display()
-
-# COMMAND ----------
-
-gold_2.display()
+if exportar:
+    gold_pagos.display()
 
 # COMMAND ----------
 
@@ -372,15 +363,12 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 
 # COMMAND ----------
 
-from datetime import datetime as dt, timedelta as delta
 a_dir = f"{gold_path}/recent"
 print(a_dir)
 for x in dbutils.fs.ls(a_dir): 
-    x_time = dt.fromtimestamp(x.modificationTime/1000) - delta(hours=6)
-    print(f"{x.name} \t=> {x_time.strftime('%d-%m-%y %H:%M')}")
-
-
-# COMMAND ----------
-
-
+    x_time = pipe(x.modificationTime/1000, 
+        dt.fromtimestamp, 
+        methodcaller('astimezone', tz('America/Mexico_City')), 
+        methodcaller('strftime', "%d %b '%y %H:%M"))
+    print(f"{x.name}\t=> {x_time}")
 
