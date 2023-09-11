@@ -109,6 +109,20 @@ CRM_TOKEN = get_secret("crm-api-token")
 
 # COMMAND ----------
 
+    attrs_indicator = "all"
+    the_token    = get_token("header")
+    
+    the_hdrs     = get_headers("apis", "headers")
+    select_attrs = attributes_from_column(attrs_indicator)
+    the_params   = { "$select" : ",".join(select_attrs) }
+
+    the_resp     = rq_get(f"{APIS_URL}/v1/lacovr/ContractSet", 
+        auth=tools.BearerAuth(the_token), headers=the_hdrs)
+
+    print(the_resp.text)
+
+# COMMAND ----------
+
 def get_token(auth_method=None):
     if auth_method == "basic":  # Auth as a POST argument. 
         auth_kwargs = {"auth" : HTTPBasicAuth(KEY, SECRET)} 
