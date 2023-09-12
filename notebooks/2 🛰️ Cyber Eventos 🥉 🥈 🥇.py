@@ -12,15 +12,16 @@
 
 # COMMAND ----------
 
-read_specs_from = 'repo'
+read_specs_from = 'repo'    # pylint: disable=invalid-name
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
 # COMMAND ----------
 
+# pylint: disable=wrong-import-position,wrong-import-order
 from collections import OrderedDict
-from datetime import date, datetime as dt, timedelta as delta
+from datetime import datetime as dt
 from json import dumps
 from operator import methodcaller
 import os
@@ -32,13 +33,13 @@ import pandas as pd
 from pyspark.sql import (functions as F, SparkSession)
 from pyspark.dbutils import DBUtils
 from pytz import timezone as tz
-from toolz import compose_left, curried, pipe
+from toolz import compose_left, pipe
 import yaml
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
 
-with open("../user_databricks.yml", 'r') as _f: 
+with open("../user_databricks.yml", 'r') as _f:
     u_dbks = yaml.safe_load(_f)
 
 epicpy_load = {
@@ -191,22 +192,22 @@ def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
 
     splitter = compose_left(
-        methodcaller('split', ','), 
-        partial2(map, methodcaller('split', '=')), 
-        partial2(map, λ_col_alias), 
+        methodcaller('split', ','),
+        partial2(map, methodcaller('split', '=')),
+        partial2(map, λ_col_alias),
         list)
     joiner = OrderedDict((rr['tabla'], splitter(rr['join_cols']))
         for _, rr in join_df.iterrows()
         if not tools.is_na(rr['join_cols']))
     return joiner
-    
 
-def read_cyber_specs(task_key: str, downer='blob'): 
+
+def read_cyber_specs(task_key: str, downer='blob'):
     specs_file, joins_file = set_specs_file(task_key, downer)
     specs_df = cyber_central.specs_setup_0(specs_file)
     if Path(joins_file).is_file():
         joins_dict = df_joiner(pd.read_csv(joins_file))
-    else: 
+    else:
         joins_dict = None
 
     return specs_df, joins_dict
@@ -237,7 +238,7 @@ def read_cyber_specs(task_key: str, downer='blob'):
 
 # COMMAND ----------
 
-cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
+cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 
 exportar = True
 
@@ -251,7 +252,7 @@ missing_cols = {}
 
 # COMMAND ----------
 
-task = 'sap_saldos'
+task = 'sap_saldos'     # pylint: disable=invalid-name
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_ii = specs_df.rename(columns=specs_rename)
@@ -260,10 +261,10 @@ specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
 missing_cols[task] = specs_dict['missing']
 the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
+one_select = pipe(the_names,
+    packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
+    methodcaller('alias', '~'.join(the_names)))
 
 widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
 
@@ -287,14 +288,14 @@ if exportar:
 
 # COMMAND ----------
 
-task = 'sap_estatus'
+task = 'sap_estatus'        # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 the_names = specs_df['nombre']
 
-one_select = pipe(the_names, 
-    packed(F.concat), 
+one_select = pipe(the_names,
+    packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
+    methodcaller('alias', '~'.join(the_names)))
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -313,9 +314,8 @@ gold_estatus = estatus_3.select(one_select)
 the_tables[task] = gold_estatus
 cyber_central.save_task_3(task, gold_path, gold_estatus)
 print(f"\tRows: {gold_estatus.count()}")
-if exportar: 
+if exportar:
     gold_estatus.display()
-     
 
 # COMMAND ----------
 
@@ -324,13 +324,13 @@ if exportar:
 
 # COMMAND ----------
 
-task = 'sap_pagos'
+task = 'sap_pagos'      # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
+one_select = pipe(the_names,
+    packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
+    methodcaller('alias', '~'.join(the_names)))
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
