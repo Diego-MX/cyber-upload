@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC ## Descripción
+# MAGIC # Descripción
 # MAGIC Este _notebook_ fue escrito originalmente por Jacobo.  
 # MAGIC Para llevarlo de DEV a QAs, le hice (Diego) algunas factorizaciones:  
 # MAGIC - Indicar tablas a partir de un diccionario en `CONFIG.PY`.  
@@ -14,12 +14,13 @@
 # COMMAND ----------
 
 from datetime import datetime as dt
-import re
-from delta.tables import DeltaTable
+from delta.tables import DeltaTable as Δ
 from pyspark.sql import functions as F, types as T, Window as W
 
-from src.platform_resources import AzureResourcer
+# COMMAND ----------
+
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
+from src.platform_resources import AzureResourcer
 
 tbl_items = DBKS_TABLES[ENV]['items']
 
@@ -53,7 +54,7 @@ def segregate_lastNames(s, pos):
         else:
             return s
         
-        
+
 def date_format(s):
     if s != '':
         return dt.strptime(s, '%Y%m%d').date()
@@ -77,7 +78,7 @@ date_format_udf = F.udf(date_format, T.DateType())
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ## Bronze 🥉 to Silver 🥈
+# MAGIC # Bronze 🥉 to Silver 🥈
 
 # COMMAND ----------
 
@@ -100,7 +101,7 @@ at_promise = pms_location.format(stage='silver', storage=at_storage)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### Person Set
+# MAGIC ## Person Set
 
 # COMMAND ----------
 
@@ -121,8 +122,10 @@ person_set_0 = (spark.read.format('delta')
     .dropDuplicates())
 
 slv_persons = f"{abfss_slv}/{tbl_items['slv_persons'][1]}"
+if Δ.isDeltaTable(spark, slv_persons): 
+    person_silver = spark.read.format('delta').load(slv_persons)
 
-if DeltaTable.isDeltaTable(spark, slv_persons): 
+if Δ.isDeltaTable(spark, slv_persons): 
     print("Person Set Delta Table")
     person_slv_0 = spark.read.format('delta').load(slv_persons)
 
@@ -141,14 +144,8 @@ display(person_slv)
 
 # COMMAND ----------
 
-display(person_set_0)
-
-display(person_set_df)
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ### Loan Contracts
+# MAGIC ## Loan Contracts
 
 # COMMAND ----------
 
@@ -160,7 +157,8 @@ loan_cols = ['ID', 'BankAccountID', 'InitialLoanAmount',
     'NominalInterestRate', 'BorrowerID', 'OverdueDays', 'LifeCycleStatusTxt',
     'PaymentPlanStartDate']
 
-loan_contract_slv = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loans'][1]}")
+loan_contract_slv = (spark.read
+    .load(f"{abfss_brz}/{tbl_items['brz_loans'][1]}")
     .select(*loan_cols)
     .withColumn('InitialLoanAmount', F.col('InitialLoanAmount').cast(T.DoubleType()))
     .withColumn('TermSpecificationValidityPeriodDurationM', F.col('TermSpecificationValidityPeriodDurationM').cast(T.IntegerType()))
@@ -174,7 +172,7 @@ display(loan_contract_slv)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC #### Balances
+# MAGIC ## Balances
 
 # COMMAND ----------
 
@@ -205,7 +203,7 @@ display(loan_balance_slv)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC #### Open Loans 
+# MAGIC ## Open Loans 
 # MAGIC 
 # MAGIC Manipulamos la tabla Open Items, para la cual tenemos la siguiente información relacionada.  
 # MAGIC 
@@ -244,7 +242,7 @@ display(loan_balance_slv)
 
 # COMMAND ----------
 
-# ['OpenItemTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 'DueDate', 
+# ['OpenItemsTS', 'ContractID', 'OpenItemID', 'Status', 'StatusTxt', 'StatusCategory', 'DueDate', 
 #  'ReceivableType', 'ReceivableTypeTxt', 'ReceivableDescription', 'Amount', 'Currency']
 
 # Columnas Finales. 
@@ -256,10 +254,11 @@ open_items_cols = {
     'monto_vencido'         : F.col('capital_vencido_monto') 
             + F.col('impuesto_vencido_monto') + F.col('comision_vencido_monto')}
 
-pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
-    .withColumn('OpenItemTS', F.to_date(F.col('OpenItemTS'), 'yyyy-MM-dd'))
-    .withColumn('DueDate',    F.to_date(F.col('DueDate'),    'yyyyMMdd'))
-    .withColumn('Amount',     F.col('Amount').cast(T.DoubleType()))
+pre_open_items = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
+    .withColumn('OpenItemsTS', F.to_date('OpenItemsTS', 'yyyy-MM-dd'))
+    .withColumn('DueDate',     F.to_date('DueDate',     'yyyyMMdd'))
+    .withColumn('Amount',      F.col('Amount').cast(T.DoubleType()))
     # Aux 1
     .withColumn('cleared',    F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
                                .cast(T.DoubleType())).fillna(0, subset=['cleared'])
@@ -269,10 +268,12 @@ pre_open_items = (spark.read.format('delta').load(f"{abfss_brz}/{tbl_items['brz_
                                .when(F.col('ReceivableType').isin([511200, 990006]), 'comision')
                                .when(F.col('ReceivableType').isin([511100, 991100, 990004]), 'impuesto')) 
     .withColumn('estatus_2',  F.when(F.col('StatusCategory') == 1, 'pagado')
-                               .when((F.col('DueDate') < F.col('OpenItemTS')) 
+                               .when((F.col('DueDate') < F.col('OpenItemsTS')) 
                                     & F.col('StatusCategory').isin([2, 3]), 'vencido'))
     .withColumn('local/fgn',  F.when(F.col('Currency') == 'MXN', 'local')
-                               .when(F.col('Currency').isNotNull(), 'foreign')))
+                               .when(F.col('Currency').isNotNull(), 'foreign'))
+                 )
+
 
 
 open_items_slct = [vv.alias(kk) for kk, vv in open_items_cols.items()]
@@ -290,7 +291,7 @@ display(loan_open_slv)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### Payment Plans
+# MAGIC ## Payment Plans
 
 # COMMAND ----------
 
@@ -349,6 +350,12 @@ if experiment_refactor:
 
 # COMMAND ----------
 
+loan_payment_0 = (spark.read.format('delta')
+    .load(f"{abfss_brz}/{tbl_items['brz_loan_payments'][1]}"))
+loan_payment_0.display()
+
+# COMMAND ----------
+
 # Loan Payment Plans
 
 payment_cols = ['ItemID', 'ContractID', 'Date', 'Category', 'Amount', 'PaymentPlanTS']
@@ -401,11 +408,7 @@ display(loan_payment_slv)
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### Write tables
-
-# COMMAND ----------
-
-display(person_set_df)
+# MAGIC ## Write tables
 
 # COMMAND ----------
 
@@ -444,7 +447,6 @@ promises_slv = (spark.read.format('delta')
     .filter(F.col('rank') == 1)
     .drop(F.col('rank')))
 
-display(persons_slv)
 
 # COMMAND ----------
 
@@ -474,7 +476,8 @@ display(base_open)
 # COMMAND ----------
 
 full_fields = (base_open
-    .join(loan_payment_plans, how='left', on=base_open['ID'] == loan_payment_plans['ContractID'])
+    .join(loan_payment_plans, how='left', 
+        on=base_open['ID'] == loan_payment_plans['ContractID'])
     .drop(loan_payment_plans['ContractID'])
     .fillna(value=0)
     .join(promises_slv, how='left', on=base_open['ID'] == promises_slv['attribute_loan_id'])

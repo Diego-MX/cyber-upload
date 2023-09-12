@@ -1,0 +1,297 @@
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xml:base="https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/">
+    <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/ContractSet('03017096770-222-MX')/Balances</id>
+    <title type="text">BalanceSet</title>
+    <updated>2023-01-18T19:50:26Z</updated>
+    <author>
+        <name/>
+    </author>
+    <link href="ContractSet('03017096770-222-MX')/Balances" rel="self" title="BalanceSet"/>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='17')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='17')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='17')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>17</d:Code>
+                <d:Name>The initial loan contracted amount</d:Name>
+                <d:Amount>30000.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='19')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='19')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='19')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>19</d:Code>
+                <d:Name>An amount for which there is a binding agreement between the bank and the borrower for a term agreement fixing period</d:Name>
+                <d:Amount>30000.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='18')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='18')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='18')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>18</d:Code>
+                <d:Name>Initial loan contracted amount plus any capital reductions and increases that have already taken place</d:Name>
+                <d:Amount>30000.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='20')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='20')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='20')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>20</d:Code>
+                <d:Name>An amount for which there is a binding agreement between the bank and the borrower for a term agreement fixing period plus any capital reductions and increases that have already taken place</d:Name>
+                <d:Amount>30000.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='1')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='1')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='1')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>1</d:Code>
+                <d:Name>Amount that is already disbursed to the borrower</d:Name>
+                <d:Amount>30000.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='21')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='21')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='21')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>21</d:Code>
+                <d:Name>Remaining principal based on the original payment plan simulated by date</d:Name>
+                <d:Amount>27565.66</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='5')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='5')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='5')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>5</d:Code>
+                <d:Name>Remaining principal based on payments received (inclusive of redraw) as of today</d:Name>
+                <d:Amount>30000.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='3')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='3')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='3')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>3</d:Code>
+                <d:Name>Interest settled that is yet to be paid by the borrower</d:Name>
+                <d:Amount>266.15</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='22')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='22')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='22')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>22</d:Code>
+                <d:Name>Remaining principal based on the original payment plan as of today</d:Name>
+                <d:Amount>27565.66</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='4')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='4')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='4')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>4</d:Code>
+                <d:Name>Charge settled that is yet to be paid by the borrower</d:Name>
+                <d:Amount>0.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='2')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='2')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='2')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>2</d:Code>
+                <d:Name>Amount that is not yet been disbursed to the borrower</d:Name>
+                <d:Amount>0.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='31')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='31')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='31')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>31</d:Code>
+                <d:Name>Interest paid by the borrower so far</d:Name>
+                <d:Amount>0.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='25')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='25')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='25')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>25</d:Code>
+                <d:Name>Interest accrued so far, but not yet settled</d:Name>
+                <d:Amount>59.73</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='99')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='99')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='99')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>99</d:Code>
+                <d:Name>Outstanding balance</d:Name>
+                <d:Amount>30320.73</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='95')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='95')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='95')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>95</d:Code>
+                <d:Name>Outstanding Charges VAT</d:Name>
+                <d:Amount>0.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='96')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='96')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='96')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>96</d:Code>
+                <d:Name>Interests not taxed</d:Name>
+                <d:Amount>12.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='97')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='97')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='97')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>97</d:Code>
+                <d:Name>Outstanding Interest VAT</d:Name>
+                <d:Amount>42.58</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+    <entry>
+        <id>https://apiprd.apimanagement.us21.hana.ondemand.com/s4b/v1/lacovr/BalanceSet(ID='03017096770-222-MX',Code='98')</id>
+        <title type="text">BalanceSet(ID='03017096770-222-MX',Code='98')</title>
+        <updated>2023-01-18T19:50:26Z</updated>
+        <category term="BAO.LB_LACOVR_B0_SRV.Balance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+        <link href="BalanceSet(ID='03017096770-222-MX',Code='98')" rel="self" title="Balance"/>
+        <content type="application/xml">
+            <m:properties xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices">
+                <d:ID>03017096770-222-MX</d:ID>
+                <d:Code>98</d:Code>
+                <d:Name>Redraw balance (principal paid ahead of original payment plan)</d:Name>
+                <d:Amount>0.00</d:Amount>
+                <d:Currency>MXN</d:Currency>
+            </m:properties>
+        </content>
+    </entry>
+</feed>

@@ -1,15 +1,14 @@
 import sqlalchemy as alq
-from sqlalchemy import orm
-import sqlalchemy.ext.declarative as alq_declarative
+from   sqlalchemy import orm, ext
 
-Base = alq_declarative.declarative_base()
+Base = ext.declarative.declarative_base()
 
 
 class LoanSources(Base): 
     # Uno por cada tabla.  
     __tablename__ = 'loan_sources'
 
-    id = alq.Column(alq.Integer, primary_key=True)
+    id   = alq.Column(alq.Integer, primary_key=True)
     name = alq.Column(alq.String(32))
   
     attributes = orm.relationship('LoanAttributes', 
