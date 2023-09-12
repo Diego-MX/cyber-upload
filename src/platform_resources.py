@@ -1,4 +1,7 @@
 from azure.keyvault.secrets import SecretClient
+from azure.storage.blob import BlobServiceClient
+from os import remove
+from pathlib import Path
 
 from config import PLATFORM_KEYS, ConfigEnviron
 
@@ -26,10 +29,10 @@ class AzureResourcer():
     def set_vault(self):
         vault_url = self.config['key-vault']['url']
         the_creds = self.env.credential
-        self.vault = SecretClient(vault_url=vault_url, credential=the_creds)
-        
-        #to_secret_or_not = self.vault.list_properties_of_secrets()
-        #next(to_secret_or_not)
+        the_vault =  SecretClient(vault_url=vault_url, credential=the_creds)
+        to_secret_or_not = the_vault.list_properties_of_secrets()
+        next(to_secret_or_not)
+        self.vault = the_vault
         
     
     def get_storage(self, account=None): 
@@ -37,7 +40,7 @@ class AzureResourcer():
             return self.config['storage']['name']
     
     
-    def set_dbks_permissions(self, blob_key):
+    def set_dbks_permissions(self, blob_key=None, gen_value='gen2'):
         # Assume account corresponding to BLOB_KEY is GEN2.  
         # and permissions are unlocked directly via CONFIG.SETUP_KEYS
         
@@ -66,8 +69,36 @@ class AzureResourcer():
         for a_conf, its_val in self.env.call_dict(pre_confs).items():
             print(f"{a_conf} = {its_val}")
             self.env.spark.conf.set(a_conf, its_val)
-          
+    
+
+    def upload_storage_blob(self, file, blob, container=None, account=None, overwrite=False, verbose=0): 
+        if account is None: 
+            account = self.get_storage()
+        
+        the_url = f"https://{account}.blob.core.windows.net"
+        b_service = BlobServiceClient(the_url, credential=self.env.credential)
+
+        the_blob  = b_service.get_blob_client(container, blob)
+        with open(file, 'rb') as _b:
+            the_blob.upload_blob(_b, overwrite=overwrite)
+            if verbose: 
+                print(f"Blob uploaded: {account}, {container};\n\t{blob}")
         
         
+    def download_storage_blob(self, file, blob, container, account=None, verbose=0): 
+        if account is None: 
+            account = self.get_storage()
+        
+        the_url = f"https://{account}.blob.core.windows.net"
+        b_service = BlobServiceClient(the_url, credential=self.env.credential)
 
+        if Path(file).is_file(): 
+            remove(file)
 
+        the_blob = b_service.get_blob_client(container, blob)
+        with open(file, 'wb') as _b: 
+            b_data = the_blob.download_blob()
+            b_data.readinto(_b)
+    
+
+    

@@ -12,9 +12,6 @@ It has two stages:
 
 And it also sets some common references for the other given repo with datalake/cosmosDB.  
 
-File history: 
-- Mar '22 creation 
-- Oct '22 edit
 
 ## Runbook 
 
@@ -25,10 +22,11 @@ Previous requirements:
 - Databricks secrets scope (`cx-collections`) with service principal keys:  
   `sp-collections-client`, `sp-collections-secret`, `aad-tenant-id`, `sp-collections-subscription`  
   This works as an identity for the running application.  
+  En `qas` se usaron: `sp-core-events-(client|secret|subscription)`
 
-- Azure key vault (`kv-cx-collections-<env>`);  
-  Give access to the service principal above and set keys:   
-  SAP keys: `core-api-key`, `core-api-secret`, `core-api-user`, `core-api-password`  
+- Azure key vault (`kv-cx-data-<env>`);  (`kv-cx-collections-dev`)
+  Give access to the service principal above and set keys:  
+  SAP keys: `core-api-key`, `core-api-secret`, `core-api-user`, `core-api-pass`  
   CRM keys:  `crm-api-user`, `crm-api-token`, 
       `crm-zis-id`, `crm-zis-user`, `crm-zis-pass`  
 

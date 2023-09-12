@@ -1,12 +1,12 @@
 # Databricks notebook source
 # MAGIC %md 
 # MAGIC ## Description
-# MAGIC 
+# MAGIC
 # MAGIC The Databricks table `bronze.crm_payment_promises` is updated every hour via this script.   
 # MAGIC We require access to:  
 # MAGIC - Keyvault `kv-resource-access-dbks` via Databricks scope of the same name.
 # MAGIC - This in turn yields keys towards a Service Principal, which in turn gives acces to other secrets. 
-# MAGIC 
+# MAGIC
 # MAGIC The corresponding key names are found in `config.py`.
 
 # COMMAND ----------
@@ -16,38 +16,66 @@
 
 # COMMAND ----------
 
-# MAGIC  %pip install -r ../reqs_dbks.txt
+# MAGIC   %pip install -q -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
-from config import ConfigEnviron, ENV, SERVER, CRM_ENV, DBKS_TABLES
 from datetime import datetime as dt
 import json
-from pyspark.sql import functions as F, types as T
+from pyspark.sql import (functions as F, types as T, 
+    SparkSession)
+from pyspark.dbutils import DBUtils
 import re
-from src.platform_resources import AzureResourcer
-from src.crm_platform import ZendeskSession
+import subprocess
+import yaml
 
+spark = SparkSession.builder.getOrCreate()
+dbks_secrets = DBUtils(spark).secrets
+
+with open("../user_databricks.yml", 'r') as _f: 
+    u_dbks = yaml.safe_load(_f)
+
+epicpy_load = {
+    'url'   : 'github.com/Bineo2/data-python-tools.git', 
+    'branch': 'dev-diego', 
+    'token' :  dbks_secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
+
+url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
+subprocess.check_call(['pip', 'install', url_call])
+
+# COMMAND ----------
+
+from importlib import reload
+import config; reload(config)
+
+from src.crm_platform import ZendeskSession
+from src.platform_resources import AzureResourcer
+from config import (app_agent, app_resourcer, DATA_2, 
+    ConfigEnviron, 
+    ENV, SERVER, CRM_ENV, DBKS_TABLES)
+
+data_paths  = DATA_2['paths']
+data_tables = DATA_2['tables']
+
+stg_permissions = app_agent.prep_dbks_permissions(app_resourcer['storage'], 'gen2')
+app_resourcer.set_dbks_permissions(stg_permissions)
+
+abfss_brz = app_resourcer.get_resource_url('abfss', 'storage', 
+    container='bronze', blob_path=data_paths['collections']) 
+abfss_slv = app_resourcer.get_resource_url('abfss', 'storage', 
+    container='silver', blob_path=data_paths['collections'])     
+
+# Para cambiar estos elementos, requerimos habilitar CRMSession en EpicPy. 
 secretter = ConfigEnviron(ENV, SERVER, spark)
 azure_getter = AzureResourcer(secretter)
-
-at_storage = azure_getter.get_storage()
-azure_getter.set_dbks_permissions(at_storage)
-
 zendesker = ZendeskSession(CRM_ENV, azure_getter)
-abfss_brz = DBKS_TABLES[ENV]['promises'].format(stage='bronze', storage=at_storage)
-abfss_slv = DBKS_TABLES[ENV]['promises'].format(stage='silver', storage=at_storage)
-
-tbl_items = DBKS_TABLES[ENV]['items']
 
 # COMMAND ----------
 
 def unnest(c, s):
-    if c == '':
-        return None
-    else:
-        c = json.loads(c)
-        return c[s]
+    unn = (None if c == '' 
+            else json.loads(c)[s])
+    return unn
 
 udf_unnest = F.udf(unnest, T.IntegerType())
 
@@ -76,15 +104,17 @@ udf_date_format = F.udf(date_format, T.StringType())
 
 # COMMAND ----------
 
-promises_meta = tbl_items['brz_promises']
-promises_tbl = promises_meta[2] if len(promises_meta) > 2 else promises_meta[0]
+promises_tbl = data_tables['brz_promises'][0]
 
-promises_df = zendesker.get_promises().drop(columns='external_id')
-promises_spk = spark.createDataFrame(promises_df)
+promises_df = (zendesker
+    .get_promises()
+    .drop(columns='external_id'))
+
+promises_spk = spark.createDataFrame(promises_df) # type: ignore
+
 (promises_spk.write.mode('overwrite')
-        .format('delta')
-        .save(f"{abfss_brz}/promises"))
-
+    .format('delta')
+    .save(f"{abfss_brz}/promises"))
 
 # COMMAND ----------
 
@@ -93,12 +123,12 @@ promises_spk = spark.createDataFrame(promises_df)
 
 # COMMAND ----------
 
-
 slv_promises_0 = promises_spk
 
 cols_unnest = ['comission', 'interest', 'principal']
 for a_col in cols_unnest:
-    slv_promises_0 = slv_promises_0.withColumn(a_col, udf_unnest('attribute_compensation', F.lit(a_col)))
+    slv_promises_0 = (slv_promises_0
+        .withColumn(a_col, udf_unnest('attribute_compensation', F.lit(a_col))))
 
 slv_promises = (slv_promises_0
     .withColumn('created_at', F.col('created_at').cast(T.TimestampType()))
@@ -108,7 +138,9 @@ slv_promises = (slv_promises_0
     .drop(F.col('attribute_compensation')))
 
 
-
 # COMMAND ----------
 
-slv_promises.write.mode('overwrite').format('delta').save(f"{abfss_slv}/promises")
+# Cambiemos a tablas Δ
+(slv_promises.write
+    .mode('overwrite')
+    .save(f"{abfss_slv}/promises"))

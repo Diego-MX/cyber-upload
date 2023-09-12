@@ -1,17 +1,22 @@
 # Databricks notebook source
-# MAGIC %md 
+# MAGIC %md  
 # MAGIC # Objetivo
-# MAGIC 
+# MAGIC  
 # MAGIC Al crear las tablas Δ, no se había puesto atención en la ubicación física... (que no es tan física, pero es lo más físico a lo que aspiran las ubicaciones de tablas).  
-# MAGIC En este _notebook_ movemos las tablas al Lago Hylia. 
+# MAGIC En este _notebook_ movemos las tablas al Lago Hylia.  
 # MAGIC Después de algunos meses se descubrió que tienen que estar en cierta ubicación.  
 
 # COMMAND ----------
 
-from datetime import datetime as dt
-import re
-from delta.tables import DeltaTable
-from pyspark.sql import functions as F, types as T, Window as W
+# pylint: disable=wrong-import-position
+
+from pyspark.sql import SparkSession
+from pyspark.dbutils import DButils     # pylint: disable=no-name-in-module
+
+spark = SparkSession.builder.getOrCreate()
+dbutils = DButils(spark)
+
+# COMMAND ----------
 
 from src.platform_resources import AzureResourcer
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
