@@ -12,10 +12,12 @@
 
 # COMMAND ----------
 
-read_specs_from = 'repo'
-# Puede ser:  {blob, repo}
+read_specs_from = 'repo'        # {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
+
+epicpy_tag = 'v1.1.18'      # dev-diego
+to_display = False
 
 # COMMAND ----------
 
@@ -43,7 +45,7 @@ with open("../user_databricks.yml", 'r') as _f:
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego', 
+    'branch': epicpy_tag, 
     'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
@@ -239,8 +241,6 @@ def read_cyber_specs(task_key: str, downer='blob'):
 
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
 
-exportar = True
-
 the_tables = {}
 missing_cols = {}
 
@@ -276,7 +276,7 @@ the_tables[task] = gold_saldos
 
 cyber_central.save_task_3(task, gold_path, gold_saldos)
 
-if exportar:
+if to_display:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
 
@@ -313,7 +313,7 @@ gold_estatus = estatus_3.select(one_select)
 the_tables[task] = gold_estatus
 cyber_central.save_task_3(task, gold_path, gold_estatus)
 print(f"\tRows: {gold_estatus.count()}")
-if exportar: 
+if to_display: 
     gold_estatus.display()
      
 
@@ -349,7 +349,7 @@ the_tables[task] = gold_pagos
 cyber_central.save_task_3(task, gold_path, gold_pagos)
 
 print(f"\tRows: {gold_pagos.count()}")
-if exportar:
+if to_display:
     gold_pagos.display()
 
 # COMMAND ----------
@@ -364,11 +364,12 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 # COMMAND ----------
 
 a_dir = f"{gold_path}/recent"
+tz_mx = tz('America/Mexico_City')
 print(a_dir)
 for x in dbutils.fs.ls(a_dir): 
     x_time = pipe(x.modificationTime/1000, 
         dt.fromtimestamp, 
-        methodcaller('astimezone', tz('America/Mexico_City')), 
+        methodcaller('astimezone', tz_mx), 
         methodcaller('strftime', "%d %b '%y %H:%M"))
     print(f"{x.name}\t=> {x_time}")
 
