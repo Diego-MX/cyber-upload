@@ -12,14 +12,18 @@
 
 # COMMAND ----------
 
-read_specs_from = 'repo'    # pylint: disable=invalid-name
+read_specs_from = 'repo'
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
+epicpy_tag = 'v1.1.18'      # dev-diego
+to_display = False
+
 # COMMAND ----------
 
 # pylint: disable=wrong-import-position,wrong-import-order
+# pylint: disable=ungrouped-imports
 from collections import OrderedDict
 from datetime import datetime as dt
 from json import dumps
@@ -44,7 +48,7 @@ with open("../user_databricks.yml", 'r') as _f:
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego', 
+    'branch': epicpy_tag, 
     'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
 
 url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
@@ -56,7 +60,7 @@ from importlib import reload
 from src import data_managers; reload(data_managers)
 import config; reload(config)
 
-from epic_py.delta import EpicDF, EpicDataBuilder, F_latinize
+from epic_py.delta import EpicDataBuilder, F_latinize
 from epic_py.tools import partial2, packed
 from src.data_managers import CyberData
 from src.utilities import tools
@@ -70,8 +74,8 @@ app_resourcer.set_dbks_permissions(stg_permissions)
 λ_path = (lambda cc, pp: app_resourcer.get_resource_url(
         'abfss', 'storage', container=cc, blob_path=pp))
 
-brz_path  = λ_path('bronze', 'ops/core-banking')  
-gold_path = λ_path('gold', 'cx/collections/cyber') 
+brz_path  = λ_path('bronze', 'ops/core-banking')
+gold_path = λ_path('gold', 'cx/collections/cyber')
 
 specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
 tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS 
@@ -79,12 +83,12 @@ tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
 
-def dumps2(an_obj, **kwargs): 
+def dumps2(an_obj, **kwargs):
     dump1 = dumps(an_obj, **kwargs)
     dump2 = re.sub(r'(,)\n *', r'\1 ', dump1)
     return dump2
 
-if not os.path.isdir(tmp_downer): 
+if not os.path.isdir(tmp_downer):
     os.makedirs(tmp_downer)
     
 
@@ -113,27 +117,27 @@ if not os.path.isdir(tmp_downer):
 # Revisar especificación en ~/refs/catalogs/cyber_txns.xlsx
 # O en User Story, o en Correos enviados.  
 
-balances = cyber_central.prepare_source('balances', 
+balances = cyber_central.prepare_source('balances',
     path=f"{brz_path}/loan-contract/aux/balances-wide")
-    
-open_items_long = cyber_central.prepare_source('open-items-long', 
+
+open_items_long = cyber_central.prepare_source('open-items-long',
     path=f"{brz_path}/loan-contract/chains/open-items")
 
-open_items_wide = cyber_central.prepare_source('open-items-wide', 
+open_items_wide = cyber_central.prepare_source('open-items-wide',
     path=f"{brz_path}/loan-contract/aux/open-items-wide")
     # tiene muchos CURRENT_AMOUNT : NULL
 
-loan_contracts = cyber_central.prepare_source('loan-contracts', 
-    path=f"{brz_path}/loan-contract/data", 
+loan_contracts = cyber_central.prepare_source('loan-contracts',
+    path=f"{brz_path}/loan-contract/data",
     open_items=open_items_wide)
 
-persons = cyber_central.prepare_source('person-set', 
+persons = cyber_central.prepare_source('person-set',
     path=f"{brz_path}/person-set/chains/person")
 
-the_txns = cyber_central.prepare_source('txns-set', 
+the_txns = cyber_central.prepare_source('txns-set',
     path=f"{brz_path}/transaction-set/data")
 
-txn_pmts = cyber_central.prepare_source('txns-grp', 
+txn_pmts = cyber_central.prepare_source('txns-grp',
     path=f"{brz_path}/transaction-set/data")
 
 # COMMAND ----------
@@ -155,10 +159,9 @@ tables_dict = {
     "TxnsPayments" : the_txns}
 
 print("The COUNT stat in each table is:")
-for kk, vv in tables_dict.items(): 
+for kk, vv in tables_dict.items():
     print(kk, vv.count())
-    
-
+ 
 # COMMAND ----------
 
 # MAGIC %md
@@ -170,9 +173,9 @@ for kk, vv in tables_dict.items():
 
 # COMMAND ----------
 
-def set_specs_file(task_key: str, downer='blob'): 
+def set_specs_file(task_key: str, downer='blob'):
      # Usa TMP_DOWNER, SPECS_PATH, 
-    if downer == 'blob': 
+    if downer == 'blob':
         dir_at = tmp_downer # and no prefix
         specs_file = f"{dir_at}/{task_key}.feather"
         joins_file = f"{tmp_downer}/{task_key}_joins.csv"
@@ -180,15 +183,14 @@ def set_specs_file(task_key: str, downer='blob'):
         joins_blob = f"{specs_path}/{task_key}_joins_latest.csv"
         app_resourcer.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
         app_resourcer.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
-    elif downer == 'repo': 
+    elif downer == 'repo':
         dir_at = "../refs/catalogs"  # prefix: "cyber_"
         specs_file = f"{dir_at}/cyber_{task_key}.feather"
         joins_file = f"{dir_at}/cyber_{task_key}_joins.csv"
     return (specs_file, joins_file)
 
 
-def df_joiner(join_df) -> OrderedDict: 
-    cols_by = ['tabla', 'join_cols']
+def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
 
     splitter = compose_left(
@@ -240,8 +242,6 @@ def read_cyber_specs(task_key: str, downer='blob'):
 
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 
-exportar = True
-
 the_tables = {}
 missing_cols = {}
 
@@ -277,7 +277,7 @@ the_tables[task] = gold_saldos
 
 cyber_central.save_task_3(task, gold_path, gold_saldos)
 
-if exportar:
+if to_display:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
 
@@ -314,7 +314,7 @@ gold_estatus = estatus_3.select(one_select)
 the_tables[task] = gold_estatus
 cyber_central.save_task_3(task, gold_path, gold_estatus)
 print(f"\tRows: {gold_estatus.count()}")
-if exportar:
+if to_display:
     gold_estatus.display()
 
 # COMMAND ----------
@@ -349,7 +349,7 @@ the_tables[task] = gold_pagos
 cyber_central.save_task_3(task, gold_path, gold_pagos)
 
 print(f"\tRows: {gold_pagos.count()}")
-if exportar:
+if to_display:
     gold_pagos.display()
 
 # COMMAND ----------
@@ -364,11 +364,11 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 # COMMAND ----------
 
 a_dir = f"{gold_path}/recent"
+tz_mx = tz('America/Mexico_City')
 print(a_dir)
-for x in dbutils.fs.ls(a_dir): 
-    x_time = pipe(x.modificationTime/1000, 
-        dt.fromtimestamp, 
-        methodcaller('astimezone', tz('America/Mexico_City')), 
+for x in dbutils.fs.ls(a_dir):
+    x_time = pipe(x.modificationTime/1000,
+        dt.fromtimestamp,
+        methodcaller('astimezone', tz_mx),
         methodcaller('strftime', "%d %b '%y %H:%M"))
     print(f"{x.name}\t=> {x_time}")
-

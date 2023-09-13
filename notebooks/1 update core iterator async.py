@@ -152,8 +152,7 @@ df_cols = {
 item_keys = {
     'balances'     : 'brz_loan_balances', 
     'open_items'   : 'brz_loan_open_items', 
-    'payment_plan' : 'brz_loan_payments'  # Esta es diferente. 
-}
+    'payment_plan' : 'brz_loan_payments' }
 
 spark_tables = {}
 for table_type in ['balances', 'open_items', 'payment_plan']: 
