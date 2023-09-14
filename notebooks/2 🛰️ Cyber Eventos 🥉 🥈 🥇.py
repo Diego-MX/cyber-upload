@@ -12,13 +12,13 @@
 
 # COMMAND ----------
 
+to_display = True
+epicpy_tag = 'v1.1.18'      # dev-diego
 read_specs_from = 'repo'
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
-epicpy_tag = 'v1.1.18'      # dev-diego
-to_display = False
 
 # COMMAND ----------
 
@@ -90,7 +90,6 @@ def dumps2(an_obj, **kwargs):
 
 if not os.path.isdir(tmp_downer):
     os.makedirs(tmp_downer)
-
 
 # COMMAND ----------
 
@@ -330,7 +329,6 @@ one_select = pipe(the_names,
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
 
 missing_cols[task] = specs_dict['missing']
 

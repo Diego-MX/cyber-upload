@@ -54,7 +54,7 @@ class CyberData():
 
     def _prep_loan_contracts(self, path, **kwargs): 
         where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
-        open_items  = (kwargs['open_items'].select('ID', 'oldest_date'))
+        open_items  = kwargs['open_items'].select('ID', 'oldest_default_date')
         repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
         status_dict = OrderedDict({
             ('VIGENTE',  '303') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
@@ -65,7 +65,7 @@ class CyberData():
             ('undefined','---') :  None})
         usgaap = [
             ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
-            ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_date')+90), 
+            ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_default_date')+90), 
             ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
             (None, F.lit(None))]
         loan_cols = OrderedDict({
@@ -85,7 +85,6 @@ class CyberData():
             partial2(map, item_namer(['RepaymentFrequency', 'repay_freq'])),  
             self.spark.createDataFrame)
         
-
         x_df = (EpicDF(self.spark, path)   # type: ignore
             .filter_plus(*where_loans) 
             .join(open_items, on='ID', how='left')
@@ -100,9 +99,9 @@ class CyberData():
             '990004', '991100', '990006'] 
         w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
         min_date = compose_left(
-                partial2(F.when, ..., F.row_number().over(w_duedate)), 
-                ϱ('otherwise', -1), 
-                partial2(eq, ..., F.lit(1)))
+            partial2(F.when, ..., F.row_number().over(w_duedate)), 
+            ϱ('otherwise', -1), 
+            partial2(eq, ..., F.lit(1)))
         
         open_cols = OrderedDict({
             'yesterday'  : F.current_date() - 1, 
@@ -127,8 +126,7 @@ class CyberData():
                     partial2(F.datediff, 'yesterday'), 
                     partial2(F.coalesce, ..., F.lit(0)))}} 
         
-        base_df = EpicDF(self.spark, path)
-        y_df = (base_df   # type: ignore
+        y_df = (EpicDF(self.spark, path)   # type: ignore
             .fillna(0, subset=rec_types)
             .with_column_plus(open_cols))
         x1_df = (y_df
@@ -178,8 +176,7 @@ class CyberData():
             'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
             'default_uncleared'  : uncleared_if(F.col('is_capital')),
             'default_interest'   : uncleared_if(F.col('is_interest')), 
-            'default_iva'        : uncleared_if(F.col('ReceivableType') == '990004'), 
-            'uncleared_recvble'  : uncleared_if(F.col('is_recvble') & F.col('is_min_dds'))}
+            'default_iva'        : uncleared_if(F.col('is_iva'))}
         x_df = (EpicDF(self.spark, path)
             .with_column_plus(single_cols)
             .filter(F.col('is_default'))
@@ -201,7 +198,7 @@ class CyberData():
             "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
         states_df = pipe(states_str, 
             partial2(map, ϱ('split', ',')), 
-            item_namer(['AddressRegion', 'state_key']), 
+            partial2(map, item_namer(['AddressRegion', 'state_key'])), 
             self.spark.createDataFrame)
         x_df = (EpicDF(self.spark, path)     # type: ignore
             .filter(F.col('ID').isNotNull())
@@ -443,9 +440,8 @@ def pd_print(a_df: pd.DataFrame, **kwargs):
         'width'      : 180}
     the_options.update(kwargs)
     
-    # pipe(the_options, 
+    # pipe(the_options.items(), 
     #   z_keymap(add('display.')), 
-    #   ϱ('items'), 
     #   concat)
     optns_ls = sum(([f"display.{kk}", vv] 
         for kk, vv in the_options.items()), start=[])
