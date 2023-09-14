@@ -54,7 +54,7 @@ class CyberData():
 
     def _prep_loan_contracts(self, path, **kwargs): 
         where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
-        open_items  = kwargs['open_items'].select('ID', 'oldest_default_date')
+        open_items  = (kwargs['open_items'].select('ID', 'oldest_default_date'))
         repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
         status_dict = OrderedDict({
             ('VIGENTE',  '303') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
@@ -94,9 +94,7 @@ class CyberData():
 
     def _prep_open_items_wide(self, path):
         id_cols = ['ContractID', 'epic_date', 'ID']
-        rec_types = [
-            '511010', '511100', '511200', 
-            '990004', '991100', '990006'] 
+        rec_types = ['511010', '511100', '511200', '990004', '991100', '990006'] 
         w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
         min_date = compose_left(
             partial2(F.when, ..., F.row_number().over(w_duedate)), 

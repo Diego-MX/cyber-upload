@@ -122,11 +122,11 @@ balances = cyber_central.prepare_source('balances',
 open_items_long = cyber_central.prepare_source('open-items-long',
     path=f"{brz_path}/loan-contract/chains/open-items")
 
-loan_contracts = cyber_central.prepare_source('loan-contracts',
-    path=f"{brz_path}/loan-contract/data",
+loan_contracts = cyber_central.prepare_source('loan-contracts', 
+    path=f"{brz_path}/loan-contract/data", 
     open_items=open_items_long)
 
-persons = cyber_central.prepare_source('person-set',
+persons = cyber_central.prepare_source('person-set', 
     path=f"{brz_path}/person-set/chains/person")
 
 the_txns = cyber_central.prepare_source('txns-set',
@@ -146,11 +146,13 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 tables_dict = {
     "BalancesWide" : balances,
-    "ContractSet"  : loan_contracts,
+    "ContractSet"  : loan_contracts, 
     "OpenItemsLong": open_items_long,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
-    "TxnsPayments" : the_txns}
+    "TxnsPayments" : the_txns
+    # "OpenItems"    : open_items_wide, 
+    }
 
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items():
@@ -294,7 +296,6 @@ one_select = pipe(the_names,
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
 
 missing_cols[task] = specs_dict['missing']
 
