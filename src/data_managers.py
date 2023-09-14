@@ -1,7 +1,7 @@
 from collections import OrderedDict, defaultdict
 from datetime import datetime as dt, date
 from functools import reduce
-from operator import itemgetter, methodcaller
+from operator import eq, itemgetter, methodcaller as ϱ
 from pytz import timezone
 import re
 
@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as pd_DF
 from pyspark.sql import (functions as F, types as T, Window as W)
-from toolz import compose, pipe, valmap
+from toolz import compose, compose_left, pipe, valmap
+from toolz.curried import map as map_z
 
 from epic_py.delta import EpicDF, TypeHandler, column_name, when_plus
 from epic_py.tools import MatchCase, partial2
@@ -52,10 +53,9 @@ class CyberData():
         return x_df
 
     def _prep_loan_contracts(self, path, **kwargs): 
-        base_df = EpicDF(self.spark, path)
-        open_items  = (kwargs['open_items'].select('ID', 'oldest_date'))
         where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
-
+        open_items  = (kwargs['open_items'].select('ID', 'oldest_date'))
+        repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
         status_dict = OrderedDict({
             ('VIGENTE',  '303') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
                                 & (F.col('OverdueDays') == 0), 
@@ -73,20 +73,20 @@ class CyberData():
             'person_id'    : F.col('BorrowerID'),
             'borrower_mod' : F.concat(F.lit('B0'), F.col('BorrowerID')),
             'interes_amort': F.col('NextPaymentInterestAmt')
-                            + F.col('NextExemptInterestAmount'), 
-            'yesterday'    : F.date_add(F.current_date(), -1), 
+                           + F.col('NextExemptInterestAmount'), 
+            'yesterday'    : F.date_add(F.current_date(), -1),      # ya no se usa
+            'process_date' : F.date_add('CurrentPostingDate', -1),
             'usgaap_date': when_plus(usgaap),
             'status_2'   : when_plus([(vv, kk[0]) 
                         for kk, vv in status_dict.items()]), 
             'status_3'   : when_plus([(vv, kk[1]) 
                         for kk, vv in status_dict.items()])})
+        repay_df   = pipe(repay_dict.items(),
+            partial2(map, item_namer(['RepaymentFrequency', 'repay_freq'])),  
+            self.spark.createDataFrame)
+        
 
-        repay_nmer = item_namer(['RepaymentFrequency', 'repay_freq'])
-        repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
-        repay_rows = map(repay_nmer, repay_dict.items())
-        repay_df   = self.spark.createDataFrame(repay_rows)
-
-        x_df = (base_df   # type: ignore
+        x_df = (EpicDF(self.spark, path)   # type: ignore
             .filter_plus(*where_loans) 
             .join(open_items, on='ID', how='left')
             .join(repay_df, on='RepaymentFrequency', how='left')
@@ -94,13 +94,16 @@ class CyberData():
         return x_df
 
     def _prep_open_items_wide(self, path):
-        base_df = EpicDF(self.spark, path)
-        id_cols   = ['ContractID', 'epic_date', 'ID']
-        rec_types = ['511010', '511100', '511200', 
+        id_cols = ['ContractID', 'epic_date', 'ID']
+        rec_types = [
+            '511010', '511100', '511200', 
             '990004', '991100', '990006'] 
         w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-        min_date = lambda cond: (F.lit(1) == F.when(cond, 
-                F.row_number().over(w_duedate)).otherwise(-1))
+        min_date = compose_left(
+                partial2(F.when, ..., F.row_number().over(w_duedate)), 
+                ϱ('otherwise', -1), 
+                partial2(eq, ..., F.lit(1)))
+        
         open_cols = OrderedDict({
             'yesterday'  : F.current_date() - 1, 
             'ID'         : F.col('ContractID'), 
@@ -117,13 +120,14 @@ class CyberData():
                 # Algunos no se usan, ya que se redefinieron en OpenItemsLong. 
                 # Pero los dejamos por si resulta factible recuperarlos. 
                 # Se indican con ## 
-                'oldest_date'      : F.col('DueDate'),      ##  
-                'oldest_uncleared' : F.col('uncleared'),    ##
+                'oldest_date' : F.col('DueDate'),           ## ya no
+                'oldest_uncleared' : F.col('uncleared'),    ## ya no
                 'oldest_eval_date' : F.col('DueDate') + 90, 
-                'overdue_days'     : pipe(F.col('DueDate'), 
+                'overdue_days' : pipe(F.col('DueDate'),     ## ya no
                     partial2(F.datediff, 'yesterday'), 
                     partial2(F.coalesce, ..., F.lit(0)))}} 
         
+        base_df = EpicDF(self.spark, path)
         y_df = (base_df   # type: ignore
             .fillna(0, subset=rec_types)
             .with_column_plus(open_cols))
@@ -141,9 +145,6 @@ class CyberData():
         return x_df
 
     def _prep_open_items_long(self, path):
-       # Filtrar IS_DEFAULT.
-        base_df = EpicDF(self.spark, path)
-        
         id_cols   = ['ContractID', 'epic_date', 'ID']
         rec_types = ['511010', '511100', '511200', 
             '990004', '991100', '990006'] 
@@ -153,31 +154,33 @@ class CyberData():
             'ID'         : F.col('ContractID'),
             'cleared'    : pipe(F.col('ReceivableDescription'), 
                     partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
-                    methodcaller('cast', T.DecimalType(20, 2)), 
+                    ϱ('cast', T.DecimalType(20, 2)), 
                     partial2(F.coalesce, ..., F.lit(0))), 
             'uncleared'  : F.col('Amount') - F.col('cleared'), 
             'is_default' : F.col('StatusCategory').isin(['2','3']),
-            'is_recvble' : F.col('ReceivableType').isin(rec_types),
-            'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
+            'is_capital' : F.col('ReceivableType') == '511010',
             'is_iva'     : F.col('ReceivableType') == '990004',
-            'is_511010'  : F.col('ReceivableType') == '511010',
+            'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
+            'is_recvble' : F.col('ReceivableType').isin(rec_types),
             'dds_max'    : F.max('DueDateShift').over(w_duedate),
-            'dds_default': F.when(F.col('is_default') & F.col('is_511010'), F.col('DueDateShift'))
-                            .otherwise(F.col('dds_max')), 
+            'dds_default': pipe(F.col('DueDateShift'), 
+                    partial2(F.when, F.col('is_default') & F.col('is_capital')), 
+                    ϱ('otherwise', F.col('dds_max'))), 
             'min_dds_def': F.min('dds_default').over(w_duedate),
             'is_min_dds' : F.col('DueDateShift') == F.col('dds_default')})
         
-        uncleared_if = (lambda cond: 
-            F.sum(F.when(cond, F.col('uncleared')).otherwise(0)))
+        uncleared_if = compose_left(
+            partial2(F.when, ..., F.col('uncleared')), 
+            ϱ('otherwise', 0), 
+            F.sum)
         group_cols = {      # siempre se filtra IS_DEFAULT. 
             'oldest_default_date': F.min('dds_default'),
             'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
-            'default_uncleared'  : uncleared_if(F.col('is_511010')),
+            'default_uncleared'  : uncleared_if(F.col('is_capital')),
             'default_interest'   : uncleared_if(F.col('is_interest')), 
             'default_iva'        : uncleared_if(F.col('ReceivableType') == '990004'), 
             'uncleared_recvble'  : uncleared_if(F.col('is_recvble') & F.col('is_min_dds'))}
-            
-        x_df = (base_df
+        x_df = (EpicDF(self.spark, path)
             .with_column_plus(single_cols)
             .filter(F.col('is_default'))
             .groupBy(*id_cols)
@@ -185,29 +188,28 @@ class CyberData():
         return x_df
      
     def _prep_person_set(self, path): 
-        base_df = EpicDF(self.spark, path)
-        states_str = [
-            "AGU,1",  "BCN,2",  "BCS,3",  "CAM,4",  "COA,5",  "COL,6",  "CHH,8",  "CHP,7", 
-            "CMX,9",  "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
-            "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
-            "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
-        states_data = [ item_namer(['AddressRegion', 'state_key'])(split)
-            for split in map(methodcaller('split', ','), states_str)]
-        states_df = self.spark.createDataFrame(states_data)
         persons_cols = {   
             'LastNameP' : F.col('LastName'),
             'LastNameM' : F.col('LastName2'), 
             'full_name' : F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
             'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID'), 
             'yesterday' : F.date_add(F.current_date(), -1)}
-        x_df = (base_df     # type: ignore
+        states_str = [
+            "AGU,1",  "BCN,2",  "BCS,3",  "CAM,4",  "COA,5",  "COL,6",  "CHH,8",  "CHP,7", 
+            "CMX,9",  "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
+            "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
+            "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
+        states_df = pipe(states_str, 
+            partial2(map, ϱ('split', ',')), 
+            item_namer(['AddressRegion', 'state_key']), 
+            self.spark.createDataFrame)
+        x_df = (EpicDF(self.spark, path)     # type: ignore
             .filter(F.col('ID').isNotNull())
             .join(states_df, how='left', on='AddressRegion')
             .with_column_plus(persons_cols))
         return x_df
 
     def _prep_txns_set(self, path): 
-        base_df = EpicDF(self.spark, path)
         txn_codes = [92703,  92800, 500027, 550021, 550022, 550023, 
             550024, 550403, 550908, 650404, 650710, 650712, 650713, 
             650716, 650717, 650718, 650719, 650720, 750001, 750025, 
@@ -217,6 +219,7 @@ class CyberData():
             'TransactionTypeTxt': F.col('TransactionTypeName') , 
             'TransactionType'   : F.col('TransactionTypeCode'),  
             'ContractID'        : F.col('AccountID')}
+        base_df = EpicDF(self.spark, path)
         x_df = (base_df
             .with_column_plus(with_rename)
             .filter_plus(
@@ -225,7 +228,6 @@ class CyberData():
         return x_df
 
     def _prep_txns_grp(self, path): 
-        base_df = EpicDF(self.spark, path)
         pymt_codes = [550021, 550022, 550023, 550024, 550403, 550908]
 
         by_older = W.partitionBy('AccountID', 'is_payment').orderBy(F.col('ValueDate'))
@@ -243,7 +245,7 @@ class CyberData():
                 'ValueDate': 'last_date',
                 'Amount'   : 'last_amount', 
                 'AmountAc' : 'last_amount_local'} }
-        y_df = (base_df
+        y_df = (EpicDF(self.spark, path)
             .with_column_plus(txn_cols)
             .filter(F.col('is_payment')))
         x1_df = (y_df      # type: ignore
@@ -276,8 +278,9 @@ class CyberData():
             'str' : lambda rr: F.format_string(rr['c_format'], rr['nombre']), 
             'dbl' : lambda rr: F.regexp_replace(F.format_string(rr['c_format'], rr['nombre']), '[\.,]', ''), 
             'int' : lambda rr: F.format_string(str(rr['c_format']), rr['nombre']), 
-            'date': lambda rr: F.when(F.col(rr['nombre']) == self.na_types['date'], F.lit('00000000')
-                    ).otherwise(F.date_format(rr['nombre'], 'MMddyyyy')) }
+            'date': lambda rr: pipe(F.col(rr['nombre']) == self.na_types['date'], 
+                    partial2(F.when, ..., F.lit('00000000')), 
+                    ϱ('otherwise', F.date_format(rr['nombre'], 'MMddyyyy')))}
 
         def row_formatter(a_row): 
             py_type = a_row['PyType']
@@ -303,12 +306,10 @@ class CyberData():
         # ['nombre', 'Longitud', 'Width', 'PyType', 'columna_valor'] 
         
         specs_0 = pd.read_feather(path)
-        #    .set_index('nombre'))
-        
         specs_df = specs_0.assign(
             width       = specs_0['Longitud'].astype(float).astype(int), 
-            width_1     = lambda df: df['width'].where(df['PyType'] != 'dbl', df['width'] + 1),
             precision_1 = specs_0['Longitud'].str.split('.').str[1], 
+            width_1     = lambda df: df['width'].where(df['PyType'] != 'dbl', df['width'] + 1),
             precision   = lambda df: np.where(df['PyType'] == 'dbl', 
                                     df['precision_1'], df['width']), 
             is_na = ( specs_0['columna_valor'].isnull() 
@@ -320,7 +321,6 @@ class CyberData():
             y_format = lambda df: df['x_format'].str.replace(r'\.\d*', '', regex=True),
             c_format = lambda df: df['y_format'].where(df['PyType'] == 'int', df['x_format']), 
             s_format = lambda df: ["%{}.{}s".format(wth, wth) for wth in df['width']])
-
         return specs_df
 
 
@@ -332,7 +332,6 @@ class CyberData():
         
         for _, rr in specs_df.iterrows(): 
             # Reading and Missing
-
             r_type = rr['PyType']
             if rr['tabla'] in tables_dict: 
                 if rr['columna_valor'] in tables_dict[rr['tabla']].columns: 
@@ -446,7 +445,7 @@ def pd_print(a_df: pd.DataFrame, **kwargs):
     
     # pipe(the_options, 
     #   z_keymap(add('display.')), 
-    #   methodcaller('items'), 
+    #   ϱ('items'), 
     #   concat)
     optns_ls = sum(([f"display.{kk}", vv] 
         for kk, vv in the_options.items()), start=[])

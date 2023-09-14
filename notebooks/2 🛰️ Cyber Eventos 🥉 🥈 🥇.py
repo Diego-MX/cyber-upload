@@ -27,23 +27,23 @@ to_display = False
 from collections import OrderedDict
 from datetime import datetime as dt
 from json import dumps
-from operator import methodcaller
+from operator import methodcaller as ϱ
 import os
 from pathlib import Path
+from pytz import timezone as tz
 import re
 from subprocess import check_call
 
 import pandas as pd
-from pyspark.sql import (functions as F, SparkSession)
-from pyspark.dbutils import DBUtils
-from pytz import timezone as tz
+from pyspark.sql import functions as F, SparkSession
+from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 from toolz import compose_left, pipe
 import yaml
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
 
-with open("../user_databricks.yml", 'r') as _f:
+with open("../user_databricks.yml", 'r') as _f:     # pylint: disable=unspecified-encoding
     u_dbks = yaml.safe_load(_f)
 
 epicpy_load = {
@@ -61,7 +61,7 @@ from src import data_managers; reload(data_managers)
 import config; reload(config)
 
 from epic_py.delta import EpicDataBuilder, F_latinize
-from epic_py.tools import partial2, packed
+from epic_py.tools import packed, partial2
 from src.data_managers import CyberData
 from src.utilities import tools
 
@@ -174,7 +174,7 @@ for kk, vv in tables_dict.items():
 # COMMAND ----------
 
 def set_specs_file(task_key: str, downer='blob'):
-     # Usa TMP_DOWNER, SPECS_PATH, 
+     # Usa TMP_DOWNER, SPECS_PATH,
     if downer == 'blob':
         dir_at = tmp_downer # and no prefix
         specs_file = f"{dir_at}/{task_key}.feather"
@@ -194,9 +194,9 @@ def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
 
     splitter = compose_left(
-        methodcaller('split', ','),
-        partial2(map, methodcaller('split', '=')),
-        partial2(map, λ_col_alias),
+        ϱ('split', ','), 
+        partial2(map, ϱ('split', '=')), 
+        partial2(map, λ_col_alias), 
         list)
     joiner = OrderedDict((rr['tabla'], splitter(rr['join_cols']))
         for _, rr in join_df.iterrows()
@@ -206,13 +206,13 @@ def df_joiner(join_df) -> OrderedDict:
 
 def read_cyber_specs(task_key: str, downer='blob'):
     specs_file, joins_file = set_specs_file(task_key, downer)
-    specs_df = cyber_central.specs_setup_0(specs_file)
+    a_specs = cyber_central.specs_setup_0(specs_file)
     if Path(joins_file).is_file():
         joins_dict = df_joiner(pd.read_csv(joins_file))
     else:
         joins_dict = None
 
-    return specs_df, joins_dict
+    return a_specs, joins_dict
 
 # COMMAND ----------
 
@@ -264,7 +264,7 @@ the_names = specs_df['nombre']
 one_select = pipe(the_names,
     packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names)))
+    ϱ('alias', '~'.join(the_names)))
 
 widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
 
@@ -295,7 +295,7 @@ the_names = specs_df['nombre']
 one_select = pipe(the_names,
     packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names)))
+    ϱ('alias', '~'.join(the_names))) 
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -330,7 +330,7 @@ the_names = specs_df['nombre']
 one_select = pipe(the_names,
     packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names)))
+    ϱ('alias', '~'.join(the_names))) 
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -366,9 +366,9 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 a_dir = f"{gold_path}/recent"
 tz_mx = tz('America/Mexico_City')
 print(a_dir)
-for x in dbutils.fs.ls(a_dir):
-    x_time = pipe(x.modificationTime/1000,
-        dt.fromtimestamp,
-        methodcaller('astimezone', tz_mx),
-        methodcaller('strftime', "%d %b '%y %H:%M"))
+for x in dbutils.fs.ls(a_dir): 
+    x_time = pipe(x.modificationTime/1000, 
+        dt.fromtimestamp, 
+        ϱ('astimezone', tz_mx), 
+        ϱ('strftime', "%d %b '%y %H:%M"))
     print(f"{x.name}\t=> {x_time}")
