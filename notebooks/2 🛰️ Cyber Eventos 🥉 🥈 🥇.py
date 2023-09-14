@@ -8,12 +8,11 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q -r ../reqs_dbks.txt
+# MAGIC %run ./0_install_reqs
 
 # COMMAND ----------
 
 to_display = True
-epicpy_tag = 'v1.1.18'      # dev-diego
 read_specs_from = 'repo'
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
@@ -32,27 +31,14 @@ import os
 from pathlib import Path
 from pytz import timezone as tz
 import re
-from subprocess import check_call
 
 import pandas as pd
 from pyspark.sql import functions as F, SparkSession
 from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 from toolz import compose_left, pipe
-import yaml
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
-
-with open("../user_databricks.yml", 'r') as _f:     # pylint: disable=unspecified-encoding
-    u_dbks = yaml.safe_load(_f)
-
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': epicpy_tag, 
-    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
-
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
@@ -151,7 +137,6 @@ tables_dict = {
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns
-    # "OpenItems"    : open_items_wide, 
     }
 
 print("The COUNT stat in each table is:")

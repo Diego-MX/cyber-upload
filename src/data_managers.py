@@ -145,26 +145,31 @@ class CyberData():
         rec_types = ['511010', '511100', '511200', 
             '990004', '991100', '990006'] 
         w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-        single_cols = OrderedDict({
-            'yesterday'  : F.current_date() - 1, 
+
+        single_cols = {
             'ID'         : F.col('ContractID'),
-            'cleared'    : pipe(F.col('ReceivableDescription'), 
-                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
-                    ϱ('cast', T.DecimalType(20, 2)), 
-                    partial2(F.coalesce, ..., F.lit(0))), 
-            'uncleared'  : F.col('Amount') - F.col('cleared'), 
+            'yesterday'  : F.current_date() - 1, 
+            'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
             'is_default' : F.col('StatusCategory').isin(['2','3']),
             'is_capital' : F.col('ReceivableType') == '511010',
             'is_iva'     : F.col('ReceivableType') == '990004',
             'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
             'is_recvble' : F.col('ReceivableType').isin(rec_types),
-            'dds_max'    : F.max('DueDateShift').over(w_duedate),
+            'cleared'    : pipe(F.col('ReceivableDescription'), 
+                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
+                    ϱ('cast', T.DecimalType(20, 2)), 
+                    partial2(F.coalesce, ..., F.lit(0)))
+            ,
+            'dds_max'    : F.max('DueDateShift').over(w_duedate), 
+            'uncleared'  : F.col('Amount') - F.col('cleared')
+            ,
             'dds_default': pipe(F.col('DueDateShift'), 
                     partial2(F.when, F.col('is_default') & F.col('is_capital')), 
-                    ϱ('otherwise', F.col('dds_max'))), 
+                    ϱ('otherwise', F.col('dds_max')))
+            ,
             'min_dds_def': F.min('dds_default').over(w_duedate),
-            'is_min_dds' : F.col('DueDateShift') == F.col('dds_default')})
-        
+            'is_min_dds' : F.col('DueDateShift') == F.col('dds_default')
+            }
         uncleared_if = compose_left(
             partial2(F.when, ..., F.col('uncleared')), 
             ϱ('otherwise', 0), 
@@ -176,14 +181,14 @@ class CyberData():
             'default_interest'   : uncleared_if(F.col('is_interest')), 
             'default_iva'        : uncleared_if(F.col('is_iva'))}
         x_df = (EpicDF(self.spark, path)
-            .with_column_plus(single_cols)
+            .with_column_plus(single_cols, optimize=False)
             .filter(F.col('is_default'))
             .groupBy(*id_cols)
             .agg_plus(group_cols))
         return x_df
      
     def _prep_person_set(self, path): 
-        persons_cols = {   
+        persons_cols = {
             'LastNameP' : F.col('LastName'),
             'LastNameM' : F.col('LastName2'), 
             'full_name' : F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
@@ -232,23 +237,24 @@ class CyberData():
             'is_oldest' : F.row_number().over(by_older) == 1,
             'is_newest' : F.row_number().over(by_newer) == 1})
         map_cols = {
-            'oldest': {
-                'AccountID': 'account_id', 
-                'ValueDate': 'first_date'}, 
             'newest': {
                 'AccountID': 'account_id', 
                 'ValueDate': 'last_date',
                 'Amount'   : 'last_amount', 
-                'AmountAc' : 'last_amount_local'} }
+                'AmountAc' : 'last_amount_local'}, 
+            'oldest': {
+                'AccountID': 'account_id', 
+                'ValueDate': 'first_date'}, 
+            }
         y_df = (EpicDF(self.spark, path)
-            .with_column_plus(txn_cols)
+            .with_column_plus(txn_cols, optimize=False)
             .filter(F.col('is_payment')))
         x1_df = (y_df      # type: ignore
             .filter(F.col('is_newest'))
-            .with_column_renamed_plus(map_cols['newest']))
+            .with_column_renamed_plus(map_cols['newest'], optimize=False))
         x2_df = (y_df      # type: ignore
             .filter(F.col('is_oldest'))
-            .with_column_renamed_plus(map_cols['oldest']))  
+            .with_column_renamed_plus(map_cols['oldest'], optimize=False))  
         x_df = (x1_df
             .join(x2_df, on='account_id', how='inner')
             .withColumnRenamed('account_id', 'AccountID'))
