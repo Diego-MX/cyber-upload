@@ -78,7 +78,7 @@ brz_path  = λ_path('bronze', 'ops/core-banking')
 gold_path = λ_path('gold', 'cx/collections/cyber')
 
 specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
-tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS 
+tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
@@ -90,7 +90,7 @@ def dumps2(an_obj, **kwargs):
 
 if not os.path.isdir(tmp_downer):
     os.makedirs(tmp_downer)
-    
+
 
 # COMMAND ----------
 
@@ -161,7 +161,7 @@ tables_dict = {
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items():
     print(kk, vv.count())
- 
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -295,7 +295,7 @@ the_names = specs_df['nombre']
 one_select = pipe(the_names,
     packed(F.concat),
     F_latinize,
-    ϱ('alias', '~'.join(the_names))) 
+    ϱ('alias', '~'.join(the_names)))
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -319,7 +319,7 @@ if to_display:
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ### SAP Pagos
 
 # COMMAND ----------
@@ -330,7 +330,7 @@ the_names = specs_df['nombre']
 one_select = pipe(the_names,
     packed(F.concat),
     F_latinize,
-    ϱ('alias', '~'.join(the_names))) 
+    ϱ('alias', '~'.join(the_names)))
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -358,7 +358,7 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ## Exploración de archivos
 
 # COMMAND ----------
@@ -366,9 +366,9 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 a_dir = f"{gold_path}/recent"
 tz_mx = tz('America/Mexico_City')
 print(a_dir)
-for x in dbutils.fs.ls(a_dir): 
-    x_time = pipe(x.modificationTime/1000, 
-        dt.fromtimestamp, 
-        ϱ('astimezone', tz_mx), 
+for x in dbutils.fs.ls(a_dir):
+    x_time = pipe(x.modificationTime/1000,
+        dt.fromtimestamp,
+        ϱ('astimezone', tz_mx),
         ϱ('strftime', "%d %b '%y %H:%M"))
     print(f"{x.name}\t=> {x_time}")
