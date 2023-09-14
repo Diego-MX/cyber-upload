@@ -123,13 +123,9 @@ balances = cyber_central.prepare_source('balances',
 open_items_long = cyber_central.prepare_source('open-items-long',
     path=f"{brz_path}/loan-contract/chains/open-items")
 
-open_items_wide = cyber_central.prepare_source('open-items-wide',
-    path=f"{brz_path}/loan-contract/aux/open-items-wide")
-    # tiene muchos CURRENT_AMOUNT : NULL
-
 loan_contracts = cyber_central.prepare_source('loan-contracts',
     path=f"{brz_path}/loan-contract/data",
-    open_items=open_items_wide)
+    open_items=open_items_long)
 
 persons = cyber_central.prepare_source('person-set',
     path=f"{brz_path}/person-set/chains/person")
@@ -147,12 +143,11 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 # COMMAND ----------
 
-# Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario. 
+# Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario.
 
 tables_dict = {
     "BalancesWide" : balances,
-    "ContractSet"  : loan_contracts, 
-    "OpenItems"    : open_items_wide, 
+    "ContractSet"  : loan_contracts,
     "OpenItemsLong": open_items_long,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
@@ -167,8 +162,8 @@ for kk, vv in tables_dict.items():
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
 # MAGIC
-# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.  
-# MAGIC Y de ahí, se preparan los archivos. 
+# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.   
+# MAGIC Y de ahí, se preparan los archivos.  
 # MAGIC
 
 # COMMAND ----------
@@ -216,8 +211,8 @@ def read_cyber_specs(task_key: str, downer='blob'):
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC ## Master Join and Fixed-Value Columns  
+# MAGIC %md
+# MAGIC ## Master Join and Fixed-Value Columns
 # MAGIC
 # MAGIC 1. Definir tipos de _Spark_, y los valores nulos para cada uno de ellos.  
 # MAGIC 2. Crear columnas para los valores fijos definidos.  
@@ -231,7 +226,7 @@ def read_cyber_specs(task_key: str, downer='blob'):
 # MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
 # MAGIC - `INT`: Aplicar `c_format`.  
 # MAGIC
-# MAGIC Post-formatos, aplicar el `s-format`, concatenar.  
+# MAGIC Post-formatos, aplicar el `s-format`, concatenar.
 
 # COMMAND ----------
 
@@ -283,7 +278,7 @@ if to_display:
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ### SAP Estatus
 
 # COMMAND ----------
