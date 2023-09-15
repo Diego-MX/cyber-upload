@@ -53,7 +53,7 @@ class CyberData():
         return x_df
 
     def _prep_loan_contracts(self, path, **kwargs): 
-        where_loans = [F.col('LifeCycleStatusTxt') == 'activos, utilizados']
+        where_loans = [F.col('LifeCycleStatus').isin(['20', '30', '50'])]
         open_items  = (kwargs['open_items'].select('ID', 'oldest_default_date'))
         repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
         status_dict = OrderedDict({
@@ -145,7 +145,7 @@ class CyberData():
         rec_types = ['511010', '511100', '511200', 
             '990004', '991100', '990006'] 
         w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-
+        # single_cols = [...] para manejar dependencias de columnas. 
         single_cols = {
             'ID'         : F.col('ContractID'),
             'yesterday'  : F.current_date() - 1, 
@@ -167,8 +167,7 @@ class CyberData():
                     partial2(F.when, F.col('is_default') & F.col('is_capital')), 
                     ϱ('otherwise', F.col('dds_max')))
             ,
-            'min_dds_def': F.min('dds_default').over(w_duedate),
-            'is_min_dds' : F.col('DueDateShift') == F.col('dds_default')
+            'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
             }
         uncleared_if = compose_left(
             partial2(F.when, ..., F.col('uncleared')), 
