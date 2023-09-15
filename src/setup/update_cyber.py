@@ -42,8 +42,8 @@ if __name__ == '__main__':
     from dotenv import load_dotenv
 
     load_dotenv(override=True)
-    from config import app_resourcer, app_agent, SITE
-    
+    from config import app_resourcer, SITE
+
     cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
     expect_specs = (read_excel_table(cyber_fields, 'general', 'especificacion')
@@ -57,29 +57,29 @@ if __name__ == '__main__':
     # print(f"Variables: (Env, Server)={ENV, SERVER}")
 
     blobs_paths = "cx/collections/cyber/spec_files"
-    
+
     cyber_tasks = [
         'sap_saldos' , # 'fiserv_saldos' ,
         'sap_pagos'  , # 'fiserv_pagos'  ,
         'sap_estatus'] # 'fiserv_estatus'
 
-    for each_task in cyber_tasks: 
+    for each_task in cyber_tasks:
         print(f"\nRunning task: {each_task}")
         spec_local = f"refs/catalogs/cyber_{each_task}.feather"
         join_local = f"refs/catalogs/cyber_{each_task}_joins.csv"
 
         now_str = dt.now(tz=timezone('America/Mexico_City')).strftime('%Y-%m-%d_%H:%M')
 
-        blob_1  = f"{blobs_paths}/{each_task}_specs_latest.feather" 
-        blob_2  = f"{blobs_paths}/{each_task}_specs_{now_str}.feather" 
-        blob_3  = f"{blobs_paths}/{each_task}_joins_latest.csv" 
-        blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.csv" 
-    
+        blob_1  = f"{blobs_paths}/{each_task}_specs_latest.feather"
+        blob_2  = f"{blobs_paths}/{each_task}_specs_{now_str}.feather"
+        blob_3  = f"{blobs_paths}/{each_task}_joins_latest.csv"
+        blob_4  = f"{blobs_paths}/{each_task}_joins_{now_str}.csv"
+
         spec_ref = read_excel_table(cyber_fields, each_task, each_task)
-        has_join = read_excel_table(cyber_fields, each_task, f"{each_task}_join") 
+        has_join = read_excel_table(cyber_fields, each_task, f"{each_task}_join")
         (execs, checks) = excelref_to_feather(spec_ref)
         execs.to_feather(spec_local)
-        
+
         app_resourcer.upload_storage_blob(spec_local, blob_1, 'gold', overwrite=True, verbose=1)
         app_resourcer.upload_storage_blob(spec_local, blob_2, 'gold')
         print(checks)
@@ -88,8 +88,3 @@ if __name__ == '__main__':
             has_join.to_csv(join_local, index=False)
             app_resourcer.upload_storage_blob(join_local, blob_3, 'gold', overwrite=True)
             app_resourcer.upload_storage_blob(join_local, blob_4, 'gold')
-
-
-
-
-
