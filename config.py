@@ -11,6 +11,7 @@ from epic_py.platform import EpicIdentity
 from epic_py.tools import dict_plus
 from src.utilities import tools
 
+# pylint: disable=line-too-long
 PAGE_MAX = 1000
 
 SETUP_2 = {

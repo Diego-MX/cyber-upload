@@ -8,46 +8,37 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q -r ../reqs_dbks.txt
+# MAGIC %run ./0_install_reqs
 
 # COMMAND ----------
 
+to_display = True
 read_specs_from = 'repo'
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD. 
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
 
+
 # COMMAND ----------
 
+# pylint: disable=wrong-import-position,wrong-import-order
+# pylint: disable=ungrouped-imports
 from collections import OrderedDict
-from datetime import date, datetime as dt, timedelta as delta
+from datetime import datetime as dt
 from json import dumps
-from operator import methodcaller
+from operator import methodcaller as ϱ
 import os
 from pathlib import Path
+from pytz import timezone as tz
 import re
-from subprocess import check_call
 
 import pandas as pd
-from pyspark.sql import (functions as F, SparkSession)
-from pyspark.dbutils import DBUtils
-from pytz import timezone as tz
-from toolz import compose_left, curried, pipe
-import yaml
+from pyspark.sql import functions as F, SparkSession
+from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
+from toolz import compose_left, pipe
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
-
-with open("../user_databricks.yml", 'r') as _f: 
-    u_dbks = yaml.safe_load(_f)
-
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego', 
-    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
-
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-check_call(['pip', 'install', url_call])
 
 # COMMAND ----------
 
@@ -55,8 +46,8 @@ from importlib import reload
 from src import data_managers; reload(data_managers)
 import config; reload(config)
 
-from epic_py.delta import EpicDF, EpicDataBuilder, F_latinize
-from epic_py.tools import partial2, packed
+from epic_py.delta import EpicDataBuilder, F_latinize
+from epic_py.tools import packed, partial2
 from src.data_managers import CyberData
 from src.utilities import tools
 
@@ -69,23 +60,22 @@ app_resourcer.set_dbks_permissions(stg_permissions)
 λ_path = (lambda cc, pp: app_resourcer.get_resource_url(
         'abfss', 'storage', container=cc, blob_path=pp))
 
-brz_path  = λ_path('bronze', 'ops/core-banking')  
-gold_path = λ_path('gold', 'cx/collections/cyber') 
+brz_path  = λ_path('bronze', 'ops/core-banking')
+gold_path = λ_path('gold', 'cx/collections/cyber')
 
 specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
-tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS 
+tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
 
-def dumps2(an_obj, **kwargs): 
+def dumps2(an_obj, **kwargs):
     dump1 = dumps(an_obj, **kwargs)
     dump2 = re.sub(r'(,)\n *', r'\1 ', dump1)
     return dump2
 
-if not os.path.isdir(tmp_downer): 
+if not os.path.isdir(tmp_downer):
     os.makedirs(tmp_downer)
-    
 
 # COMMAND ----------
 
@@ -112,27 +102,23 @@ if not os.path.isdir(tmp_downer):
 # Revisar especificación en ~/refs/catalogs/cyber_txns.xlsx
 # O en User Story, o en Correos enviados.  
 
-balances = cyber_central.prepare_source('balances', 
+balances = cyber_central.prepare_source('balances',
     path=f"{brz_path}/loan-contract/aux/balances-wide")
-    
-open_items_long = cyber_central.prepare_source('open-items-long', 
-    path=f"{brz_path}/loan-contract/chains/open-items")
 
-open_items_wide = cyber_central.prepare_source('open-items-wide', 
-    path=f"{brz_path}/loan-contract/aux/open-items-wide")
-    # tiene muchos CURRENT_AMOUNT : NULL
+open_items_long = cyber_central.prepare_source('open-items-long',
+    path=f"{brz_path}/loan-contract/chains/open-items")
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
-    open_items=open_items_wide)
+    open_items=open_items_long)
 
 persons = cyber_central.prepare_source('person-set', 
     path=f"{brz_path}/person-set/chains/person")
 
-the_txns = cyber_central.prepare_source('txns-set', 
+the_txns = cyber_central.prepare_source('txns-set',
     path=f"{brz_path}/transaction-set/data")
 
-txn_pmts = cyber_central.prepare_source('txns-grp', 
+txn_pmts = cyber_central.prepare_source('txns-grp',
     path=f"{brz_path}/transaction-set/data")
 
 # COMMAND ----------
@@ -142,36 +128,35 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 # COMMAND ----------
 
-# Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario. 
+# Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario.
 
 tables_dict = {
     "BalancesWide" : balances,
     "ContractSet"  : loan_contracts, 
-    "OpenItems"    : open_items_wide, 
     "OpenItemsLong": open_items_long,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
-    "TxnsPayments" : the_txns}
+    "TxnsPayments" : the_txns
+    }
 
 print("The COUNT stat in each table is:")
-for kk, vv in tables_dict.items(): 
+for kk, vv in tables_dict.items():
     print(kk, vv.count())
-    
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
 # MAGIC
-# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.  
-# MAGIC Y de ahí, se preparan los archivos. 
+# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.   
+# MAGIC Y de ahí, se preparan los archivos.  
 # MAGIC
 
 # COMMAND ----------
 
-def set_specs_file(task_key: str, downer='blob'): 
-     # Usa TMP_DOWNER, SPECS_PATH, 
-    if downer == 'blob': 
+def set_specs_file(task_key: str, downer='blob'):
+     # Usa TMP_DOWNER, SPECS_PATH,
+    if downer == 'blob':
         dir_at = tmp_downer # and no prefix
         specs_file = f"{dir_at}/{task_key}.feather"
         joins_file = f"{tmp_downer}/{task_key}_joins.csv"
@@ -179,42 +164,41 @@ def set_specs_file(task_key: str, downer='blob'):
         joins_blob = f"{specs_path}/{task_key}_joins_latest.csv"
         app_resourcer.download_storage_blob(specs_file, specs_blob, 'gold', verbose=1)
         app_resourcer.download_storage_blob(joins_file, joins_blob, 'gold', verbose=1)
-    elif downer == 'repo': 
+    elif downer == 'repo':
         dir_at = "../refs/catalogs"  # prefix: "cyber_"
         specs_file = f"{dir_at}/cyber_{task_key}.feather"
         joins_file = f"{dir_at}/cyber_{task_key}_joins.csv"
     return (specs_file, joins_file)
 
 
-def df_joiner(join_df) -> OrderedDict: 
-    cols_by = ['tabla', 'join_cols']
+def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
 
     splitter = compose_left(
-        methodcaller('split', ','), 
-        partial2(map, methodcaller('split', '=')), 
+        ϱ('split', ','), 
+        partial2(map, ϱ('split', '=')), 
         partial2(map, λ_col_alias), 
         list)
     joiner = OrderedDict((rr['tabla'], splitter(rr['join_cols']))
         for _, rr in join_df.iterrows()
         if not tools.is_na(rr['join_cols']))
     return joiner
-    
 
-def read_cyber_specs(task_key: str, downer='blob'): 
+
+def read_cyber_specs(task_key: str, downer='blob'):
     specs_file, joins_file = set_specs_file(task_key, downer)
-    specs_df = cyber_central.specs_setup_0(specs_file)
+    a_specs = cyber_central.specs_setup_0(specs_file)
     if Path(joins_file).is_file():
         joins_dict = df_joiner(pd.read_csv(joins_file))
-    else: 
+    else:
         joins_dict = None
 
-    return specs_df, joins_dict
+    return a_specs, joins_dict
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC ## Master Join and Fixed-Value Columns  
+# MAGIC %md
+# MAGIC ## Master Join and Fixed-Value Columns
 # MAGIC
 # MAGIC 1. Definir tipos de _Spark_, y los valores nulos para cada uno de ellos.  
 # MAGIC 2. Crear columnas para los valores fijos definidos.  
@@ -228,7 +212,7 @@ def read_cyber_specs(task_key: str, downer='blob'):
 # MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
 # MAGIC - `INT`: Aplicar `c_format`.  
 # MAGIC
-# MAGIC Post-formatos, aplicar el `s-format`, concatenar.  
+# MAGIC Post-formatos, aplicar el `s-format`, concatenar.
 
 # COMMAND ----------
 
@@ -237,9 +221,7 @@ def read_cyber_specs(task_key: str, downer='blob'):
 
 # COMMAND ----------
 
-cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
-
-exportar = True
+cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 
 the_tables = {}
 missing_cols = {}
@@ -251,7 +233,7 @@ missing_cols = {}
 
 # COMMAND ----------
 
-task = 'sap_saldos'
+task = 'sap_saldos'     # pylint: disable=invalid-name
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_ii = specs_df.rename(columns=specs_rename)
@@ -260,10 +242,10 @@ specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
 missing_cols[task] = specs_dict['missing']
 the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
+one_select = pipe(the_names,
+    packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
+    ϱ('alias', '~'.join(the_names)))
 
 widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
 
@@ -276,30 +258,29 @@ the_tables[task] = gold_saldos
 
 cyber_central.save_task_3(task, gold_path, gold_saldos)
 
-if exportar:
+if to_display:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ### SAP Estatus
 
 # COMMAND ----------
 
-task = 'sap_estatus'
+task = 'sap_estatus'        # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 the_names = specs_df['nombre']
 
-one_select = pipe(the_names, 
-    packed(F.concat), 
+one_select = pipe(the_names,
+    packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
+    ϱ('alias', '~'.join(the_names)))
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
 
 missing_cols[task] = specs_dict['missing']
 
@@ -313,29 +294,27 @@ gold_estatus = estatus_3.select(one_select)
 the_tables[task] = gold_estatus
 cyber_central.save_task_3(task, gold_path, gold_estatus)
 print(f"\tRows: {gold_estatus.count()}")
-if exportar: 
+if to_display:
     gold_estatus.display()
-     
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ### SAP Pagos
 
 # COMMAND ----------
 
-task = 'sap_pagos'
+task = 'sap_pagos'      # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 the_names = specs_df['nombre']
-one_select = pipe(the_names, 
-    packed(F.concat), 
+one_select = pipe(the_names,
+    packed(F.concat),
     F_latinize,
-    methodcaller('alias', '~'.join(the_names))) 
+    ϱ('alias', '~'.join(the_names)))
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
 
 missing_cols[task] = specs_dict['missing']
 
@@ -349,7 +328,7 @@ the_tables[task] = gold_pagos
 cyber_central.save_task_3(task, gold_path, gold_pagos)
 
 print(f"\tRows: {gold_pagos.count()}")
-if exportar:
+if to_display:
     gold_pagos.display()
 
 # COMMAND ----------
@@ -358,17 +337,17 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ## Exploración de archivos
 
 # COMMAND ----------
 
 a_dir = f"{gold_path}/recent"
+tz_mx = tz('America/Mexico_City')
 print(a_dir)
-for x in dbutils.fs.ls(a_dir): 
-    x_time = pipe(x.modificationTime/1000, 
-        dt.fromtimestamp, 
-        methodcaller('astimezone', tz('America/Mexico_City')), 
-        methodcaller('strftime', "%d %b '%y %H:%M"))
+for x in dbutils.fs.ls(a_dir):
+    x_time = pipe(x.modificationTime/1000,
+        dt.fromtimestamp,
+        ϱ('astimezone', tz_mx),
+        ϱ('strftime', "%d %b '%y %H:%M"))
     print(f"{x.name}\t=> {x_time}")
-

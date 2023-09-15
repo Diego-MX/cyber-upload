@@ -2,7 +2,7 @@ tabla,helper,join_cols,comentario
 ContractSet,ovr_cols,"ID=loan_id,BorrowerID=person_id",
 PersonSet,person_cols,ID=person_id,
 BalancesWide,---,ID=loan_id,
-OpenItems,---,ID=loan_id,formato Wide. 
+OpenItems,---,,formato Wide. 
 TxnsGrouped,---,AccountID=loan_id,
 OpenItemsLong,---,ContractID=loan_id,
 _val,---,,
