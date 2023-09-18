@@ -173,7 +173,6 @@ def set_specs_file(task_key: str, downer='blob'):
 
 def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
-
     splitter = compose_left(
         ϱ('split', ','), 
         partial2(map, ϱ('split', '=')), 
