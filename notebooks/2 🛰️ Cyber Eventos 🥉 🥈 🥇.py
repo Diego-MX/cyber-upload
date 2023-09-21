@@ -45,10 +45,6 @@ dbutils = DBUtils(spark)
 
 # COMMAND ----------
 
-from importlib import reload
-from src import data_managers; reload(data_managers)
-import config; reload(config)
-
 from epic_py.delta import EpicDataBuilder, F_latinize
 from epic_py.tools import packed, partial2
 from src.data_managers import CyberData
@@ -132,13 +128,12 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 # COMMAND ----------
 
-# Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario.
-
+# Las llaves de las tablas se leen de las specs en Excel. 
 tables_dict = {
     "BalancesWide" : balances,
-    "ContractSet"  : loan_contracts, 
+    "ContractSet"  : loan_contracts,
     "OpenItemsLong": open_items_long,
-    "PersonSet"    : persons, 
+    "PersonSet"    : persons,
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns}
 
@@ -173,7 +168,6 @@ def set_specs_file(task_key: str, downer='blob'):
         joins_file = f"{dir_at}/cyber_{task_key}_joins.csv"
     return (specs_file, joins_file)
 
-
 def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
     splitter = compose_left(
@@ -186,7 +180,6 @@ def df_joiner(join_df) -> OrderedDict:
         if not tools.is_na(rr['join_cols']))
     return joiner
 
-
 def read_cyber_specs(task_key: str, downer='blob'):
     specs_file, joins_file = set_specs_file(task_key, downer)
     a_specs = cyber_central.specs_setup_0(specs_file)
@@ -194,7 +187,6 @@ def read_cyber_specs(task_key: str, downer='blob'):
         joins_dict = df_joiner(pd.read_csv(joins_file))
     else:
         joins_dict = None
-
     return a_specs, joins_dict
 
 # COMMAND ----------
@@ -229,6 +221,14 @@ cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 the_tables = {}
 missing_cols = {}
 
+def one_column(names, header=True):
+    an_alias = '~'.join(names) if header else 'one-column'
+    the_col = pipe(names, 
+        packed(F.concat), 
+        F_latinize, 
+        ϱ('alias', an_alias))
+    return the_col
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -240,15 +240,10 @@ task = 'sap_saldos'     # pylint: disable=invalid-name
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_ii = specs_df.rename(columns=specs_rename)
-specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
+specs_dict = cyber_central.specs-_reader_1(specs_df, tables_dict)
 
 missing_cols[task] = specs_dict['missing']
-the_names = specs_df['nombre']
-one_select = pipe(the_names,
-    packed(F.concat),
-    F_latinize,
-    ϱ('alias', '~'.join(the_names)))
+one_select = one_column(specs_df['nombre'])
 
 widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
 
@@ -274,12 +269,7 @@ if to_display:
 
 task = 'sap_estatus'        # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-the_names = specs_df['nombre']
-
-one_select = pipe(the_names,
-    packed(F.concat),
-    F_latinize,
-    ϱ('alias', '~'.join(the_names)))
+one_select = one_column(specs_df['nombre'])
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -309,11 +299,8 @@ if to_display:
 
 task = 'sap_pagos'      # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-the_names = specs_df['nombre']
-one_select = pipe(the_names,
-    packed(F.concat),
-    F_latinize,
-    ϱ('alias', '~'.join(the_names)))
+
+one_select = one_column(specs_df['nombre'])
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
