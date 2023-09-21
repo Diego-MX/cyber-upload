@@ -3,8 +3,10 @@
 # MAGIC
 # MAGIC # Preparación
 # MAGIC
-# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican los tipos de columnas desde el lado de la fuente. 
-# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos de columnas especificados para crear el _output_.
+# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican 
+# MAGIC los tipos de columnas desde el lado de la fuente. 
+# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos 
+# magicde columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
@@ -23,6 +25,7 @@ read_specs_from = 'repo'
 
 # pylint: disable=wrong-import-position,wrong-import-order
 # pylint: disable=ungrouped-imports
+# pylint: disable=multiple-statements
 from collections import OrderedDict
 from datetime import datetime as dt
 from json import dumps
@@ -63,8 +66,8 @@ app_resourcer.set_dbks_permissions(stg_permissions)
 brz_path  = λ_path('bronze', 'ops/core-banking')
 gold_path = λ_path('gold', 'cx/collections/cyber')
 
-specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
-tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS
+specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage # pylint: disable=invalid-name
+tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS  # pylint: disable=invalid-name
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
@@ -87,7 +90,8 @@ if not os.path.isdir(tmp_downer):
 # MAGIC %md
 # MAGIC Solo 4 requieren modificación  
 # MAGIC
-# MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan algunas columnas auxiliares.  
+# MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan 
+# MAGIC algunas columnas auxiliares.  
 # MAGIC * `Person Set`: tiene algunas modificaciones personalizadas.
 # MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo.
 # MAGIC * `Transaction Set`:  tiene agrupado por contrato, y separado por fechas. 
@@ -136,8 +140,7 @@ tables_dict = {
     "OpenItemsLong": open_items_long,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
-    "TxnsPayments" : the_txns
-    }
+    "TxnsPayments" : the_txns}
 
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items():
@@ -148,8 +151,8 @@ for kk, vv in tables_dict.items():
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
 # MAGIC
-# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.   
-# MAGIC Y de ahí, se preparan los archivos.  
+# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las 
+# MAGIC definiciones en Excel.  Y de ahí, se preparan los archivos.  
 # MAGIC
 
 # COMMAND ----------
@@ -205,7 +208,8 @@ def read_cyber_specs(task_key: str, downer='blob'):
 # MAGIC 4. Las fechas se manejan por separado.  
 # MAGIC
 # MAGIC ### Explicit conversion to string
-# MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna `str`, `date`, `dbl`, `int`.  
+# MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna 
+# MAGIC `str`, `date`, `dbl`, `int`.  
 # MAGIC - `STR`: Aplicar formato `c_format` y dejar ASCII.   
 # MAGIC - `DATE`: Convertir los `1900-01-01` capturados previamente y aplicar `date_format`.  
 # MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
