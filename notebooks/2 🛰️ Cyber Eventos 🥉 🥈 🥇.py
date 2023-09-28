@@ -144,18 +144,46 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 
 # COMMAND ----------
 
-# Las llaves de las tablas se leen de las specs en Excel. 
+# Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario.
 tables_dict = {
     "BalancesWide" : balances,
-    "ContractSet"  : loan_contracts,
+    "ContractSet"  : loan_contracts, 
     "OpenItemsLong": open_items,
-    "PersonSet"    : persons,
+    "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns}
 
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items():
     print(kk, vv.count())
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC Las columnas de Open Items Debug son:  
+# MAGIC ```python
+# MAGIC [   'ReceivableType', 'DueDate', 'ContractID', 'OpenItemID', 'Amount', 
+# MAGIC     'Currency', 'StatusCategory', 'ReceivableDescription', 'ReceivableTypeTxt',  
+# MAGIC     'StatusTxt', 'Status', 'sap_AccountID', 'sap_EventID',  
+# MAGIC     'sap_EventDateTime', 'epic_id', 'epic_date', 'rank_item', 'n_item', 
+# MAGIC     'DueDateShift', 'yesterday', 'ID', 'due_date_', 'is_default', 'is_capital',  
+# MAGIC     'is_iva', 'is_interest', 'is_recvble', 'cleared', 'dds_default', 
+# MAGIC     'uncleared', 'is_min_dds']
+# MAGIC ```
+# MAGIC El código que usamos para inspeccionar los _open items_ es: 
+# MAGIC
+# MAGIC ```python
+# MAGIC open_items_d = cyber_central.prepare_source('open-items',
+# MAGIC     path=f"{brz_path}/loan-contract/chains/open-items", debug=True)
+# MAGIC
+# MAGIC (open_items_d
+# MAGIC     .filter(F.col('ID') == "03017114357-444-MX")
+# MAGIC     .select('ID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
+# MAGIC         'ReceivableType'.alias('rec_type'), 'cleared', 'uncleared', 
+# MAGIC         'due_date_', 'is_min_dds', 'is_default', 'is_recvble', 
+# MAGIC         'Amount', 'ReceivableDescription', 'DueDate', 'StatusTxt')
+# MAGIC     .display())
+# MAGIC ```
 
 # COMMAND ----------
 
@@ -203,7 +231,7 @@ def read_cyber_specs(task_key: str, downer='blob'):
         joins_dict = df_joiner(pd.read_csv(joins_file))
     else:
         joins_dict = None
-    return a_specs, joins_dict
+    return (a_specs, joins_dict)
 
 # COMMAND ----------
 
@@ -283,7 +311,7 @@ if to_display:
 
 # COMMAND ----------
 
-task = 'sap_estatus'        # pylint: disable=invalid-name
+task = 'sap_estatus'        #    pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 one_select = one_column(specs_df['nombre'])
 

@@ -1,20 +1,18 @@
 from collections import OrderedDict, defaultdict
 from datetime import datetime as dt, date
 from functools import reduce
-from operator import eq, or_, itemgetter, methodcaller as ϱ
-from pytz import timezone
+from operator import eq, or_, methodcaller as ϱ
 import re
-from warnings import warn
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as pd_DF
-from pyspark.sql import (functions as F, types as T, Window as W)
+from pyspark.sql import functions as F, types as T, Window as W
+from pytz import timezone
 from toolz import compose, compose_left, pipe, valmap
-from toolz.curried import map as map_z
 
-from epic_py.delta import EpicDF, TypeHandler, column_name, when_plus
-from epic_py.tools import MatchCase, partial2
+from epic_py.delta import EpicDF, column_name, when_plus
+from epic_py.tools import partial2
 
 item_namer = lambda names: compose(dict, partial2(zip, names))
 ## (kk, vv) -> {name[0]: kk, name[1]: vv}
@@ -28,23 +26,23 @@ class CyberData():
 
     def prepare_source(self, which, path, **kwargs) -> EpicDF: 
         if which == 'balances': 
-            return self._prep_balances(path)
+            return self._prep_balances(path, **kwargs)
         elif which == 'loan-contracts':
             return self._prep_loan_contracts(path, **kwargs)
         elif which == 'open-items': 
             return self._prep_open_items(path, **kwargs)
         elif which == 'open-items-wide': 
-            return self._prep_open_items_wide(path)    
+            return self._prep_open_items_wide(path, **kwargs)    
         elif which == 'person-set':
-            return self._prep_person_set(path)
+            return self._prep_person_set(path, **kwargs)
         elif which == 'txns-grp': 
-            return self._prep_txns_grp(path)
+            return self._prep_txns_grp(path, **kwargs)
         elif which == 'txns-set': 
-            return self._prep_txns_set(path)
+            return self._prep_txns_set(path, **kwargs)
         else:  
             raise Exception(f"WHICH (source) is not specified")
         
-    def _prep_balances(self, path) -> EpicDF:
+    def _prep_balances(self, path, **kwargs) -> EpicDF:
         base_df = EpicDF(self.spark, path)
         bal_cols = {
             'x3_96': F.col('code_3') + F.col('code_96')}
@@ -71,18 +69,18 @@ class CyberData():
             ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_default_date')+90), 
             ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
             (None, F.lit(None))]
-        loan_cols = OrderedDict({
-            'ContractID'   : F.col('ID'), 
-            'person_id'    : F.col('BorrowerID'),
-            'borrower_mod' : F.concat(F.lit('B0'), F.col('BorrowerID')),
-            'interes_amort': F.col('NextPaymentInterestAmt')
-                           + F.col('NextExemptInterestAmount'), 
-            'yesterday'    : F.date_add(F.current_date(), -1),      # ya no se usa
-            'process_date' : F.date_add('CurrentPostingDate', -1),
-            'usgaap_date': when_plus(usgaap),
-            'status_2'   : when_plus([(vv, kk[0]) 
+        loan_cols = OrderedDict({ 
+            'ContractID'    : F.col('ID'), 
+            'person_id'     : F.col('BorrowerID'),
+            'borrower_mod'  : F.concat(F.lit('B0'), F.col('BorrowerID')),
+            'interes_amort' : F.col('NextPaymentInterestAmt')
+                            + F.col('NextExemptInterestAmount'), 
+            'yesterday'     : F.date_add(F.current_date(), -1),      # ya no se usa
+            'process_date'  : F.date_add('CurrentPostingDate', -1),
+            'usgaap_date'   : when_plus(usgaap),
+            'status_2'  : when_plus([(vv, kk[0]) 
                         for kk, vv in status_dict.items()]), 
-            'status_3'   : when_plus([(vv, kk[1]) 
+            'status_3'  : when_plus([(vv, kk[1]) 
                         for kk, vv in status_dict.items()])})
         repay_df   = pipe(repay_dict.items(),
             partial2(map, item_namer(['RepaymentFrequency', 'repay_freq'])),  
@@ -235,7 +233,7 @@ class CyberData():
                 F.col('ValueDate') == F.col('yesterday')))
         return x_df
 
-    def _prep_txns_grp(self, path): 
+    def _prep_txns_grp(self, path, **kwargs): 
         pymt_codes = [550021, 550022, 550023, 550024, 550403, 550908]
 
         by_older = W.partitionBy('AccountID', 'is_payment').orderBy(F.col('ValueDate'))
@@ -252,8 +250,7 @@ class CyberData():
                 'AmountAc' : 'last_amount_local'}, 
             'oldest': {
                 'AccountID': 'account_id', 
-                'ValueDate': 'first_date'}, 
-            }
+                'ValueDate': 'first_date'}}
         y_df = (EpicDF(self.spark, path)
             .with_column_plus(txn_cols, optimize=False)
             .filter(F.col('is_payment')))
@@ -301,13 +298,10 @@ class CyberData():
             0 : specs_df.index[specs_df['PyType'].isin(['int', 'dbl'])].tolist(), 
             '': specs_df.index[specs_df['PyType'] == 'str' ].tolist(), 
             date(1900, 1, 1): specs_df.index[specs_df['PyType'] == 'date'].tolist()}
-        
         cast_1 = [F.col(rr['nombre']).cast(self.spk_types[rr['PyType']]()) 
             for _, rr in specs_df.iterrows()]
-        
         strg_2 = [row_formatter(rr).alias(rr['nombre']) 
             for _, rr in specs_df.iterrows()]
-
         return {'0-fill': fill_0, '1-cast': cast_1, '2-string': strg_2}
             
 
@@ -373,7 +367,6 @@ class CyberData():
 
     def master_join_2(self, spec_joins, specs_dict, tables_dict, **kwargs) -> EpicDF: 
         tables_only = kwargs.get('tables_only', False)
-        
         if not tables_only:
             readers  = specs_dict['readers']
             fix_vals = specs_dict['fix_vals']
@@ -383,33 +376,32 @@ class CyberData():
         
         k_table = (lambda key: 
             tables_dict[key].select(*readers[key], *spec_joins[key]))
-        
         joiners = [(k_table(kk), list(map(column_name, ccc))) 
             for kk, ccc in spec_joins.items()]
-        
         λ_join = (lambda t_c, tt_cc:  
             (t_c[0].join(tt_cc[0], how='left', on=tt_cc[1]), None))
-            
         pre_joined, _ = reduce(λ_join, joiners)
-        
         pos_joined = pre_joined.select('*', *fix_vals)
         return pos_joined
-            
-
-    def save_task_3(self, task, gold_path, gold_table): 
+    
+    def save_task_paths(self, task, gold_path): 
         now_time = dt.now(tz=timezone('America/Mexico_City'))
         now_hm = now_time.strftime('%Y-%m-%d_%H%M')
         now_00 = now_time.strftime('%Y-%m-%d_00')
         
         cyber_key, cyber_name = self.reports[task]
-        report_dir     = f"{gold_path}/{cyber_name}/_spark/{now_00}"
-        report_recent  = f"{gold_path}/recent/{cyber_key}.txt"
-        report_history = f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.txt"
-        
+        save_paths = {
+            'now_dir'   : f"{gold_path}/{cyber_name}/_spark/{now_00}", 
+            'recent'    : f"{gold_path}/recent/{cyber_key}.txt", 
+            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.txt"}
         print(f"{now_hm}_{cyber_key}_{task}.txt")
-        gold_table.save_as_file(report_recent, report_dir, header=False)
-        gold_table.save_as_file(report_history, report_dir, header=True)
-        return report_history
+        return save_paths
+
+    def save_task_3(self, task, gold_path, gold_table): 
+        the_paths = self.save_task_paths(task, gold_path)
+        gold_table.save_as_file(the_paths['recent'], the_paths['now_dir'], header=False)
+        gold_table.save_as_file(the_paths['history'], the_paths['now_dir'], header=True)
+        return 
     
           
     def set_defaults(self): 
@@ -420,21 +412,18 @@ class CyberData():
             'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
             'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
             'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
-
         self.na_types = {
             'str' : '', 
             'dbl' : 0, 
             'int' : 0, 
             'long': 0,
             'date': date(1900, 1, 1)}
-
         self.spk_types = {
             'str' : T.StringType, 
             'dbl' : T.DoubleType, 
             'int' : T.IntegerType, 
             'long': T.LongType, 
             'date': T.DateType}
-
         self.c_formats = {
             'int' : '%0{}d', 
             'dbl' : '%0{}.{}f', 
@@ -442,7 +431,6 @@ class CyberData():
             'str' : '%-{}.{}s', 
             'date': '%8.8d', 
             'long': '%0{}d'}
-
 
 
 def pd_print(a_df: pd.DataFrame, **kwargs):
