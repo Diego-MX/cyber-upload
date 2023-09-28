@@ -6,7 +6,7 @@
 # MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican 
 # MAGIC los tipos de columnas desde el lado de la fuente. 
 # MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos 
-# magicde columnas especificados para crear el _output_.
+# MAGIC # magicde columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
@@ -379,4 +379,4 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 a_dir = f"{gold_path}/recent"
 print(a_dir)
 for x in dbutils.fs.ls(a_dir):
-    print(f"\t{x.name}\t=> {msec_strftime(x.modificationTime)}")
+    print(f"\t{x.name}\t→ {msec_strftime(x.modificationTime)}")

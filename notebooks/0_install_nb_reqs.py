@@ -9,7 +9,7 @@
 
 # COMMAND ----------
 
-epicpy_tag = 'v1.1.19'      # dev-diego
+epicpy_ref = 'v1.1.19'      # dev-diego
 # pylint: disable=wrong-import-position,wrong-import-order
 # pylint: disable=ungrouped-imports
 
@@ -28,8 +28,15 @@ with open("../user_databricks.yml", 'r') as _f:     # pylint: disable=unspecifie
 
 epicpy_load = {
     'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': epicpy_tag, 
+    'ref'   : epicpy_ref, 
     'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
 
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
+url_call = "git+https://{token}@{url}@{ref}".format(**epicpy_load)
 check_call(['pip', 'install', url_call])
+
+# COMMAND ----------
+
+import epic_py
+print(f"""
+Epic Ref\t→ {epicpy_ref}
+Epic Ver\t→ {epic_py.__version__}"""[1:])
