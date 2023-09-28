@@ -1,16 +1,21 @@
 # Databricks notebook source
+# MAGIC %md 
+# MAGIC ## Descripción
+# MAGIC Instalar requerimientos de librerías para los _notebooks_. 
+
+# COMMAND ----------
+
 # MAGIC %pip install -q -r ../reqs_dbks.txt
 
 # COMMAND ----------
 
 epicpy_tag = 'v1.1.19'      # dev-diego
+# pylint: disable=wrong-import-position,wrong-import-order
+# pylint: disable=ungrouped-imports
 
 # COMMAND ----------
 
-# pylint: disable=wrong-import-position,wrong-import-order
-# pylint: disable=ungrouped-imports
 from subprocess import check_call
-
 from pyspark.sql import SparkSession
 from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 import yaml
