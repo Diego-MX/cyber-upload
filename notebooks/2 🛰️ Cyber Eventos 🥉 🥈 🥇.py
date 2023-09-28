@@ -8,16 +8,15 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./0_install_reqs
+# MAGIC %run ./0_install_nb_reqs
 
 # COMMAND ----------
 
 to_display = True
 read_specs_from = 'repo'
 # Puede ser:  {blob, repo}
-# REPO es la forma formal, como se lee en PRD. 
-# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
-
+# REPO es la forma formal, como se lee en PRD.
+# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH.
 
 # COMMAND ----------
 
@@ -31,6 +30,7 @@ import os
 from pathlib import Path
 from pytz import timezone as tz
 import re
+from warnings import warn
 
 import pandas as pd
 from pyspark.sql import functions as F, SparkSession
@@ -75,6 +75,22 @@ if not os.path.isdir(tmp_downer):
 
 # COMMAND ----------
 
+try: 
+    from epicpy.tools import msec_strftime
+    print("Función importable, favor de borrar la otra.")
+except ImportError:
+    warn("Function not Importable")
+    tz_mx = tz('America/Mexico_City')
+    ts_fmt = "%d %b '%y %H:%M"
+    def msec_strftime(ms, msec_tz=tz_mx, msec_format=ts_fmt): 
+        strf = pipe(ms/1000, 
+            dt.fromtimestamp, 
+            ϱ('astimezone', msec_tz),
+            ϱ('strftime', msec_format))
+        return strf
+
+# COMMAND ----------
+
 # MAGIC %md 
 # MAGIC # Modificaciones Silver 🥈
 
@@ -101,12 +117,12 @@ if not os.path.isdir(tmp_downer):
 balances = cyber_central.prepare_source('balances',
     path=f"{brz_path}/loan-contract/aux/balances-wide")
 
-open_items_long = cyber_central.prepare_source('open-items-long',
+open_items = cyber_central.prepare_source('open-items',
     path=f"{brz_path}/loan-contract/chains/open-items")
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
-    open_items=open_items_long)
+    open_items=open_items)
 
 persons = cyber_central.prepare_source('person-set', 
     path=f"{brz_path}/person-set/chains/person")
@@ -128,7 +144,7 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 tables_dict = {
     "BalancesWide" : balances,
     "ContractSet"  : loan_contracts,
-    "OpenItemsLong": open_items_long,
+    "OpenItemsLong": open_items,
     "PersonSet"    : persons,
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns}
@@ -218,9 +234,9 @@ missing_cols = {}
 
 def one_column(names, header=True):
     an_alias = '~'.join(names) if header else 'one-column'
-    the_col = pipe(names, 
-        packed(F.concat), 
-        F_latinize, 
+    the_col = pipe(names,
+        packed(F.concat),
+        F_latinize,
         ϱ('alias', an_alias))
     return the_col
 
@@ -328,11 +344,6 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 # COMMAND ----------
 
 a_dir = f"{gold_path}/recent"
-tz_mx = tz('America/Mexico_City')
 print(a_dir)
 for x in dbutils.fs.ls(a_dir):
-    x_time = pipe(x.modificationTime/1000,
-        dt.fromtimestamp,
-        ϱ('astimezone', tz_mx),
-        ϱ('strftime', "%d %b '%y %H:%M"))
-    print(f"{x.name}\t=> {x_time}")
+    print(f"\t{x.name}\t=> {msec_strftime(x.modificationTime)}")

@@ -31,10 +31,10 @@ class CyberData():
             return self._prep_balances(path)
         elif which == 'loan-contracts':
             return self._prep_loan_contracts(path, **kwargs)
+        elif which == 'open-items': 
+            return self._prep_open_items(path, **kwargs)
         elif which == 'open-items-wide': 
             return self._prep_open_items_wide(path)    
-        elif which == 'open-items-long': 
-            return self._prep_open_items_long(path)
         elif which == 'person-set':
             return self._prep_person_set(path)
         elif which == 'txns-grp': 
@@ -53,9 +53,11 @@ class CyberData():
             .with_column_plus(bal_cols))    
         return x_df
 
-    def _prep_loan_contracts(self, path, **kwargs): 
-        where_loans = [F.col('LifeCycleStatus').isin(['20', '30', '50'])]
-        open_items  = (kwargs['open_items'].select('ID', 'oldest_default_date'))
+    def _prep_loan_contracts(self, path, **kwargs):
+        open_items  = (kwargs['open_items']
+            .select('ID', 'oldest_default_date'))
+        where_loans = kwargs.get('where', 
+            [F.col('LifeCycleStatus').isin(['20', '30', '50'])])
         repay_dict = {'MT': 'MENSUAL', 'WK': 'SEMANAL', 'FN': 'QUINCENAL'}
         status_dict = OrderedDict({
             ('VIGENTE',  '303') : (F.col('LifeCycleStatus').isin(['20', '30'])) 
@@ -85,7 +87,6 @@ class CyberData():
         repay_df   = pipe(repay_dict.items(),
             partial2(map, item_namer(['RepaymentFrequency', 'repay_freq'])),  
             self.spark.createDataFrame)
-        
         x_df = (EpicDF(self.spark, path)   # type: ignore
             .filter_plus(*where_loans) 
             .join(open_items, on='ID', how='left')
@@ -93,6 +94,58 @@ class CyberData():
             .with_column_plus(loan_cols))
         return x_df
 
+    def _prep_open_items(self, path, **kwargs):
+        debug = kwargs.get('debug', False)
+        id_cols = ['ContractID', 'epic_date', 'ID']
+        rec_types = ['511010', '511100', '511200', 
+            '990004', '991100', '990006'] 
+        w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
+        # single_cols = [...] para manejar dependencias de columnas. 
+        single_cols = [{
+            'yesterday'  : F.current_date() - 1,    # ya no. 
+            'ID'         : F.col('ContractID'),
+            'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
+            'cleared'    : pipe(F.col('ReceivableDescription'), 
+                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
+                    ϱ('cast', T.DecimalType(20, 2)), 
+                    partial2(F.coalesce, ..., F.lit(0))),
+            'is_default' : F.col('StatusCategory').isin(['2','3']),
+            'is_recvble' : F.col('ReceivableType').isin(rec_types),
+            'is_capital' : F.col('ReceivableType') == '511010',
+            'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
+            'is_iva'     : F.col('ReceivableType') == '990004',
+            },{
+            'uncleared'  : F.col('Amount') - F.col('cleared'),
+            'dds_default': pipe(F.col('DueDateShift'), 
+                    partial2(F.when, F.col('is_default') & F.col('is_capital')))
+            },{
+            'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
+            }]
+        uncleared_if = compose_left(
+            partial2(F.when, ..., F.col('uncleared')), 
+            ϱ('otherwise', 0), 
+            F.sum)
+        group_cols = {      # siempre se filtra IS_DEFAULT. 
+            'oldest_default_date': F.min('dds_default'),
+            'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
+            'default_uncleared'  : uncleared_if(F.col('is_capital')),
+            'default_interest'   : uncleared_if(F.col('is_interest')), 
+            'default_iva'        : uncleared_if(F.col('is_iva'))}
+        try: 
+            x1_df = (EpicDF(self.spark, path)
+                .with_column_plus(single_cols))
+        except: 
+            single_cols_ii = reduce(or_, single_cols)
+            x1_df = (EpicDF(self.spark, path)
+                .with_column_plus(single_cols_ii, optimize=False))
+        if debug: 
+            return x1_df
+        x_df = (x1_df
+            .filter(F.col('is_default'))
+            .groupBy(*id_cols)
+            .agg_plus(group_cols))
+        return x_df
+     
     def _prep_open_items_wide(self, path):
         # Ya no se usa ITEMS_WIDE ... porque queries. 
         id_cols = ['ContractID', 'epic_date', 'ID']
@@ -142,56 +195,6 @@ class CyberData():
                 *group_cols['oldest' ].keys()))
         return x_df
 
-    def _prep_open_items_long(self, path):
-        id_cols   = ['ContractID', 'epic_date', 'ID']
-        rec_types = ['511010', '511100', '511200', 
-            '990004', '991100', '990006'] 
-        w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-        # single_cols = [...] para manejar dependencias de columnas. 
-        single_cols = [{
-            'yesterday'  : F.current_date() - 1,    # ya no. 
-            'ID'         : F.col('ContractID'),
-            'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
-            'cleared'    : pipe(F.col('ReceivableDescription'), 
-                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
-                    ϱ('cast', T.DecimalType(20, 2)), 
-                    partial2(F.coalesce, ..., F.lit(0))),
-            'is_default' : F.col('StatusCategory').isin(['2','3']),
-            'is_recvble' : F.col('ReceivableType').isin(rec_types),
-            'is_capital' : F.col('ReceivableType') == '511010',
-            'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
-            'is_iva'     : F.col('ReceivableType') == '990004',
-            },{
-            'uncleared'  : F.col('Amount') - F.col('cleared'),
-            'dds_default': pipe(F.col('DueDateShift'), 
-                    partial2(F.when, F.col('is_default') & F.col('is_capital')), 
-                    ϱ('otherwise', F.max('DueDateShift').over(w_duedate)))
-            },{
-            'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
-            }]
-        uncleared_if = compose_left(
-            partial2(F.when, ..., F.col('uncleared')), 
-            ϱ('otherwise', 0), 
-            F.sum)
-        group_cols = {      # siempre se filtra IS_DEFAULT. 
-            'oldest_default_date': F.min('dds_default'),
-            'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
-            'default_uncleared'  : uncleared_if(F.col('is_capital')),
-            'default_interest'   : uncleared_if(F.col('is_interest')), 
-            'default_iva'        : uncleared_if(F.col('is_iva'))}
-        try: 
-            x1_df = (EpicDF(self.spark, path)
-                .with_column_plus(single_cols))
-        except: 
-            single_cols_ii = reduce(or_, single_cols)
-            x1_df = (EpicDF(self.spark, path)
-                .with_column_plus(single_cols_ii, optimize=False))
-        x_df = (x1_df
-            .filter(F.col('is_default'))
-            .groupBy(*id_cols)
-            .agg_plus(group_cols))
-        return x_df
-     
     def _prep_person_set(self, path): 
         persons_cols = {
             'LastNameP' : F.col('LastName'),
@@ -214,7 +217,7 @@ class CyberData():
             .with_column_plus(persons_cols))
         return x_df
 
-    def _prep_txns_set(self, path): 
+    def _prep_txns_set(self, path):
         txn_codes = [92703,  92800, 500027, 550021, 550022, 550023, 
             550024, 550403, 550908, 650404, 650710, 650712, 650713, 
             650716, 650717, 650718, 650719, 650720, 750001, 750025, 
