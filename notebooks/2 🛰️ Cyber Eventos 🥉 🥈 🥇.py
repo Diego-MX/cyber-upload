@@ -256,7 +256,7 @@ task = 'sap_saldos'     # pylint: disable=invalid-name
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_ii = specs_df.rename(columns=specs_rename)
-specs_dict = cyber_central.specs-_reader_1(specs_df, tables_dict)
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
 missing_cols[task] = specs_dict['missing']
 one_select = one_column(specs_df['nombre'])
