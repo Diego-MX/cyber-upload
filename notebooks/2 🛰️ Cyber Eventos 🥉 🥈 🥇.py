@@ -3,26 +3,28 @@
 # MAGIC
 # MAGIC # Preparación
 # MAGIC
-# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican los tipos de columnas desde el lado de la fuente. 
-# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos de columnas especificados para crear el _output_.
+# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican 
+# MAGIC los tipos de columnas desde el lado de la fuente. 
+# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos 
+# MAGIC # magicde columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
-# MAGIC %run ./0_install_reqs
+# MAGIC %run ./0_install_nb_reqs
 
 # COMMAND ----------
 
 to_display = True
 read_specs_from = 'repo'
 # Puede ser:  {blob, repo}
-# REPO es la forma formal, como se lee en PRD. 
-# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
-
+# REPO es la forma formal, como se lee en PRD.
+# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH.
 
 # COMMAND ----------
 
 # pylint: disable=wrong-import-position,wrong-import-order
 # pylint: disable=ungrouped-imports
+# pylint: disable=multiple-statements
 from collections import OrderedDict
 from datetime import datetime as dt
 from json import dumps
@@ -31,6 +33,7 @@ import os
 from pathlib import Path
 from pytz import timezone as tz
 import re
+from warnings import warn
 
 import pandas as pd
 from pyspark.sql import functions as F, SparkSession
@@ -41,10 +44,6 @@ spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
 
 # COMMAND ----------
-
-from importlib import reload
-from src import data_managers; reload(data_managers)
-import config; reload(config)
 
 from epic_py.delta import EpicDataBuilder, F_latinize
 from epic_py.tools import packed, partial2
@@ -63,8 +62,8 @@ app_resourcer.set_dbks_permissions(stg_permissions)
 brz_path  = λ_path('bronze', 'ops/core-banking')
 gold_path = λ_path('gold', 'cx/collections/cyber')
 
-specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
-tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS
+specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage # pylint: disable=invalid-name
+tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS  # pylint: disable=invalid-name
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
@@ -79,6 +78,22 @@ if not os.path.isdir(tmp_downer):
 
 # COMMAND ----------
 
+try: 
+    from epicpy.tools import msec_strftime
+    print("Función importable, favor de borrar la otra.")
+except ImportError:
+    warn("Function not Importable")
+    tz_mx = tz('America/Mexico_City')
+    ts_fmt = "%d %b '%y %H:%M"
+    def msec_strftime(ms, msec_tz=tz_mx, msec_format=ts_fmt): 
+        strf = pipe(ms/1000, 
+            dt.fromtimestamp, 
+            ϱ('astimezone', msec_tz),
+            ϱ('strftime', msec_format))
+        return strf
+
+# COMMAND ----------
+
 # MAGIC %md 
 # MAGIC # Modificaciones Silver 🥈
 
@@ -87,7 +102,8 @@ if not os.path.isdir(tmp_downer):
 # MAGIC %md
 # MAGIC Solo 4 requieren modificación  
 # MAGIC
-# MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan algunas columnas auxiliares.  
+# MAGIC * `Loans Contract`:  se filtran los prestamos, modifican fechas, y agregan 
+# MAGIC algunas columnas auxiliares.  
 # MAGIC * `Person Set`: tiene algunas modificaciones personalizadas.
 # MAGIC * `Balances`, `Open Items`: sí se tienen que abordar a fondo.
 # MAGIC * `Transaction Set`:  tiene agrupado por contrato, y separado por fechas. 
@@ -105,12 +121,12 @@ if not os.path.isdir(tmp_downer):
 balances = cyber_central.prepare_source('balances',
     path=f"{brz_path}/loan-contract/aux/balances-wide")
 
-open_items_long = cyber_central.prepare_source('open-items-long',
+open_items = cyber_central.prepare_source('open-items',
     path=f"{brz_path}/loan-contract/chains/open-items")
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
-    open_items=open_items_long)
+    open_items=open_items)
 
 persons = cyber_central.prepare_source('person-set', 
     path=f"{brz_path}/person-set/chains/person")
@@ -129,15 +145,13 @@ txn_pmts = cyber_central.prepare_source('txns-grp',
 # COMMAND ----------
 
 # Las llaves de las tablas se deben mantener, ya que se toman de las especificaciones del usuario.
-
 tables_dict = {
     "BalancesWide" : balances,
     "ContractSet"  : loan_contracts, 
-    "OpenItemsLong": open_items_long,
+    "OpenItemsLong": open_items,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
-    "TxnsPayments" : the_txns
-    }
+    "TxnsPayments" : the_txns}
 
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items():
@@ -145,11 +159,39 @@ for kk, vv in tables_dict.items():
 
 # COMMAND ----------
 
+# MAGIC %md 
+# MAGIC Las columnas de Open Items Debug son:  
+# MAGIC ```python
+# MAGIC [   'ReceivableType', 'DueDate', 'ContractID', 'OpenItemID', 'Amount', 
+# MAGIC     'Currency', 'StatusCategory', 'ReceivableDescription', 'ReceivableTypeTxt',  
+# MAGIC     'StatusTxt', 'Status', 'sap_AccountID', 'sap_EventID',  
+# MAGIC     'sap_EventDateTime', 'epic_id', 'epic_date', 'rank_item', 'n_item', 
+# MAGIC     'DueDateShift', 'yesterday', 'ID', 'due_date_', 'is_default', 'is_capital',  
+# MAGIC     'is_iva', 'is_interest', 'is_recvble', 'cleared', 'dds_default', 
+# MAGIC     'uncleared', 'is_min_dds']
+# MAGIC ```
+# MAGIC El código que usamos para inspeccionar los _open items_ es: 
+# MAGIC
+# MAGIC ```python
+# MAGIC open_items_d = cyber_central.prepare_source('open-items',
+# MAGIC     path=f"{brz_path}/loan-contract/chains/open-items", debug=True)
+# MAGIC
+# MAGIC (open_items_d
+# MAGIC     .filter(F.col('ID') == "03017114357-444-MX")
+# MAGIC     .select('ID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
+# MAGIC         'ReceivableType'.alias('rec_type'), 'cleared', 'uncleared', 
+# MAGIC         'due_date_', 'is_min_dds', 'is_default', 'is_recvble', 
+# MAGIC         'Amount', 'ReceivableDescription', 'DueDate', 'StatusTxt')
+# MAGIC     .display())
+# MAGIC ```
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
 # MAGIC
-# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las definiciones en Excel.   
-# MAGIC Y de ahí, se preparan los archivos.  
+# MAGIC Leemos los archivos `specs` y `joins` que se compilaron a partir de las 
+# MAGIC definiciones en Excel.  Y de ahí, se preparan los archivos.  
 # MAGIC
 
 # COMMAND ----------
@@ -170,10 +212,8 @@ def set_specs_file(task_key: str, downer='blob'):
         joins_file = f"{dir_at}/cyber_{task_key}_joins.csv"
     return (specs_file, joins_file)
 
-
 def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
-
     splitter = compose_left(
         ϱ('split', ','), 
         partial2(map, ϱ('split', '=')), 
@@ -184,7 +224,6 @@ def df_joiner(join_df) -> OrderedDict:
         if not tools.is_na(rr['join_cols']))
     return joiner
 
-
 def read_cyber_specs(task_key: str, downer='blob'):
     specs_file, joins_file = set_specs_file(task_key, downer)
     a_specs = cyber_central.specs_setup_0(specs_file)
@@ -192,8 +231,7 @@ def read_cyber_specs(task_key: str, downer='blob'):
         joins_dict = df_joiner(pd.read_csv(joins_file))
     else:
         joins_dict = None
-
-    return a_specs, joins_dict
+    return (a_specs, joins_dict)
 
 # COMMAND ----------
 
@@ -206,7 +244,8 @@ def read_cyber_specs(task_key: str, downer='blob'):
 # MAGIC 4. Las fechas se manejan por separado.  
 # MAGIC
 # MAGIC ### Explicit conversion to string
-# MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna `str`, `date`, `dbl`, `int`.  
+# MAGIC Aplicamos las definiciones anteriores de acuerdo al tipo de columna 
+# MAGIC `str`, `date`, `dbl`, `int`.  
 # MAGIC - `STR`: Aplicar formato `c_format` y dejar ASCII.   
 # MAGIC - `DATE`: Convertir los `1900-01-01` capturados previamente y aplicar `date_format`.  
 # MAGIC - `DBL`: Aplicar `c_format` y quitar decimal.  
@@ -226,6 +265,14 @@ cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 the_tables = {}
 missing_cols = {}
 
+def one_column(names, header=True):
+    an_alias = '~'.join(names) if header else 'one-column'
+    the_col = pipe(names,
+        packed(F.concat),
+        F_latinize,
+        ϱ('alias', an_alias))
+    return the_col
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -238,14 +285,9 @@ task = 'sap_saldos'     # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_ii = specs_df.rename(columns=specs_rename)
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-# Tiene: [readers, missing, fix_vals]
 
 missing_cols[task] = specs_dict['missing']
-the_names = specs_df['nombre']
-one_select = pipe(the_names,
-    packed(F.concat),
-    F_latinize,
-    ϱ('alias', '~'.join(the_names)))
+one_select = one_column(specs_df['nombre'])
 
 widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
 
@@ -269,14 +311,9 @@ if to_display:
 
 # COMMAND ----------
 
-task = 'sap_estatus'        # pylint: disable=invalid-name
+task = 'sap_estatus'        #    pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-the_names = specs_df['nombre']
-
-one_select = pipe(the_names,
-    packed(F.concat),
-    F_latinize,
-    ϱ('alias', '~'.join(the_names)))
+one_select = one_column(specs_df['nombre'])
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -306,11 +343,8 @@ if to_display:
 
 task = 'sap_pagos'      # pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-the_names = specs_df['nombre']
-one_select = pipe(the_names,
-    packed(F.concat),
-    F_latinize,
-    ϱ('alias', '~'.join(the_names)))
+
+one_select = one_column(specs_df['nombre'])
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
 
@@ -343,11 +377,6 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 # COMMAND ----------
 
 a_dir = f"{gold_path}/recent"
-tz_mx = tz('America/Mexico_City')
 print(a_dir)
 for x in dbutils.fs.ls(a_dir):
-    x_time = pipe(x.modificationTime/1000,
-        dt.fromtimestamp,
-        ϱ('astimezone', tz_mx),
-        ϱ('strftime', "%d %b '%y %H:%M"))
-    print(f"{x.name}\t=> {x_time}")
+    print(f"\t{x.name}\t→ {msec_strftime(x.modificationTime)}")
