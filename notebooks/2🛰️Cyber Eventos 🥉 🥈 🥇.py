@@ -10,9 +10,11 @@
 
 # COMMAND ----------
 
+# pylint: disable=multiple-statements
+# pylint: disable=no-value-for-parameter
 from importlib import reload
 from src.setup import setup_epicpy; reload(setup_epicpy)
-setup_epicpy.install_epicpy()
+setup_epicpy.install_it()
 # GH_REF, REF_FILE, USER_FILE, V_TYPING
 
 # COMMAND ----------
@@ -21,8 +23,8 @@ setup_epicpy.install_epicpy()
 
 # COMMAND ----------
 
-to_display = True
-read_specs_from = 'repo'
+TO_DISPLAY = True
+READ_SPECS_FROM = 'repo'
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD.
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH.
@@ -33,14 +35,11 @@ read_specs_from = 'repo'
 # pylint: disable=ungrouped-imports
 # pylint: disable=wrong-import-position,wrong-import-order
 from collections import OrderedDict
-from datetime import datetime as dt
 from json import dumps
 from operator import methodcaller as ϱ
 import os
 from pathlib import Path
-from pytz import timezone as tz
 import re
-from warnings import warn
 
 import pandas as pd
 from pyspark.sql import functions as F, SparkSession
@@ -54,7 +53,7 @@ dbutils = DBUtils(spark)
 # COMMAND ----------
 
 from epic_py.delta import EpicDataBuilder, F_latinize
-from epic_py.tools import msec_strftime, packed, partial2
+from epic_py.tools import msec_strftime, packed
 from src.data_managers import CyberData
 from src.utilities import tools
 
@@ -293,7 +292,7 @@ def one_column(names, header=True):
 
 task = 'sap_saldos'     # pylint: disable=invalid-name
 
-specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
+specs_df, spec_joins = read_cyber_specs(task, READ_SPECS_FROM)
 specs_df_ii = specs_df.rename(columns=specs_rename)
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
@@ -311,7 +310,7 @@ the_tables[task] = gold_saldos
 
 cyber_central.save_task_3(task, gold_path, gold_saldos)
 
-if to_display:
+if TO_DISPLAY:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
 
@@ -323,7 +322,7 @@ if to_display:
 # COMMAND ----------
 
 task = 'sap_estatus'        #    pylint: disable=invalid-name
-specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
+specs_df, spec_joins = read_cyber_specs(task, READ_SPECS_FROM)
 one_select = one_column(specs_df['nombre'])
 
 specs_df_2 = specs_df.rename(columns=specs_rename)
@@ -342,7 +341,7 @@ gold_estatus = estatus_3.select(one_select)
 the_tables[task] = gold_estatus
 cyber_central.save_task_3(task, gold_path, gold_estatus)
 print(f"\tRows: {gold_estatus.count()}")
-if to_display:
+if TO_DISPLAY:
     gold_estatus.display()
 
 # COMMAND ----------
@@ -353,7 +352,7 @@ if to_display:
 # COMMAND ----------
 
 task = 'sap_pagos'      # pylint: disable=invalid-name
-specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
+specs_df, spec_joins = read_cyber_specs(task, READ_SPECS_FROM)
 
 one_select = one_column(specs_df['nombre'])
 
@@ -373,7 +372,7 @@ the_tables[task] = gold_pagos
 cyber_central.save_task_3(task, gold_path, gold_pagos)
 
 print(f"\tRows: {gold_pagos.count()}")
-if to_display:
+if TO_DISPLAY:
     gold_pagos.display()
 
 # COMMAND ----------

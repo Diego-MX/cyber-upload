@@ -3,7 +3,7 @@
 
 from subprocess import check_call
 from sys import argv
-from pyspark.dbutils import DBUtils
+from pyspark.dbutils import DBUtils # pylint: disable=import-error,no-name-in-module
 from pyspark.sql import SparkSession
 try: import yaml                    # pylint: disable=multiple-statements
 except ImportError: yaml = None     # pylint: disable=multiple-statements
@@ -15,7 +15,7 @@ EPIC_REF = 'gh-1.6'
 V_TYPING = '4.7.1'
 
 # pylint: disable=redefined-outer-name
-def install_epicpy(epic_ref, reqs, user_file, typing, verbose):
+def install_it(epic_ref=None, reqs=None, user_file=None, typing=False, verbose=False):
     # Orden argumentos ≠ orden programático
     if typing: 
         _install_typing(typing)
@@ -24,7 +24,7 @@ def install_epicpy(epic_ref, reqs, user_file, typing, verbose):
     _install_with_token(epic_ref, user_file, verbose)
 
 
-def _install_with_token(gh_ref=None, user_file=None, verbose=False): 
+def _install_with_token(gh_ref, user_file, verbose): 
     import yaml     
     gh_ref = gh_ref or EPIC_REF
     user_file = user_file or USER_FILE
@@ -44,12 +44,12 @@ def _install_with_token(gh_ref=None, user_file=None, verbose=False):
         print(info)
     return 
 
-def _install_reqs(reqs=None): 
+def _install_reqs(reqs): 
     reqs = reqs if isinstance(reqs, str) else REQS_FILE
     _pip_install('-r', reqs)
     return 
 
-def _install_typing(typing=None): 
+def _install_typing(typing): 
     typing = typing if isinstance(typing, str) else V_TYPING
     _pip_install('--upgrade', f"typing-extensions=={typing}")
     return 
@@ -58,11 +58,11 @@ def _pip_install(*args):
     check_call(['pip', 'install', *args])
     return
 
-
 if __name__ == '__main__': 
+    # pylint: disable=invalid-name
     epic_ref  = argv[1] if len(argv) > 1 else EPIC_REF
     reqs_file = argv[2] if len(argv) > 2 else REQS_FILE
     user_file = argv[3] if len(argv) > 3 else USER_FILE
     v_typing  = argv[4] if len(argv) > 4 else V_TYPING
     
-    install_epicpy(epic_ref, reqs_file, user_file, v_typing)
+    install_it(epic_ref, reqs_file, user_file, v_typing, False)
