@@ -1,8 +1,8 @@
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict    # pylint: disable=missing-module-docstring
 from datetime import datetime as dt, date
 from functools import reduce
-from operator import eq, or_, methodcaller as ϱ
-import re
+from operator import eq, or_, methodcaller as ϱ, attrgetter as ɣ
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,7 @@ from pytz import timezone
 from toolz import compose, compose_left, pipe, valmap
 
 from epic_py.delta import EpicDF, column_name, when_plus
-from epic_py.tools import partial2
+from epic_py.tools import packed, partial2
 
 item_namer = lambda names: compose(dict, partial2(zip, names))
 ## (kk, vv) -> {name[0]: kk, name[1]: vv}
@@ -40,7 +40,7 @@ class CyberData():
         elif which == 'txns-set': 
             return self._prep_txns_set(path, **kwargs)
         else:  
-            raise Exception(f"WHICH (source) is not specified")
+            raise Exception("WHICH (source) is not specified")     # pylint: disable=broad-exception-raised
         
     def _prep_balances(self, path, **kwargs) -> EpicDF:
         base_df = EpicDF(self.spark, path)
@@ -132,7 +132,7 @@ class CyberData():
         try: 
             x1_df = (EpicDF(self.spark, path)
                 .with_column_plus(single_cols))
-        except: 
+        except Exception:   # pylint: disable=broad-exception-caught 
             single_cols_ii = reduce(or_, single_cols)
             x1_df = (EpicDF(self.spark, path)
                 .with_column_plus(single_cols_ii, optimize=False))
@@ -193,6 +193,57 @@ class CyberData():
                 *group_cols['oldest' ].keys()))
         return x_df
 
+    def _prep_open_items_long(self, path):
+        id_cols   = ['ContractID', 'epic_date', 'ID']
+        rec_types = ['511010', '511100', '511200', 
+            '990004', '991100', '990006'] 
+        w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
+        # single_cols = [...] para manejar dependencias de columnas. 
+        single_cols = [{
+            'yesterday'  : F.current_date() - 1,    # ya no. 
+            'ID'         : F.col('ContractID'),
+            'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
+            'cleared'    : pipe(F.col('ReceivableDescription'), 
+                    partial2(F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
+                    ϱ('cast', T.DecimalType(20, 2)), 
+                    partial2(F.coalesce, ..., F.lit(0))),
+            'is_default' : F.col('StatusCategory').isin(['2','3']),
+            'is_recvble' : F.col('ReceivableType').isin(rec_types),
+            'is_capital' : F.col('ReceivableType') == '511010',
+            'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
+            'is_iva'     : F.col('ReceivableType') == '990004',
+            },{
+            'uncleared'  : F.col('Amount') - F.col('cleared'),
+            'dds_default': pipe(F.col('DueDateShift'), 
+                    partial2(F.when, F.col('is_default') & F.col('is_capital')), 
+                    ϱ('otherwise', F.max('DueDateShift').over(w_duedate)))
+            },{
+            'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
+            }]
+        uncleared_if = compose_left(
+            partial2(F.when, ..., F.col('uncleared')), 
+            ϱ('otherwise', 0), 
+            F.sum)
+        group_cols = {      # siempre se filtra IS_DEFAULT. 
+            'oldest_default_date': F.min('dds_default'),
+            'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
+            'default_uncleared'  : uncleared_if(F.col('is_capital')),
+            'default_interest'   : uncleared_if(F.col('is_interest')), 
+            'default_iva'        : uncleared_if(F.col('is_iva'))}
+        try: 
+            x1_df = (EpicDF(self.spark, path)
+                .with_column_plus(single_cols))
+        except Exception:   # pylint: disable=broad-exception-caught
+            warn("Execute WITH_COLUMN_PLUS non-optimized.")
+            single_cols_ii = reduce(or_, single_cols)
+            x1_df = (EpicDF(self.spark, path)
+                .with_column_plus(single_cols_ii, optimize=False))
+        x_df = (x1_df
+            .filter(F.col('is_default'))
+            .groupBy(*id_cols)
+            .agg_plus(group_cols))
+        return x_df
+     
     def _prep_person_set(self, path): 
         persons_cols = {
             'LastNameP' : F.col('LastName'),
@@ -233,7 +284,7 @@ class CyberData():
                 F.col('ValueDate') == F.col('yesterday')))
         return x_df
 
-    def _prep_txns_grp(self, path, **kwargs): 
+    def _prep_txns_grp(self, path): 
         pymt_codes = [550021, 550022, 550023, 550024, 550403, 550908]
 
         by_older = W.partitionBy('AccountID', 'is_payment').orderBy(F.col('ValueDate'))
@@ -281,8 +332,14 @@ class CyberData():
             return lat_srs 
 
         str_λs = {
-            'str' : lambda rr: F.format_string(rr['c_format'], rr['nombre']), 
-            'dbl' : lambda rr: F.regexp_replace(F.format_string(rr['c_format'], rr['nombre']), '[\.,]', ''), 
+            'str' : compose_left(ɣ('c_format', 'nombre'), 
+                packed(F.format_string)),
+                #lambda rr: F.format_string(rr['c_format'], rr['nombre']), 
+            'dbl' : compose_left(ɣ('c_format', 'nombre'), 
+                packed(F.format_string), 
+                partial2(F.regexp_replace, ..., '[\.,]', '')),
+            #'dbl' : (lambda rr: 
+            #   F.regexp_replace(F.format_string(rr['c_format'], rr['nombre']), '[\.,]', '')), 
             'int' : lambda rr: F.format_string(str(rr['c_format']), rr['nombre']), 
             'date': lambda rr: pipe(F.col(rr['nombre']) == self.na_types['date'], 
                     partial2(F.when, ..., F.lit('00000000')), 
@@ -323,7 +380,8 @@ class CyberData():
                 for _, rr in df.iterrows()], 
             y_format = lambda df: df['x_format'].str.replace(r'\.\d*', '', regex=True),
             c_format = lambda df: df['y_format'].where(df['PyType'] == 'int', df['x_format']), 
-            s_format = lambda df: ["%{}.{}s".format(wth, wth) for wth in df['width']])
+            s_format = lambda df: ["%{}.{}s".format(wth, wth)   # pylint: disable=duplicate-string-formatting-argument
+                for wth in df['width']])
         return specs_df
 
 

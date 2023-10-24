@@ -6,7 +6,7 @@
 # MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican 
 # MAGIC los tipos de columnas desde el lado de la fuente. 
 # MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos 
-# MAGIC # magicde columnas especificados para crear el _output_.
+# MAGIC de columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
@@ -265,7 +265,7 @@ cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 the_tables = {}
 missing_cols = {}
 
-def one_column(names, header=True):
+def one_column(names: list, header=True):
     an_alias = '~'.join(names) if header else 'one-column'
     the_col = pipe(names,
         packed(F.concat),
