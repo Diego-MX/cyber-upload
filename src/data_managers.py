@@ -342,13 +342,13 @@ class CyberData():
                 #lambda rr: F.format_string(rr['c_format'], rr['nombre']), 
             'dbl' : compose_left(ɣ('c_format', 'nombre'), 
                 packed(F.format_string), 
-                partial2(F.regexp_replace, ..., '[\.,]', '')),
+                partial2(F.regexp_replace, ..., '[\.,]', '')),  # pylint: disable=anomalous-backslash-in-string
             #'dbl' : (lambda rr: 
             #   F.regexp_replace(F.format_string(rr['c_format'], rr['nombre']), '[\.,]', '')), 
             'int' : lambda rr: F.format_string(str(rr['c_format']), rr['nombre']), 
             'date': lambda rr: pipe(F.col(rr['nombre']) == self.na_types['date'], 
-                    partial2(F.when, ..., F.lit('00000000')), 
-                    ϱ('otherwise', F.date_format(rr['nombre'], 'MMddyyyy')))}
+                partial2(F.when, ..., F.lit('00000000')), 
+                ϱ('otherwise', F.date_format(rr['nombre'], 'MMddyyyy')))}
 
         def row_formatter(a_row): 
             py_type = a_row['PyType']
