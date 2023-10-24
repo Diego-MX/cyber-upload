@@ -183,6 +183,7 @@ class CyberData():
             x1_df = (EpicDF(self.spark, path)
                 .with_column_plus(single_cols))
         except: 
+            warn("Execute WITH_COLUMN_PLUS non-optimized.")
             single_cols_ii = reduce(or_, single_cols)
             x1_df = (EpicDF(self.spark, path)
                 .with_column_plus(single_cols_ii, optimize=False))

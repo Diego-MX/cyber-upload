@@ -6,7 +6,7 @@
 # MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican 
 # MAGIC los tipos de columnas desde el lado de la fuente. 
 # MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos 
-# magicde columnas especificados para crear el _output_.
+# MAGIC de columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
@@ -221,7 +221,7 @@ cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 the_tables = {}
 missing_cols = {}
 
-def one_column(names, header=True):
+def one_column(names: list, header=True):
     an_alias = '~'.join(names) if header else 'one-column'
     the_col = pipe(names, 
         packed(F.concat), 
@@ -240,7 +240,7 @@ task = 'sap_saldos'     # pylint: disable=invalid-name
 
 specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
 specs_df_ii = specs_df.rename(columns=specs_rename)
-specs_dict = cyber_central.specs-_reader_1(specs_df, tables_dict)
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
 missing_cols[task] = specs_dict['missing']
 one_select = one_column(specs_df['nombre'])
