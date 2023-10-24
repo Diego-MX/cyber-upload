@@ -15,7 +15,10 @@ from epic_py.delta import EpicDF, column_name, when_plus
 from epic_py.tools import partial2
 
 item_namer = lambda names: compose(dict, partial2(zip, names))
-## (kk, vv) -> {name[0]: kk, name[1]: vv}
+# item_namer([nm_1, nm_2])(obj_1, obj_2) := {nm_1: obj_1, nm_2: obj_2}
+# item_namer(names) = two_objs -> dict(zip(names, two_objs)) = compose(dict, partial2(zip, names))
+# names -> curry(zip)(...) -> compose_left(..., dict)
+# item_namer = compose(partial2(compose, dict), curry(zip))
 
 
 class CyberData(): 
@@ -123,7 +126,7 @@ class CyberData():
             partial2(F.when, ..., F.col('uncleared')), 
             ϱ('otherwise', 0), 
             F.sum)
-        group_cols = {      # siempre se filtra IS_DEFAULT. 
+        group_cols = {
             'oldest_default_date': F.min('dds_default'),
             'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
             'default_uncleared'  : uncleared_if(F.col('is_capital')),
@@ -132,10 +135,12 @@ class CyberData():
         try: 
             x1_df = (EpicDF(self.spark, path)
                 .with_column_plus(single_cols))
+            print("WITH_COLUMN_PLUS fixed in Open Items")
         except: 
             single_cols_ii = reduce(or_, single_cols)
             x1_df = (EpicDF(self.spark, path)
                 .with_column_plus(single_cols_ii, optimize=False))
+            
         if debug: 
             return x1_df
         x_df = (x1_df
@@ -209,7 +214,7 @@ class CyberData():
             partial2(map, ϱ('split', ',')), 
             partial2(map, item_namer(['AddressRegion', 'state_key'])), 
             self.spark.createDataFrame)
-        x_df = (EpicDF(self.spark, path)     # type: ignore
+        x_df = (EpicDF(self.spark, path)
             .filter(F.col('ID').isNotNull())
             .join(states_df, how='left', on='AddressRegion')
             .with_column_plus(persons_cols))

@@ -1,7 +1,6 @@
 # Databricks notebook source
 # MAGIC %md 
-# MAGIC ## Descripción
-# MAGIC Instalar requerimientos de librerías para los _notebooks_. 
+# MAGIC Instalando requerimientos de librerías para los _notebooks_. 
 
 # COMMAND ----------
 
@@ -9,7 +8,7 @@
 
 # COMMAND ----------
 
-epicpy_ref = 'v1.1.19'      # dev-diego
+epicpy_ref = 'gh-1.5' # 'v1.1.19'      # dev-diego
 # pylint: disable=wrong-import-position,wrong-import-order
 # pylint: disable=ungrouped-imports
 
@@ -38,5 +37,5 @@ check_call(['pip', 'install', url_call])
 
 import epic_py
 print(f"""
-Epic Ref\t→ {epicpy_ref}
-Epic Ver\t→ {epic_py.__version__}"""[1:])
+Epic Ref → {epicpy_ref}
+Epic Ver → {epic_py.__version__}"""[1:])

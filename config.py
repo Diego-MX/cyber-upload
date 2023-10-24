@@ -605,9 +605,7 @@ cyber_handler = TypeHandler({
         'no_decimal': True},
     'str' : {
         'NA': '',
-        'c_format': '%-{}s', 
-        #'encoding': 'ascii'
-        },
+        'c_format': '%-{}s', }, 
     'date': {
         'NA': date(1900, 1, 1), 
         'c_format': '%8.8d', 
