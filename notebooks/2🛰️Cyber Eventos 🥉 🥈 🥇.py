@@ -10,7 +10,14 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./0_install_nb_reqs
+from importlib import reload
+from src.setup import setup_epicpy; reload(setup_epicpy)
+setup_epicpy.install_epicpy()
+# GH_REF, REF_FILE, USER_FILE, V_TYPING
+
+# COMMAND ----------
+
+#%run ./0_install_nb_reqs
 
 # COMMAND ----------
 
@@ -22,9 +29,9 @@ read_specs_from = 'repo'
 
 # COMMAND ----------
 
-# pylint: disable=wrong-import-position,wrong-import-order
-# pylint: disable=ungrouped-imports
 # pylint: disable=multiple-statements
+# pylint: disable=ungrouped-imports
+# pylint: disable=wrong-import-position,wrong-import-order
 from collections import OrderedDict
 from datetime import datetime as dt
 from json import dumps
@@ -39,6 +46,7 @@ import pandas as pd
 from pyspark.sql import functions as F, SparkSession
 from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 from toolz import compose_left, pipe
+from toolz.curried import map as map_z
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -46,7 +54,7 @@ dbutils = DBUtils(spark)
 # COMMAND ----------
 
 from epic_py.delta import EpicDataBuilder, F_latinize
-from epic_py.tools import packed, partial2
+from epic_py.tools import msec_strftime, packed, partial2
 from src.data_managers import CyberData
 from src.utilities import tools
 
@@ -75,22 +83,6 @@ def dumps2(an_obj, **kwargs):
 
 if not os.path.isdir(tmp_downer):
     os.makedirs(tmp_downer)
-
-# COMMAND ----------
-
-try: 
-    from epicpy.tools import msec_strftime
-    print("Función importable, favor de borrar la otra.")
-except ImportError:
-    warn("Function not Importable")
-    tz_mx = tz('America/Mexico_City')
-    ts_fmt = "%d %b '%y %H:%M"
-    def msec_strftime(ms, msec_tz=tz_mx, msec_format=ts_fmt): 
-        strf = pipe(ms/1000, 
-            dt.fromtimestamp, 
-            ϱ('astimezone', msec_tz),
-            ϱ('strftime', msec_format))
-        return strf
 
 # COMMAND ----------
 
@@ -160,7 +152,7 @@ for kk, vv in tables_dict.items():
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC Las columnas de Open Items Debug son:  
+# MAGIC Las columnas de Open Items (debug = `True`) son:  
 # MAGIC ```python
 # MAGIC [   'ReceivableType', 'DueDate', 'ContractID', 'OpenItemID', 'Amount', 
 # MAGIC     'Currency', 'StatusCategory', 'ReceivableDescription', 'ReceivableTypeTxt',  
@@ -178,12 +170,31 @@ for kk, vv in tables_dict.items():
 # MAGIC
 # MAGIC (open_items_d
 # MAGIC     .filter(F.col('ID') == "03017114357-444-MX")
-# MAGIC     .select('ID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
+# MAGIC     .select('ID', 'OpenItemID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
 # MAGIC         'ReceivableType'.alias('rec_type'), 'cleared', 'uncleared', 
-# MAGIC         'due_date_', 'is_min_dds', 'is_default', 'is_recvble', 
+# MAGIC         'dds_default', 'is_min_dds', 'is_default', 'is_recvble', 
 # MAGIC         'Amount', 'ReceivableDescription', 'DueDate', 'StatusTxt')
 # MAGIC     .display())
 # MAGIC ```
+
+# COMMAND ----------
+
+an_open_item = (cyber_central.prepare_source('open-items',
+        path=f"{brz_path}/loan-contract/chains/open-items")
+    .filter(F.col('ContractID') == "03017114357-444-MX"))
+an_open_item.display()
+
+# COMMAND ----------
+
+open_items_d = (cyber_central.prepare_source('open-items',
+        path=f"{brz_path}/loan-contract/chains/open-items", debug=True)
+    .filter(F.col('ContractID') == "03017114357-444-MX")
+    .select('ID', 'OpenItemID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
+        F.col('ReceivableType').alias('rec_type'), 'cleared', 'uncleared', 
+        'dds_default', 'is_min_dds', 'is_default', 'is_capital', 'is_recvble', 
+        'Amount', 'ReceivableDescription', 'DueDate', 'StatusTxt'))
+    
+open_items_d.display()
 
 # COMMAND ----------
 
@@ -216,8 +227,8 @@ def df_joiner(join_df) -> OrderedDict:
     λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
     splitter = compose_left(
         ϱ('split', ','), 
-        partial2(map, ϱ('split', '=')), 
-        partial2(map, λ_col_alias), 
+        map_z(ϱ('split', '=')), 
+        map_z(λ_col_alias), 
         list)
     joiner = OrderedDict((rr['tabla'], splitter(rr['join_cols']))
         for _, rr in join_df.iterrows()
@@ -265,8 +276,8 @@ cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 the_tables = {}
 missing_cols = {}
 
-def one_column(names: list, header=True):
-    an_alias = '~'.join(names) if header else 'one-column'
+def one_column(names, header=True):
+    an_alias = '~'.join(names) if header else 'one-fixed-width'
     the_col = pipe(names,
         packed(F.concat),
         F_latinize,

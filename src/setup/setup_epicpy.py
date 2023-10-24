@@ -1,9 +1,9 @@
 # DX, Epic Bank
 # CDMX, 17 octubre '23
 
-EPIC_REF = 'gh-1.6'     # DEV 'v1.1.10' 
 REQS_FILE = '../reqs_dbks.txt'
 USER_FILE = '../user_databricks.yml'
+EPIC_REF = 'gh-1.6' 
 V_TYPING = '4.7.1'
 
 from subprocess import check_call
