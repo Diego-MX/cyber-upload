@@ -18,7 +18,7 @@ from datetime import datetime as dt, date, timedelta as delta
 from delta.tables import DeltaTable as Δ
 from pyspark.sql import (functions as F, 
     types as T, Window as W, SparkSession)
-from pyspark.dbutils import DBUtils
+from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 import re
 
 spark = SparkSession.builder.getOrCreate()
@@ -102,7 +102,7 @@ persons_slv = (EpicDF(spark, f"{events_brz}/person-set/chains/person")
     .select(*persons_cols)
     .withColumn('phone_number', F.coalesce('PhoneNumber', 'MobileNumber')))
 
-display(persons_slv)
+persons_slv.display()    # pylint:
 
 # COMMAND ----------
 
@@ -144,7 +144,7 @@ loan_cols_0 = [F.col('ID').alias('ContractID'),
 loans_slv = (EpicDF(spark, f"{events_brz}/loan-contract/data")
     .select(loan_cols_0))
 
-display(loans_slv)
+loans_slv.display()
 
 # COMMAND ----------
 
@@ -330,7 +330,7 @@ promises_slv = (EpicDF(spark, f"{at_promise}/promises")
     .filter(F.col('rk_promise') == 1)
     .drop(  F.col('rk_promise')))
 
-display(promises_slv)
+promises_slv.display()
 
 # COMMAND ----------
 
@@ -349,7 +349,7 @@ golden_join = (loans_slv
     .join(how='left', on='ContractID', other=promises_slv
           .withColumnRenamed('attribute_loan_id', 'ContractID')))
 
-display(golden_join)
+golden_join.display()
 
 
 # COMMAND ----------

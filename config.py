@@ -42,8 +42,7 @@ SETUP_2 = {
             'client_secret'   : 'sp-collections-secret',
             'tenant_id'       : 'aad-tenant-id',
             'subscription_id' : 'sp-collections-subscription' } ,
-        'databricks-scope': 'cx-collections'}
-}
+        'databricks-scope': 'cx-collections'} }
 
 PLATFORM_2 = {
     'dev': {
@@ -57,34 +56,48 @@ PLATFORM_2 = {
         'storage'   : 'stlakehyliastg'},
     'prd': {
         'key-vault' : 'kv-cx-data-prd',
-        'storage'   : 'stlakehyliaprd'},
-}
+        'storage'   : 'stlakehyliaprd'} }
+
 
 CORE_2 = {
     'dev-sap': {
-        'base_url'  : '', 
-        'auth_url'  : '', 
-        'client_id' : 'core-api-key', 
-        'client_secret' : 'core-api-secret', 
+        'base_url': "https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b", 
+        'auth_url': "https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token", 
+        'client_id'     : 'core-api-key',
+        'client_secret' : 'core-api-secret',
         'sap_username'  : 'core-api-user', 
-        'sap_password'  : 'core-api-pass'}, 
-    'qas-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 
-        'sap_username', 'sap_password'}, 
-    'prd-sap': {'base_url', 'auth_url', 'client_id', 'client_secret', 
-        'sap_username', 'sap_password'}
-}
+        'sap_password'  : 'core-api-password'}, 
+    'qas-sap': {
+        'base_url': "https://apiqas.apimanagement.us21.hana.ondemand.com/s4b", 
+        'auth_url': "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
+        'client_id'     : 'core-api-key',
+        'client_secret' : 'core-api-secret',
+        'sap_username'  : 'core-api-user', 
+        'sap_password'  : 'core-api-password'}, 
+    'prd-sap': {
+        'base_url': "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b", 
+        'auth_url': "https://apiprd.apimanagement.us21.hana.ondemand.com/oauth2/token", 
+        'client_id'     : 'core-api-key',
+        'client_secret' : 'core-api-secret',
+        'sap_username'  : 'core-api-user', 
+        'sap_password'  : 'core-api-password'} }
 
 
 CRM_2 = {
     'sandbox-zd': {
         'url': "https://bineo1633010523.zendesk.com/api",
-        'main-user': 'crm-api-user', 'main-token': 'crm-api-token',
-        'zis-id': 'crm-zis-id', 'zis-user': 'crm-zis-user', 'zis-pass': 'crm-zis-pass'},
+        'main-user': 'crm-api-user', 
+        'main-token': 'crm-api-token',
+        'zis-id': 'crm-zis-id', 
+        'zis-user': 'crm-zis-user', 
+        'zis-pass': 'crm-zis-pass'},
     'prod-zd': {
         'url': "https://bineo.zendesk.com/api",
-        'main-user': 'crm-api-user', 'main-token': 'crm-api-token',
-        'zis-id': 'crm-zis-id', 'zis-user': 'crm-zis-user', 'zis-pass': 'crm-zis-pass'},
-}
+        'main-user': 'crm-api-user', 
+        'main-token': 'crm-api-token',
+        'zis-id': 'crm-zis-id', 
+        'zis-user': 'crm-zis-user', 
+        'zis-pass': 'crm-zis-pass'} }
 
 DATA_2 = {
     'paths': {
@@ -104,8 +117,7 @@ DATA_2 = {
         'slv_loan_payments' :('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
         'slv_persons'   :('din_clients.slv_ops_persons_set',    'persons-set'),
         'slv_promises'  :('farore_transactions.slv_cx_payment_promises',    'promises'),
-        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts')}
-}
+        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts')} }
 
 
 SETUP_KEYS = {
@@ -590,28 +602,17 @@ CRM_ENV  = environ.get('CRM_ENV')
 
 app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV])
 app_resourcer = app_agent.get_resourcer(PLATFORM_2[ENV], check_all=False)
-
+prep_secret = app_resourcer.get_vault_secretter()
+prep_core = app_agent.prep_core(CORE_2[CORE_ENV], prep_secret)
 
 cyber_handler = TypeHandler({
-    'int' : {
-        'NA': 0,
-        'c_format': '%0{}d',}, 
-    'long' : {
-        'NA': 0,
-        'c_format': '%0{}d',}, 
-    'dbl' : {
-        'NA': 0, 
-        'c_format': '%0{}.{}f', 
-        'no_decimal': True},
-    'str' : {
-        'NA': '',
-        'c_format': '%-{}s', }, 
-    'date': {
-        'NA': date(1900, 1, 1), 
-        'c_format': '%8.8d', 
-        'date_format': 'MMddyyyy'}})
+    'int' : dict(NA=0, c_format='%0{}d'), 
+    'long': dict(NA=0, c_format='%0{}d'), 
+    'dbl' : dict(NA=0, c_format='%0{}.{}f', no_decimal=True),
+    'str' : dict(NA='', c_format='%-{}s'), 
+    'date': dict(NA=date(1900, 1, 1), c_format='%8.8d', date_format='MMddyyyy')})
 
-specs_rename = {
+cyber_rename = {
     'nombre'    : 'name', 
     'PyType'    : 'pytype',
     'Longitud'  : 'len', 

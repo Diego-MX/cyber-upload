@@ -1,104 +1,86 @@
-# Databricks notebook source
+# Databricks notebook source    # pylint: disable=missing-module-docstring,invalid-name
 # MAGIC %md 
 # MAGIC
 # MAGIC # Preparación
 # MAGIC
-# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican los tipos de columnas desde el lado de la fuente. 
-# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los tipos de columnas especificados para crear el _output_.
-
-# COMMAND ----------
-
-# MAGIC %pip install -q -r ../reqs_dbks.txt
-
-# COMMAND ----------
-
-read_specs_from = 'repo'    
-# Puede ser:  {blob, repo}
-# REPO es la forma formal, como se lee en PRD. 
-# BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH. 
-
-# COMMAND ----------
-
-from collections import OrderedDict
-from datetime import date
-from json import dumps
-import os
-from pathlib import Path
-import re
-from subprocess import check_call
-
-import pandas as pd
-from pyspark.sql import (functions as F, SparkSession, Window as W)
-from pyspark.dbutils import DBUtils
-from toolz import compose_left, curried
-import yaml
-
-spark = SparkSession.builder.getOrCreate()
-dbutils = DBUtils(spark)
-
-with open("../user_databricks.yml", 'r') as _f: 
-    u_dbks = yaml.safe_load(_f)
-
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego', 
-    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token']) }  
-
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-check_call(['pip', 'install', url_call])
+# MAGIC * Las modificaciones `silver` se hacen en las tablas base, y se verifican 
+# MAGIC   los tipos de columnas desde el lado de la fuente. 
+# MAGIC * La preparación `gold` consiste en unir las `silver`, y se utilizan los 
+# MAGIC   tipos de columnas especificados para crear el _output_.
 
 # COMMAND ----------
 
 from importlib import reload
+from src.setup import pkg_epicpy; reload(pkg_epicpy)    # pylint: disable=multiple-statements
+pkg_epicpy.install_it()
+
+# COMMAND ----------
+
+# balances, open-items-long, open-items-wide, loan-contracts, person-set, txns-set, txns-grp
+TEST_TABLE = 'loan-contracts'
+
+# match, null-ids
+WHICH_TEST = 'match'
+
+# COMMAND ----------
+
+# pylint: disable=multiple-statements
+# pylint: disable=ungrouped-imports
+# pylint: disable=unspecified-encoding
+# pylint: disable=wrong-import-position,wrong-import-order
+
+# COMMAND ----------
+
+from collections import OrderedDict
+from operator import methodcaller as ϱ, itemgetter as ɣ
+from pathlib import Path
+
+import pandas as pd
+from pyspark.sql import functions as F, SparkSession
+from pyspark.dbutils import DBUtils   # pylint: disable=import-error,no-name-in-module
+from toolz import complement, compose_left, pipe
+from toolz.curried import map as map_z, valfilter, valmap
+
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
+# COMMAND ----------
+
 from src import data_managers; reload(data_managers)
 import config; reload(config)
 
 from epic_py.delta import EpicDF, EpicDataBuilder
-from epic_py.tools import method_getter, partial2
-from src.data_managers import CyberData     # , set_specs_file, read_cyber_specs
+from epic_py.partners.apis_core import SAPSession
+from epic_py.tools import packed
+from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import app_agent, app_resourcer, cyber_handler, specs_rename
+from config import app_agent, app_resourcer, prep_core, cyber_handler, cyber_rename
 
 stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
 app_resourcer.set_dbks_permissions(stg_permissions)
+core_session = SAPSession(prep_core)
 
-λ_path = (lambda cc, pp: app_resourcer.get_resource_url(
-        'abfss', 'storage', container=cc, blob_path=pp))
-
-brz_path  = λ_path('bronze', 'ops/core-banking')  
-gold_path = λ_path('gold', 'cx/collections/cyber') 
+brz_path = app_resourcer.get_resource_url('abfss', 'storage', 
+    container='bronze', blob_path='ops/core-banking')  
 
 specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage
-tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS 
+tmp_downer = "/FileStore/cyber/specs"           # @local (dbks) driver node ≠ DBFS 
 
 cyber_central = CyberData(spark)
 cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
 
-def dumps2(an_obj, **kwargs): 
-    dump1 = dumps(an_obj, **kwargs)
-    dump2 = re.sub(r'(,)\n *', r'\1 ', dump1)
-    return dump2
-
-if not os.path.isdir(tmp_downer): 
-    os.makedirs(tmp_downer)
-    
-
 # COMMAND ----------
-
-# Revisar especificación en ~/refs/catalogs/cyber_txns.xlsx
-# O en User Story, o en Correos enviados.  
 
 balances = cyber_central.prepare_source('balances', 
     path=f"{brz_path}/loan-contract/aux/balances-wide")
     
-open_items_long = cyber_central.prepare_source('open-items-long', 
+open_items = cyber_central.prepare_source('open-items', 
     path=f"{brz_path}/loan-contract/chains/open-items")
 
 open_items_wide = cyber_central.prepare_source('open-items-wide', 
     path=f"{brz_path}/loan-contract/aux/open-items-wide")
-    # tiene muchos CURRENT_AMOUNT : NULL
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
@@ -121,7 +103,7 @@ tables_dict = {
     "BalancesWide" : balances,
     "ContractSet"  : loan_contracts, 
     "OpenItems"    : open_items_wide, 
-    "OpenItemsLong": open_items_long,
+    "OpenItemsLong": open_items,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns}
@@ -130,15 +112,22 @@ print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items(): 
     print(kk, vv.count())
     
-
 # COMMAND ----------
 
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
 
-exportar = True
-
 the_tables = {}
 missing_cols = {}
+
+
+def read_cyber_specs(task_key: str, downer='blob'): 
+    specs_file, joins_file = set_specs_file(task_key, downer)
+    the_specs = cyber_central.specs_setup_0(specs_file)
+    if Path(joins_file).is_file():
+        the_joins = df_joiner(pd.read_csv(joins_file))
+    else: 
+        the_joins = None
+    return (the_specs, the_joins)
 
 
 def set_specs_file(task_key: str, downer='blob'): 
@@ -159,52 +148,18 @@ def set_specs_file(task_key: str, downer='blob'):
 
 
 def df_joiner(join_df) -> OrderedDict: 
-    cols_by = ['tabla', 'join_cols']
-    λ_col_alias = lambda cc_aa: F.col(cc_aa[0]).alias(cc_aa[1])
+    λ_col_alias = lambda cc, aa: F.col(cc).alias(aa)
 
-    splitter = compose_left(
-        method_getter('split', ','), 
-        partial2(map, method_getter('split', '=')), 
-        partial2(map, λ_col_alias), 
+    splitter = compose_left(ϱ('split', ','), 
+        map_z(ϱ('split', '=')), 
+        map_z(packed(λ_col_alias)), 
         list)
-    joiner = OrderedDict((rr['tabla'], splitter(rr['join_cols']))
-        for _, rr in join_df.iterrows()
-        if not tools.is_na(rr['join_cols']))
+    joiner = pipe(join_df.iterrows(), 
+        map_z(ɣ('tabla', 'join_cols')), dict, 
+        valfilter(complement(tools.is_na)), 
+        valmap(splitter))
     return joiner
     
-
-def read_cyber_specs(task_key: str, downer='blob'): 
-    specs_file, joins_file = set_specs_file(task_key, downer)
-    specs_df = cyber_central.specs_setup_0(specs_file)
-    if Path(joins_file).is_file():
-        joins_dict = df_joiner(pd.read_csv(joins_file))
-    else: 
-        joins_dict = None
-
-    return specs_df, joins_dict
-
-# COMMAND ----------
-
-task = 'sap_saldos'
-
-specs_df, spec_joins = read_cyber_specs(task, read_specs_from)
-specs_df_2 = specs_df.rename(columns=specs_rename)
-specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
-
-missing_cols[task] = specs_dict['missing']
-one_select = F.concat(*specs_df['nombre']).alias('~'.join(specs_df['nombre']))
-
-widther_2 = cyber_builder.get_loader(specs_df_2, 'fixed-width')
-
-saldos_tbls = (cyber_central
-    .master_join_2(spec_joins, specs_dict, tables_dict, tables_only=True))
-    
-
-
-# COMMAND ----------
-
-saldos_tbls.display()
-
 # COMMAND ----------
 
 # MAGIC %md 
@@ -216,6 +171,10 @@ saldos_tbls.display()
 
 # MAGIC %md 
 # MAGIC ## PersonSet
+
+# COMMAND ----------
+
+person_set = core_session.call_data_api('person-set', )
 
 # COMMAND ----------
 
@@ -262,6 +221,25 @@ balances_weird2.display()
 # MAGIC %md
 # MAGIC ## OpenItems
 # MAGIC
+
+# COMMAND ----------
+
+an_open_item = (cyber_central.prepare_source('open-items',
+        path=f"{brz_path}/loan-contract/chains/open-items")
+    .filter(F.col('ContractID') == "03017114357-444-MX"))
+an_open_item.display()
+
+# COMMAND ----------
+
+open_items_d = (cyber_central.prepare_source('open-items',
+        path=f"{brz_path}/loan-contract/chains/open-items", debug=True)
+    .filter(F.col('ContractID') == "03017114357-444-MX")
+    .select('ID', 'OpenItemID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
+        F.col('ReceivableType').alias('rec_type'), 'cleared', 'uncleared', 
+        'dds_default', 'is_min_dds', 'is_default', 'is_capital', 'is_recvble', 
+        'Amount', 'ReceivableDescription', 'DueDate', 'StatusTxt'))
+    
+open_items_d.display()
 
 # COMMAND ----------
 
@@ -323,8 +301,3 @@ items_l_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
     .join(items_l_weird0, on='loan_id', how='semi'))
 
 items_l_weird2.display()
-    
-
-# COMMAND ----------
-
-items_l_weird1.display()

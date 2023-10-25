@@ -10,16 +10,10 @@
 
 # COMMAND ----------
 
-# pylint: disable=multiple-statements
-# pylint: disable=no-value-for-parameter
 from importlib import reload
-from src.setup import setup_epicpy; reload(setup_epicpy)
-setup_epicpy.install_it()
+from src.setup import pkg_epicpy; reload(pkg_epicpy)    # pylint: disable=multiple-statements
+pkg_epicpy.install_it()
 # GH_REF, REF_FILE, USER_FILE, V_TYPING
-
-# COMMAND ----------
-
-#%run ./0_install_nb_reqs
 
 # COMMAND ----------
 
@@ -32,8 +26,12 @@ READ_SPECS_FROM = 'repo'
 # COMMAND ----------
 
 # pylint: disable=multiple-statements
+# pylint: disable=no-value-for-parameter
 # pylint: disable=ungrouped-imports
 # pylint: disable=wrong-import-position,wrong-import-order
+
+# COMMAND ----------
+
 from collections import OrderedDict
 from json import dumps
 from operator import methodcaller as ϱ
@@ -57,7 +55,7 @@ from epic_py.tools import msec_strftime, packed
 from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import app_agent, app_resourcer, cyber_handler, specs_rename
+from config import app_agent, app_resourcer, cyber_handler, cyber_rename
 
 stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
@@ -178,25 +176,6 @@ for kk, vv in tables_dict.items():
 
 # COMMAND ----------
 
-an_open_item = (cyber_central.prepare_source('open-items',
-        path=f"{brz_path}/loan-contract/chains/open-items")
-    .filter(F.col('ContractID') == "03017114357-444-MX"))
-an_open_item.display()
-
-# COMMAND ----------
-
-open_items_d = (cyber_central.prepare_source('open-items',
-        path=f"{brz_path}/loan-contract/chains/open-items", debug=True)
-    .filter(F.col('ContractID') == "03017114357-444-MX")
-    .select('ID', 'OpenItemID', 'DueDateShift', F.col('StatusCategory').alias('s_cat'), 
-        F.col('ReceivableType').alias('rec_type'), 'cleared', 'uncleared', 
-        'dds_default', 'is_min_dds', 'is_default', 'is_capital', 'is_recvble', 
-        'Amount', 'ReceivableDescription', 'DueDate', 'StatusTxt'))
-    
-open_items_d.display()
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Tabla de instrucciones
 # MAGIC
@@ -293,7 +272,7 @@ def one_column(names, header=True):
 task = 'sap_saldos'     # pylint: disable=invalid-name
 
 specs_df, spec_joins = read_cyber_specs(task, READ_SPECS_FROM)
-specs_df_ii = specs_df.rename(columns=specs_rename)
+specs_df_ii = specs_df.rename(columns=cyber_rename)
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
 missing_cols[task] = specs_dict['missing']
@@ -325,7 +304,7 @@ task = 'sap_estatus'        #    pylint: disable=invalid-name
 specs_df, spec_joins = read_cyber_specs(task, READ_SPECS_FROM)
 one_select = one_column(specs_df['nombre'])
 
-specs_df_2 = specs_df.rename(columns=specs_rename)
+specs_df_2 = specs_df.rename(columns=cyber_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
@@ -356,7 +335,7 @@ specs_df, spec_joins = read_cyber_specs(task, READ_SPECS_FROM)
 
 one_select = one_column(specs_df['nombre'])
 
-specs_df_2 = specs_df.rename(columns=specs_rename)
+specs_df_2 = specs_df.rename(columns=cyber_rename)
 
 specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
 
