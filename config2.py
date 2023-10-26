@@ -125,7 +125,7 @@ CRM_ENV  = environ.get('CRM_ENV')
 app_agent = EpicIdentity.create(SERVER, SETUP[ENV])
 app_resourcer = app_agent.get_resourcer(PLATFORM[ENV], check_all=False)
 prep_secret = app_resourcer.get_vault_secretter()
-prep_core = app_agent.prep_sap_connect(CORE[CORE_ENV], prep_secret)
+prep_core = app_agent.prep_core(CORE[CORE_ENV], prep_secret)
 
 cyber_handler = TypeHandler({
     'date': dict(c_format='%8.8d', NA=date(1900, 1, 1), date_format='MMddyyyy'),
