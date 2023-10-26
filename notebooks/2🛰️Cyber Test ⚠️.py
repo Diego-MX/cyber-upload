@@ -121,16 +121,16 @@ missing_cols = {}
 
 
 def read_cyber_specs(task_key: str, downer='blob'): 
-    specs_file, joins_file = set_specs_file(task_key, downer)
+    specs_file, joins_file = _set_specs_file(task_key, downer)
     the_specs = cyber_central.specs_setup_0(specs_file)
     if Path(joins_file).is_file():
-        the_joins = df_joiner(pd.read_csv(joins_file))
+        the_joins = _df_joiner(pd.read_csv(joins_file))
     else: 
         the_joins = None
     return (the_specs, the_joins)
 
 
-def set_specs_file(task_key: str, downer='blob'): 
+def _set_specs_file(task_key: str, downer='blob'): 
      # Usa TMP_DOWNER, SPECS_PATH, 
     if downer == 'blob': 
         dir_at = tmp_downer # and no prefix
@@ -147,7 +147,7 @@ def set_specs_file(task_key: str, downer='blob'):
     return (specs_file, joins_file)
 
 
-def df_joiner(join_df) -> OrderedDict: 
+def _df_joiner(join_df) -> OrderedDict: 
     λ_col_alias = lambda cc, aa: F.col(cc).alias(aa)
 
     splitter = compose_left(ϱ('split', ','), 
