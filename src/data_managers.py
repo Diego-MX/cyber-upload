@@ -496,7 +496,6 @@ class CyberData():
 
 
 
-
 def pd_print(a_df: pd.DataFrame, **kwargs):
     the_options = {
         'max_rows'   : None, 

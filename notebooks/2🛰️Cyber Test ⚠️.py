@@ -32,7 +32,7 @@ WHICH_TEST = 'match'
 # COMMAND ----------
 
 from collections import OrderedDict
-from operator import methodcaller as ϱ, itemgetter as ɣ
+from operator import itemgetter as ɣ, methodcaller as ϱ 
 from pathlib import Path
 
 import pandas as pd
@@ -47,7 +47,7 @@ dbutils = DBUtils(spark)
 # COMMAND ----------
 
 from src import data_managers; reload(data_managers)
-import config; reload(config)
+import config2; reload(config2)
 
 from epic_py.delta import EpicDF, EpicDataBuilder
 from epic_py.partners.apis_core import SAPSession
@@ -55,7 +55,7 @@ from epic_py.tools import packed
 from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import app_agent, app_resourcer, prep_core, cyber_handler, cyber_rename
+from config2 import app_agent, app_resourcer, prep_core, cyber_handler, cyber_rename
 
 stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
@@ -163,9 +163,19 @@ def df_joiner(join_df) -> OrderedDict:
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC
 # MAGIC # Exploration
 # MAGIC
+
+# COMMAND ----------
+
+specs_df, spec_joins = read_cyber_specs('sap_saldos', 'repo')
+specs_df_ii = specs_df.rename(columns=cyber_rename)
+specs_dict = cyber_central.specs_reader_1(specs_df, tables_dict)
+
+widther = cyber_builder.get_loader(specs_df_ii, 'fixed-width')
+
+saldos_2 = cyber_central.master_join_2(spec_joins, specs_dict, tables_dict)
+saldos_tbls = saldos_2.with_column_plus(widther)
 
 # COMMAND ----------
 
