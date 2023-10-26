@@ -55,7 +55,7 @@ from epic_py.tools import msec_strftime, packed
 from src.data_managers import CyberData
 from src.utilities import tools
 
-from config import app_agent, app_resourcer, cyber_handler, cyber_rename
+from config2 import app_agent, app_resourcer, cyber_handler, cyber_rename
 
 stg_account = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')

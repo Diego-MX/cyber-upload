@@ -1,124 +1,15 @@
 """Infrastructure variables to be defined in the Azure & Databricks environment."""
-from datetime import date
 from os import environ, getcwd, getenv
 from pathlib import Path
 import re
 
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 
-from epic_py.delta import TypeHandler
-from epic_py.platform import EpicIdentity
 from epic_py.tools import dict_plus
 from src.utilities import tools
 
 # pylint: disable=line-too-long
 PAGE_MAX = 1000
-
-SETUP_2 = {
-    'dev': {
-        'service-principal' : {
-            'client_id'       : 'sp-lakehylia-app-id',
-            'client_secret'   : 'sp-lakehylia-secret',
-            'tenant_id'       : 'aad-tenant-id',
-            'subscription_id' : 'aad-subscription-id'} ,
-        'databricks-scope' : 'kv-resource-access-dbks'},
-    'qas' : {
-        'service-principal' : {
-            'client_id'       : 'sp-core-events-client',
-            'client_secret'   : 'sp-core-events-secret',
-            'tenant_id'       : 'aad-tenant-id',
-            'subscription_id' : 'sp-core-events-subscription' } ,
-        'databricks-scope': 'eh-core-banking'},
-    'stg' : {
-        'service-principal' : {
-            'client_id'       : 'sp-collections-client',
-            'client_secret'   : 'sp-collections-secret',
-            'tenant_id'       : 'aad-tenant-id',
-            'subscription_id' : 'sp-collections-subscription' } ,
-        'databricks-scope': 'cx-collections'},
-    'prd' : {
-        'service-principal' : {
-            'client_id'       : 'sp-collections-client',
-            'client_secret'   : 'sp-collections-secret',
-            'tenant_id'       : 'aad-tenant-id',
-            'subscription_id' : 'sp-collections-subscription' } ,
-        'databricks-scope': 'cx-collections'} }
-
-PLATFORM_2 = {
-    'dev': {
-        'key-vault' : 'kv-collections-data-dev',
-        'storage'   : 'lakehylia'},
-    'qas': {
-        'key-vault' : 'kv-cx-data-qas',
-        'storage'   : 'stlakehyliaqas'},
-    'stg': {
-        'key-vault' : 'kv-cx-adm-stg',
-        'storage'   : 'stlakehyliastg'},
-    'prd': {
-        'key-vault' : 'kv-cx-data-prd',
-        'storage'   : 'stlakehyliaprd'} }
-
-
-CORE_2 = {
-    'dev-sap': {
-        'base_url': "https://sbx-latp-apim.prod.apimanagement.us20.hana.ondemand.com/s4b", 
-        'auth_url': "https://latp-apim.prod.apimanagement.us20.hana.ondemand.com/oauth2/token", 
-        'client_id'     : 'core-api-key',
-        'client_secret' : 'core-api-secret',
-        'sap_username'  : 'core-api-user', 
-        'sap_password'  : 'core-api-password'}, 
-    'qas-sap': {
-        'base_url': "https://apiqas.apimanagement.us21.hana.ondemand.com/s4b", 
-        'auth_url': "https://apiqas.apimanagement.us21.hana.ondemand.com/oauth2/token", 
-        'client_id'     : 'core-api-key',
-        'client_secret' : 'core-api-secret',
-        'sap_username'  : 'core-api-user', 
-        'sap_password'  : 'core-api-password'}, 
-    'prd-sap': {
-        'base_url': "https://apiprd.apimanagement.us21.hana.ondemand.com/s4b", 
-        'auth_url': "https://apiprd.apimanagement.us21.hana.ondemand.com/oauth2/token", 
-        'client_id'     : 'core-api-key',
-        'client_secret' : 'core-api-secret',
-        'sap_username'  : 'core-api-user', 
-        'sap_password'  : 'core-api-password'} }
-
-
-CRM_2 = {
-    'sandbox-zd': {
-        'url': "https://bineo1633010523.zendesk.com/api",
-        'main-user': 'crm-api-user', 
-        'main-token': 'crm-api-token',
-        'zis-id': 'crm-zis-id', 
-        'zis-user': 'crm-zis-user', 
-        'zis-pass': 'crm-zis-pass'},
-    'prod-zd': {
-        'url': "https://bineo.zendesk.com/api",
-        'main-user': 'crm-api-user', 
-        'main-token': 'crm-api-token',
-        'zis-id': 'crm-zis-id', 
-        'zis-user': 'crm-zis-user', 
-        'zis-pass': 'crm-zis-pass'} }
-
-DATA_2 = {
-    'paths': {
-        'core': 'ops/core-banking/batch-updates',
-        'events': 'ops/core-banking',
-        'collections': 'cx/collections/sunshine-objects'},
-    'tables': {
-        'brz_persons'       :('din_clients.brz_ops_persons_set',    'persons-set'),
-        'brz_loan_payments' :('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
-        'brz_loans'     :('nayru_accounts.brz_ops_loan_contracts',      'loan-contracts'),
-        'brz_loan_balances' :('nayru_accounts.brz_ops_loan_balances',   'loan-balances'),
-        'brz_loan_open_items'   :('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),
-        'brz_promises'      :('farore_transactions.brz_cx_payment_promises',    'promises'),
-        'slv_loans'         :('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'),
-        'slv_loan_balances' :('nayru_accounts.slv_ops_loan_balances',   'loan-balances'),
-        'slv_loan_open_items'   :('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),
-        'slv_loan_payments' :('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
-        'slv_persons'   :('din_clients.slv_ops_persons_set',    'persons-set'),
-        'slv_promises'  :('farore_transactions.slv_cx_payment_promises',    'promises'),
-        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts')} }
-
 
 SETUP_KEYS = {
     'dev' : {
@@ -599,21 +490,3 @@ ENV = dict_plus(environ).get_plus('ENV_TYPE', 'ENV', 'nan-env')
 SERVER   = environ.get('SERVER_TYPE', 'wap')
 CORE_ENV = environ.get('CORE_ENV')
 CRM_ENV  = environ.get('CRM_ENV')
-
-app_agent = EpicIdentity.create(SERVER, SETUP_2[ENV])
-app_resourcer = app_agent.get_resourcer(PLATFORM_2[ENV], check_all=False)
-prep_secret = app_resourcer.get_vault_secretter()
-prep_core = app_agent.prep_core(CORE_2[CORE_ENV], prep_secret)
-
-cyber_handler = TypeHandler({
-    'int' : dict(NA=0, c_format='%0{}d'), 
-    'long': dict(NA=0, c_format='%0{}d'), 
-    'dbl' : dict(NA=0, c_format='%0{}.{}f', no_decimal=True),
-    'str' : dict(NA='', c_format='%-{}s'), 
-    'date': dict(NA=date(1900, 1, 1), c_format='%8.8d', date_format='MMddyyyy')})
-
-cyber_rename = {
-    'nombre'    : 'name', 
-    'PyType'    : 'pytype',
-    'Longitud'  : 'len', 
-    'Posición inicial' : 'pos'}
