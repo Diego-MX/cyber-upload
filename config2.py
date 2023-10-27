@@ -100,19 +100,19 @@ DATA = {
         'events': 'ops/core-banking',
         'collections': 'cx/collections/sunshine-objects'},
     'tables': {
-        'brz_persons'       :('din_clients.brz_ops_persons_set',    'persons-set'),
-        'brz_loan_payments' :('nayru_accounts.brz_ops_loan_payments',   'loan-payments'),
-        'brz_loans'     :('nayru_accounts.brz_ops_loan_contracts',      'loan-contracts'),
-        'brz_loan_balances' :('nayru_accounts.brz_ops_loan_balances',   'loan-balances'),
+        'brz_persons'       :('din_clients.brz_ops_persons_set', 'persons-set'),
+        'brz_loan_payments' :('nayru_accounts.brz_ops_loan_payments', 'loan-payments'),
+        'brz_loans'     :('nayru_accounts.brz_ops_loan_contracts', 'loan-contracts'),
+        'brz_loan_balances' :('nayru_accounts.brz_ops_loan_balances', 'loan-balances'),
         'brz_loan_open_items'   :('nayru_accounts.brz_ops_loan_open_items', 'loan-open-items'),
-        'brz_promises'      :('farore_transactions.brz_cx_payment_promises',    'promises'),
-        'slv_loans'         :('nayru_accounts.slv_ops_loan_contracts',  'loan-contracts'),
-        'slv_loan_balances' :('nayru_accounts.slv_ops_loan_balances',   'loan-balances'),
+        'brz_promises'      :('farore_transactions.brz_cx_payment_promises', 'promises'),
+        'slv_loans'         :('nayru_accounts.slv_ops_loan_contracts', 'loan-contracts'),
+        'slv_loan_balances' :('nayru_accounts.slv_ops_loan_balances', 'loan-balances'),
         'slv_loan_open_items'   :('nayru_accounts.slv_ops_loan_open_items', 'loan-open-items'),
-        'slv_loan_payments' :('nayru_accounts.slv_ops_loan_payments',   'loan-payments'),
-        'slv_persons'   :('din_clients.slv_ops_persons_set',    'persons-set'),
-        'slv_promises'  :('farore_transactions.slv_cx_payment_promises',    'promises'),
-        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts',  'loan-contracts')} }
+        'slv_loan_payments' :('nayru_accounts.slv_ops_loan_payments', 'loan-payments'),
+        'slv_persons'   :('din_clients.slv_ops_persons_set', 'persons-set'),
+        'slv_promises'  :('farore_transactions.slv_cx_payment_promises', 'promises'),
+        'gld_loans'     :('nayru_accounts.gld_ops_loan_contracts', 'loan-contracts')} }
 
 
 ## Technical objects used accross the project.
