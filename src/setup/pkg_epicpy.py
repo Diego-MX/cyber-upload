@@ -1,6 +1,8 @@
 # DX, Epic Bank
 # CDMX, 17 octubre '23
 
+from json import dumps
+import re
 from subprocess import check_call
 from sys import argv
 from pyspark.dbutils import DBUtils # pylint: disable=import-error,no-name-in-module
@@ -8,11 +10,11 @@ from pyspark.sql import SparkSession
 try: import yaml                    # pylint: disable=multiple-statements
 except ImportError: yaml = None     # pylint: disable=multiple-statements
 
-
 REQS_FILE = '../reqs_dbks.txt'
 USER_FILE = '../user_databricks.yml'
 EPIC_REF = 'gh-1.6' 
 V_TYPING = '4.7.1'
+
 
 # pylint: disable=redefined-outer-name
 def install_it(epic_ref=None, reqs=None, user_file=None, typing=False, verbose=False):
@@ -41,7 +43,7 @@ def _install_with_token(gh_ref, user_file, verbose):
     if verbose: 
         import epic_py
         info = {'Epic Ref': gh_ref, 'Epic Ver': epic_py.__version__}
-        print(info)
+        tabulate(info)   
     return 
 
 def _install_reqs(reqs): 
@@ -57,6 +59,12 @@ def _install_typing(typing):
 def _pip_install(*args): 
     check_call(['pip', 'install', *args])
     return
+
+def tabulate(a_dict): 
+    d_dump = dumps(a_dict, separators=('\n', '\t'))
+    d_print = re.sub(r'[\{\}"]', '', d_dump)
+    print(d_print)
+
 
 if __name__ == '__main__': 
     # pylint: disable=invalid-name
