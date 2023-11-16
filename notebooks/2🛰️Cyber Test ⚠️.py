@@ -1,4 +1,4 @@
-# Databricks notebook source    # pylint: disable=missing-module-docstring,invalid-name
+# Databricks notebook source
 # MAGIC %md 
 # MAGIC
 # MAGIC # Preparación
@@ -12,7 +12,10 @@
 
 from importlib import reload
 from src.setup import pkg_epicpy; reload(pkg_epicpy)    # pylint: disable=multiple-statements
-pkg_epicpy.install_it()
+pkg_epicpy.install_it(
+    epic_ref=None, 
+    reqs="../reqs_dbks.txt",
+    user_file="../user_databricks.yml")
 
 # COMMAND ----------
 
@@ -32,7 +35,7 @@ WHICH_TEST = 'match'
 # COMMAND ----------
 
 from collections import OrderedDict
-from operator import itemgetter as ɣ, methodcaller as ϱ 
+from operator import attrgetter as σ, itemgetter as ɣ, methodcaller as ϱ
 from pathlib import Path
 
 import pandas as pd
@@ -50,7 +53,7 @@ from src import data_managers; reload(data_managers)
 import config2; reload(config2)
 
 from epic_py.delta import EpicDF, EpicDataBuilder
-from epic_py.partners.apis_core import SAPSession
+from epic_py.partners.core import SAPSession
 from epic_py.tools import packed
 from src.data_managers import CyberData
 from src.utilities import tools
@@ -76,7 +79,7 @@ cyber_builder = EpicDataBuilder(typehandler=cyber_handler)
 balances = cyber_central.prepare_source('balances', 
     path=f"{brz_path}/loan-contract/aux/balances-wide")
     
-open_items = cyber_central.prepare_source('open-items', 
+open_items_long = cyber_central.prepare_source('open-items', 
     path=f"{brz_path}/loan-contract/chains/open-items")
 
 open_items_wide = cyber_central.prepare_source('open-items-wide', 
@@ -84,7 +87,7 @@ open_items_wide = cyber_central.prepare_source('open-items-wide',
 
 loan_contracts = cyber_central.prepare_source('loan-contracts', 
     path=f"{brz_path}/loan-contract/data", 
-    open_items=open_items_wide)
+    open_items=open_items_long)
 
 persons = cyber_central.prepare_source('person-set', 
     path=f"{brz_path}/person-set/chains/person")
@@ -103,7 +106,7 @@ tables_dict = {
     "BalancesWide" : balances,
     "ContractSet"  : loan_contracts, 
     "OpenItems"    : open_items_wide, 
-    "OpenItemsLong": open_items,
+    "OpenItemsLong": open_items_long,
     "PersonSet"    : persons, 
     "TxnsGrouped"  : txn_pmts, 
     "TxnsPayments" : the_txns}
@@ -111,7 +114,7 @@ tables_dict = {
 print("The COUNT stat in each table is:")
 for kk, vv in tables_dict.items(): 
     print(kk, vv.count())
-    
+
 # COMMAND ----------
 
 cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']  
@@ -127,7 +130,6 @@ def read_cyber_specs(task_key: str, downer='blob'):
     else: 
         the_joins = None
     return (the_specs, the_joins)
-
 
 def _set_specs_file(task_key: str, downer='blob'): 
      # Usa TMP_DOWNER, SPECS_PATH, 
@@ -153,12 +155,13 @@ def _df_joiner(join_df) -> OrderedDict:
         map_z(ϱ('split', '=')), 
         map_z(packed(λ_col_alias)), 
         list)
-    joiner = pipe(join_df.iterrows(), 
-        map_z(ɣ('tabla', 'join_cols')), dict, 
+    joiner = pipe(join_df.itertuples(), 
+        map_z(σ('tabla', 'join_cols')), dict, 
         valfilter(complement(tools.is_na)), 
         valmap(splitter))
     return joiner
     
+
 # COMMAND ----------
 
 # MAGIC %md 
@@ -178,12 +181,20 @@ saldos_tbls = saldos_2.with_column_plus(widther)
 
 # COMMAND ----------
 
+list(widther)
+
+# COMMAND ----------
+
 # MAGIC %md 
 # MAGIC ## PersonSet
 
 # COMMAND ----------
 
-person_set = core_session.call_data_api('person-set', )
+import pandas as pd
+from epic_py.partners.core.models import PersonSet
+from epic_py.tools import packed
+
+person_set = core_session.call_data_api('person-set', out='list')
 
 # COMMAND ----------
 
@@ -198,7 +209,6 @@ person_weird2 = (EpicDF(spark, f"{brz_path}/loan-contract/data")
     .join(person_weird0, on='loan_id', how='semi'))
 
 person_weird2.display()
-
 
 # COMMAND ----------
 

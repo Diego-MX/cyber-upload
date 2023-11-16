@@ -1,10 +1,10 @@
-# DX, 25 de octubre de 2023 -- o antes, 
+# DX, 25 de octubre de 2023
 # CDMX, Epic Bank
 """Transformadores de datos, específicos para Cyber."""
 from collections import OrderedDict, defaultdict
 from datetime import datetime as dt, date
 from functools import reduce
-from operator import eq, or_, methodcaller as ϱ, attrgetter as ɣ
+from operator import eq, or_, attrgetter as ɣ, itemgetter as σ, methodcaller as ϱ
 from warnings import warn
 
 import numpy as np
@@ -13,7 +13,7 @@ from pandas import DataFrame as pd_DF
 from pyspark.sql import functions as F, types as T, Window as W
 from pytz import timezone
 from toolz import (compose, compose_left, identity, juxt, pipe, 
-    thread_first, thread_last, valmap)
+    thread_first as thread, thread_last as thread2, valmap)
 from toolz.curried import map as map_z
 
 from epic_py.delta import EpicDF, column_name, when_plus
@@ -108,7 +108,7 @@ class CyberData():
             'yesterday'  : F.current_date() - 1,    # ya no. 
             'ID'         : F.col('ContractID'),
             'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
-            'cleared'    : thread_first(F.col('ReceivableDescription'), 
+            'cleared'    : thread(F.col('ReceivableDescription'), 
                     (F.regexp_extract, r"Cleared: ([\d\.]+)", 1), 
                     ϱ('cast', T.DecimalType(20, 2)), 
                     (F.coalesce, F.lit(0))),
@@ -119,7 +119,7 @@ class CyberData():
             'is_iva'     : F.col('ReceivableType') == '990004',
             },{
             'uncleared'  : F.col('Amount') - F.col('cleared'),
-            'dds_default': thread_last(F.col('DueDateShift'), 
+            'dds_default': thread2(F.col('DueDateShift'), 
                     (F.when, F.col('is_default') & F.col('is_capital')))
             },{
             'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
@@ -134,14 +134,8 @@ class CyberData():
             'default_uncleared'  : uncleared_if(F.col('is_capital')),
             'default_interest'   : uncleared_if(F.col('is_interest')), 
             'default_iva'        : uncleared_if(F.col('is_iva'))}
-        try: 
-            x1_df = (EpicDF(self.spark, path)
-                .with_column_plus(single_cols))
-            print("WITH_COLUMN_PLUS fixed in Open Items")
-        except Exception:   # pylint: disable=broad-exception-caught 
-            single_cols_ii = reduce(or_, single_cols)
-            x1_df = (EpicDF(self.spark, path)
-                .with_column_plus(single_cols_ii, optimize=False))
+        x1_df = (EpicDF(self.spark, path)
+            .with_column_plus(single_cols))
             
         if debug: 
             return x1_df
@@ -156,20 +150,21 @@ class CyberData():
         id_cols = ['ContractID', 'epic_date', 'ID']
         rec_types = ['511010', '511100', '511200', '990004', '991100', '990006'] 
         w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-        min_date = thread_first(
-            (F.when, F.row_number().over(w_duedate)), 
+        min_date = compose_left(
+            partial2(F.when, ..., F.row_number().over(w_duedate)), 
             ϱ('otherwise', -1), 
-            (eq, F.lit(1)))
+            partial2(eq, ..., F.lit(1)))
         
-        open_cols = OrderedDict({
+        open_cols = [{
             'yesterday'  : F.current_date() - 1, 
             'ID'         : F.col('ContractID'), 
             'interest'   : F.col('991100') + F.col('511100'), 
             'iva'        : F.col('990004'), 
             'is_due'     : F.col('DueDate') >= F.current_date(),  
-            'is_default' : F.col('StatusCategory').isin(['2','3']),
+            'is_default' : F.col('StatusCategory').isin(['2','3'])
+            },{
             'is_current' : min_date(F.col('is_due')), 
-            'is_oldest'  : min_date(F.col('is_default'))})
+            'is_oldest'  : min_date(F.col('is_default'))}]
         group_cols = {
             'current' : {
                 'current_amount' : F.col('amount')}, 
@@ -198,57 +193,6 @@ class CyberData():
             .select(*id_cols, 
                 *group_cols['current'].keys(), 
                 *group_cols['oldest' ].keys()))
-        return x_df
-
-    def _prep_open_items_long(self, path):
-        id_cols   = ['ContractID', 'epic_date', 'ID']
-        rec_types = ['511010', '511100', '511200', 
-            '990004', '991100', '990006'] 
-        w_duedate = W.partitionBy(*id_cols).orderBy('DueDate')
-        # single_cols = [...] para manejar dependencias de columnas. 
-        single_cols = [{
-            'yesterday'  : F.current_date() - 1,    # ya no. 
-            'ID'         : F.col('ContractID'),
-            'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
-            'cleared'    : thread_first(F.col('ReceivableDescription'), 
-                    (F.regexp_extract, r"Cleared: ([\d\.]+)", 1), 
-                    ϱ('cast', T.DecimalType(20, 2)), 
-                    (F.coalesce, ..., F.lit(0))),
-            'is_default' : F.col('StatusCategory').isin(['2','3']),
-            'is_recvble' : F.col('ReceivableType').isin(rec_types),
-            'is_capital' : F.col('ReceivableType') == '511010',
-            'is_interest': F.col('ReceivableType').isin(['991100', '511100']),
-            'is_iva'     : F.col('ReceivableType') == '990004',
-            },{
-            'uncleared'  : F.col('Amount') - F.col('cleared'),
-            'dds_default': thread_last(F.col('DueDateShift'), 
-                    (F.when, F.col('is_default') & F.col('is_capital')), 
-                    ϱ('otherwise', F.max('DueDateShift').over(w_duedate)))
-            },{
-            'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
-            }]
-        uncleared_if = compose_left(
-            partial2(F.when, ..., F.col('uncleared')), 
-            ϱ('otherwise', 0), 
-            F.sum)
-        group_cols = {      # siempre se filtra IS_DEFAULT. 
-            'oldest_default_date': F.min('dds_default'),
-            'uncleared_min'      : uncleared_if(F.col('is_min_dds') & F.col('is_recvble')), 
-            'default_uncleared'  : uncleared_if(F.col('is_capital')),
-            'default_interest'   : uncleared_if(F.col('is_interest')), 
-            'default_iva'        : uncleared_if(F.col('is_iva'))}
-        try: 
-            x1_df = (EpicDF(self.spark, path)
-                .with_column_plus(single_cols))
-        except Exception:   # pylint: disable=broad-exception-caught
-            warn("Execute WITH_COLUMN_PLUS non-optimized.")
-            single_cols_ii = reduce(or_, single_cols)
-            x1_df = (EpicDF(self.spark, path)
-                .with_column_plus(single_cols_ii, optimize=False))
-        x_df = (x1_df
-            .filter(F.col('is_default'))
-            .groupBy(*id_cols)
-            .agg_plus(group_cols))
         return x_df
      
     def _prep_person_set(self, path): 
@@ -343,7 +287,7 @@ class CyberData():
             'dbl' : compose(partial2(F.regexp_replace, ..., '[\.,]', ''),   # pylint: disable=anomalous-backslash-in-string
                 packed(F.format_string), ɣ('c_format', 'nombre')),
             'int' : lambda rr: F.format_string(str(rr['c_format']), rr['nombre']), 
-            'date': lambda rr: thread_first(F.col(rr['nombre']), 
+            'date': lambda rr: thread(F.col(rr['nombre']), 
                 (eq, self.na_types['date']), 
                 (F.when, F.lit('00000000')), 
                 ϱ('otherwise', F.date_format(rr['nombre'], 'MMddyyyy')))}
@@ -454,9 +398,9 @@ class CyberData():
         cyber_key, cyber_name = self.reports[task]
         save_paths = {
             'now_dir'   : f"{gold_path}/{cyber_name}/_spark/{now_00}", 
-            'recent'    : f"{gold_path}/recent/{cyber_key}.txt", 
-            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.txt"}
-        print(f"{now_hm}_{cyber_key}_{task}.txt")
+            'recent'    : f"{gold_path}/recent/{cyber_key}.TXT", 
+            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.TXT"}
+        print(f"{now_hm}_{cyber_key}_{task}.TXT")
         return save_paths
 
     def save_task_3(self, task, gold_path, gold_table): 
@@ -464,7 +408,6 @@ class CyberData():
         gold_table.save_as_file(the_paths['recent'], the_paths['now_dir'], header=False)
         gold_table.save_as_file(the_paths['history'], the_paths['now_dir'], header=True)
         return 
-    
           
     def set_defaults(self): 
         self.reports = {
