@@ -119,7 +119,6 @@ cyber_tasks = ['sap_pagos', 'sap_estatus', 'sap_saldos']
 the_tables = {}
 missing_cols = {}
 
-
 def read_cyber_specs(task_key: str, downer='blob'): 
     specs_file, joins_file = _set_specs_file(task_key, downer)
     the_specs = cyber_central.specs_setup_0(specs_file)
@@ -203,7 +202,8 @@ person_weird2.display()
 
 # COMMAND ----------
 
-person_weird1.display()
+person_call = core_session.call_data_api('person-set', '')
+
 
 # COMMAND ----------
 
