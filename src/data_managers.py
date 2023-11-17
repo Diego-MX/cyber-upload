@@ -399,14 +399,17 @@ class CyberData():
         save_paths = {
             'now_dir'   : f"{gold_path}/{cyber_name}/_spark/{now_00}", 
             'recent'    : f"{gold_path}/recent/{cyber_key}.TXT", 
-            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.TXT"}
-        print(f"{now_hm}_{cyber_key}_{task}.TXT")
+            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.txt"}
         return save_paths
 
     def save_task_3(self, task, gold_path, gold_table): 
         the_paths = self.save_task_paths(task, gold_path)
-        gold_table.save_as_file(the_paths['recent'], the_paths['now_dir'], header=False)
-        gold_table.save_as_file(the_paths['history'], the_paths['now_dir'], header=True)
+        print(the_paths['recent'])
+        write_opts = dict(tmp_dir=the_paths['now_dir'], 
+            ignoreLeadingWhiteSpace=False, 
+            ignoreTrailingWhiteSpace=False)
+        gold_table.save_as_file(the_paths['recent'], header=False, **write_opts)
+        gold_table.save_as_file(the_paths['history'],header=True, **write_opts)
         return 
           
     def set_defaults(self): 
@@ -436,7 +439,6 @@ class CyberData():
             'str' : '%-{}.{}s', 
             'date': '%8.8d', 
             'long': '%0{}d'}
-
 
 
 def pd_print(a_df: pd.DataFrame, **kwargs):

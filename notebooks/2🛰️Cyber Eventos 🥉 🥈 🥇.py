@@ -34,7 +34,7 @@ READ_SPECS_FROM = 'repo'
 
 from collections import OrderedDict
 from json import dumps
-from operator import methodcaller as ϱ
+from operator import methodcaller as ϱ, attrgetter as ɣ
 import os
 from pathlib import Path
 import re
@@ -43,7 +43,7 @@ import pandas as pd
 from pyspark.sql import functions as F, SparkSession
 from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 from toolz import compose_left, pipe
-from toolz.curried import map as map_z
+from toolz.curried import map as map_z, valmap
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -295,6 +295,17 @@ if TO_DISPLAY:
 
 # COMMAND ----------
 
+a_file = f"{gold_path}/history/core_balance/"
+[x.name for x in dbutils.fs.ls(a_file)]
+
+# COMMAND ----------
+
+
+a_table = spark.read.text(a_file+"C8BD1374_2023-11-16_0101.txt")
+a_table.display()
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ### SAP Estatus
 
@@ -367,5 +378,11 @@ print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
 
 a_dir = f"{gold_path}/recent"
 print(a_dir)
-for x in dbutils.fs.ls(a_dir):
-    print(f"\t{x.name}\t→ {msec_strftime(x.modificationTime)}")
+
+file_infos = pipe(dbutils.fs.ls(a_dir), 
+    map_z(ɣ('name', 'modificationTime')), dict, 
+    valmap(msec_strftime), ϱ('items'), 
+    map_z(packed("\t{}\t→ {}".format)))
+
+for ff in file_infos: 
+    print(ff)
