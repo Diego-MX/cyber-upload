@@ -12,8 +12,8 @@ except ImportError: yaml = None     # pylint: disable=multiple-statements
 
 REQS_FILE = '../reqs_dbks.txt'
 USER_FILE = '../user_databricks.yml'
-EPIC_REF = 'gh-1.6' 
-V_TYPING = '4.7.1'
+EPIC_REF  = 'gh-1.6' 
+V_TYPING  = '4.7.1'
 
 
 # pylint: disable=redefined-outer-name

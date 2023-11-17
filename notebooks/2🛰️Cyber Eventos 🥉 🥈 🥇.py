@@ -300,12 +300,6 @@ a_file = f"{gold_path}/history/core_balance/"
 
 # COMMAND ----------
 
-
-a_table = spark.read.text(a_file+"C8BD1374_2023-11-16_0101.txt")
-a_table.display()
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ### SAP Estatus
 
