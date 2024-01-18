@@ -4,13 +4,12 @@
 from collections import OrderedDict, defaultdict
 from datetime import datetime as dt, date
 from functools import reduce
-from operator import eq, or_, attrgetter as ɣ, itemgetter as σ, methodcaller as ϱ
-from warnings import warn
+from operator import eq, attrgetter as ɣ, methodcaller as ϱ
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as pd_DF
-from pyspark.sql import functions as F, types as T, Window as W
+from pyspark.sql import functions as F, types as T, Window as W     # pylint: disable=import-error
 from pytz import timezone
 from toolz import (compose, compose_left, identity, juxt, pipe, 
     thread_first as thread, thread_last as thread2, valmap)
@@ -70,9 +69,9 @@ class CyberData():
             ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
             ('undefined','---') :  None})
         usgaap = [
-            ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
-            ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_default_date')+90), 
-            ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
+    ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
+    ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_default_date')+90), 
+    ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
             (None, F.lit(None))]
         loan_cols = OrderedDict({ 
             'ContractID'    : F.col('ID'), 
@@ -327,7 +326,7 @@ class CyberData():
                 for _, rr in df.iterrows()], 
             y_format = lambda df: df['x_format'].str.replace(r'\.\d*', '', regex=True),
             c_format = lambda df: df['y_format'].where(df['PyType'] == 'int', df['x_format']), 
-            s_format = lambda df: ["%{}.{}s".format(wth, wth)   # pylint: disable=duplicate-string-formatting-argument
+            s_format = lambda df: ["%{}.{}s".format(wth, wth)   # pylint: disable=duplicate-string-formatting-argument,consider-using-f-string
                 for wth in df['width']])
         return specs_df
 
@@ -399,7 +398,7 @@ class CyberData():
         save_paths = {
             'now_dir'   : f"{gold_path}/{cyber_name}/_spark/{now_00}", 
             'recent'    : f"{gold_path}/recent/{cyber_key}.TXT", 
-            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.txt"}
+            'history'   : f"{gold_path}/history/{cyber_name}/{cyber_key}_{now_hm}.TXT"}
         return save_paths
 
     def save_task_3(self, task, gold_path, gold_table): 
