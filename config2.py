@@ -97,7 +97,7 @@ CRM = {
 DATA = {
     'paths': {
         'core': 'ops/core-banking/batch-updates',
-        'events': 'ops/core-banking',
+        'events': 'ops/core-banking-x',
         'collections': 'cx/collections/sunshine-objects'},
     'tables': {
         'brz_persons'       :('din_clients.brz_ops_persons_set', 'persons-set'),
