@@ -57,15 +57,13 @@ from src.utilities import tools
 
 from config2 import app_agent, app_resourcer, cyber_handler, cyber_rename
 
-stg_account = app_resourcer['storage']
-stg_permissions = app_agent.prep_dbks_permissions(stg_account, 'gen2')
+stg_permissions = app_agent.prep_dbks_permissions(app_resourcer['storage'], 'gen2')
 app_resourcer.set_dbks_permissions(stg_permissions)
 
-λ_path = (lambda cc, pp: app_resourcer.get_resource_url(
-        'abfss', 'storage', container=cc, blob_path=pp))
-
-brz_path  = λ_path('bronze', 'ops/core-banking')
-gold_path = λ_path('gold', 'cx/collections/cyber')
+brz_path  = app_resourcer.get_resource_url(
+        'abfss', 'storage', container='bronze', blob_path='ops/core-banking-x')
+gold_path = app_resourcer.get_resource_url(
+        'abfss', 'storage', container='gold', blob_path='cx/collections/cyber')
 
 specs_path = "cx/collections/cyber/spec_files"  # @Blob Storage # pylint: disable=invalid-name
 tmp_downer = "/FileStore/cyber/specs"   # @local (dbks) driver node ≠ DBFS  # pylint: disable=invalid-name
@@ -376,7 +374,7 @@ print(a_dir)
 file_infos = pipe(dbutils.fs.ls(a_dir), 
     map_z(ɣ('name', 'modificationTime')), dict, 
     valmap(msec_strftime), ϱ('items'), 
-    map_z(packed("\t{}\t→ {}".format)))
+    map_z(packed("\t{} → {}".format)))
 
 for ff in file_infos: 
     print(ff)

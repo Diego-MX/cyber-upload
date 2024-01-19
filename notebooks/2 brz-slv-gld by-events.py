@@ -9,7 +9,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q -r ../reqs_dbks.txt
+from src.setup import 
 
 # COMMAND ----------
 
