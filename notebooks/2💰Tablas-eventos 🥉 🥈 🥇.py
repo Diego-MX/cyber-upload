@@ -9,51 +9,29 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q -r ../reqs_dbks.txt
+from src.setup import dependencies as deps
+deps.from_reqsfile("../reqs_dbks.txt")
+deps.gh_epicpy('gh-1.6', "../user_databricks.yml", False, True)
 
 # COMMAND ----------
 
+# pylint: disable=import-error
+# pylint: disable=ungrouped-imports
+# pylint: disable=wrong-import-order,wrong-import-position
 from collections import OrderedDict
-from datetime import datetime as dt, date, timedelta as delta
-from delta.tables import DeltaTable as Δ
-from pyspark.sql import (functions as F, 
-    types as T, Window as W, SparkSession)
-from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
-import re
-
-spark = SparkSession.builder.getOrCreate()
-dbutils = DBUtils(spark)
-
-import subprocess
-import yaml
-
-spark = SparkSession.builder.getOrCreate()
-dbutils = DBUtils(spark)
-
-with open("../user_databricks.yml", 'r') as _f: 
-    u_dbks = yaml.safe_load(_f)
-
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego',
-    'token' : dbutils.secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
-
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-subprocess.check_call(['pip', 'install', url_call])
-
-# COMMAND ----------
-
-from importlib import reload
-import config; reload(config)
+from pyspark.sql import functions as F, types as T, Window as W, SparkSession
+from pyspark.dbutils import DBUtils     # pylint: disable=no-name-in-module
 
 from epic_py.delta import EpicDF
 
-from src.utilities import tools
-from src.platform_resources import AzureResourcer
-from config import (app_agent, app_resourcer,
-    ConfigEnviron, ENV, SERVER, DBKS_TABLES, DATA_2)
+from config2 import app_agent, app_resourcer, DATA
 
-data_paths = DATA_2['paths']
+
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
+
+data_paths = DATA['paths']
 
 the_storage = app_resourcer['storage']
 stg_permissions = app_agent.prep_dbks_permissions(the_storage, 'gen2')
