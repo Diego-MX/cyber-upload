@@ -1,14 +1,14 @@
 # DX, Epic Bank
 # CDMX, 17 octubre '23
 
-from json import dumps
-from subprocess import check_call
-
 # pylint: disable=import-error
 # pylint: disable=import-outside-toplevel
 # pylint: disable=useless-return
+from json import dumps
+from subprocess import check_call
+
 from pkg_resources import working_set
-from pyspark.dbutils import DBUtils     # pylint: no-name-in-module
+from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession    
 has_yaml = 'yaml' in working_set.by_key
 

@@ -16,46 +16,32 @@
 
 # COMMAND ----------
 
-# MAGIC   %pip install -q -r ../reqs_dbks.txt
+from src.setup import dependencies as deps
+deps.from_reqsfile('../reqs_dbks.txt')
+deps.gh_epicpy('gh-1.6', '../user_databricks.yml')
 
 # COMMAND ----------
 
+# pylint: disable=import-error
+# pylint: disable=ungrouped-imports
+# pylint: disable=wrong-import-order,wrong-import-position
 from datetime import datetime as dt
 import json
-from pyspark.sql import (functions as F, types as T, 
-    SparkSession)
-from pyspark.dbutils import DBUtils
 import re
-import subprocess
-import yaml
+
+from pyspark.sql import functions as F, types as T, SparkSession
+from pyspark.dbutils import DBUtils
+
+from src.crm_platform import ZendeskSession
+from src.platform_resources import AzureResourcer
+from config import ConfigEnviron, ENV, SERVER, CRM_ENV
+from config2 import app_agent, app_resourcer, DATA
 
 spark = SparkSession.builder.getOrCreate()
 dbks_secrets = DBUtils(spark).secrets
 
-with open("../user_databricks.yml", 'r') as _f: 
-    u_dbks = yaml.safe_load(_f)
-
-epicpy_load = {
-    'url'   : 'github.com/Bineo2/data-python-tools.git', 
-    'branch': 'dev-diego', 
-    'token' :  dbks_secrets.get(u_dbks['dbks_scope'], u_dbks['dbks_token'])}
-
-url_call = "git+https://{token}@{url}@{branch}".format(**epicpy_load)
-subprocess.check_call(['pip', 'install', url_call])
-
-# COMMAND ----------
-
-from importlib import reload
-import config; reload(config)
-
-from src.crm_platform import ZendeskSession
-from src.platform_resources import AzureResourcer
-from config import (app_agent, app_resourcer, DATA_2, 
-    ConfigEnviron, 
-    ENV, SERVER, CRM_ENV, DBKS_TABLES)
-
-data_paths  = DATA_2['paths']
-data_tables = DATA_2['tables']
+data_paths  = DATA['paths']
+data_tables = DATA['tables']
 
 stg_permissions = app_agent.prep_dbks_permissions(app_resourcer['storage'], 'gen2')
 app_resourcer.set_dbks_permissions(stg_permissions)
