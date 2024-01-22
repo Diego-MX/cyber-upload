@@ -11,8 +11,9 @@
 # COMMAND ----------
 
 from importlib import reload
-from src.setup import pkg_epicpy; reload(pkg_epicpy)    # pylint: disable=multiple-statements
-pkg_epicpy.install_it()
+from src.setup import dependencies as deps
+deps.from_reqsfile("../reqs_dbks.txt")
+deps.gh_epicpy("gh-1.6", "../user_databricks.yml", False, True)
 # GH_REF, REF_FILE, USER_FILE, V_TYPING
 
 # COMMAND ----------
@@ -22,8 +23,6 @@ READ_SPECS_FROM = 'repo'
 # Puede ser:  {blob, repo}
 # REPO es la forma formal, como se lee en PRD.
 # BLOB es la forma rápida, que se actualiza desde local, sin necesidad de Github PUSH.
-
-# COMMAND ----------
 
 # pylint: disable=multiple-statements
 # pylint: disable=no-value-for-parameter

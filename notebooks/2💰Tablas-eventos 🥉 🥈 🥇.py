@@ -26,10 +26,8 @@ from epic_py.delta import EpicDF
 
 from config2 import app_agent, app_resourcer, DATA
 
-
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
-
 
 data_paths = DATA['paths']
 
