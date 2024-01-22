@@ -124,7 +124,6 @@ CRM_ENV  = environ.get('CRM_ENV')
 
 app_agent = EpicIdentity.create(SERVER, SETUP[ENV])
 app_resourcer = app_agent.get_resourcer(PLATFORM[ENV], check_all=False)
-# prep_secret = app_resourcer.get_vault_secretter()  ya no se usó para PREP_SAP_CONNECT
 prep_core = app_agent.prep_sap_connect(CORE[CORE_ENV])
 
 cyber_handler = TypeHandler({

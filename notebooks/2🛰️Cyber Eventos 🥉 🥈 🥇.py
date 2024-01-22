@@ -40,7 +40,7 @@ from pathlib import Path
 import re
 
 import pandas as pd
-from pyspark.sql import functions as F, SparkSession
+from pyspark.sql import functions as F, SparkSession    # pylint: disable=import-error
 from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
 from toolz import compose_left, pipe
 from toolz.curried import map as map_z, valmap
@@ -290,11 +290,6 @@ cyber_central.save_task_3(task, gold_path, gold_saldos)
 if TO_DISPLAY:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
-
-# COMMAND ----------
-
-a_file = f"{gold_path}/history/core_balance/"
-[x.name for x in dbutils.fs.ls(a_file)]
 
 # COMMAND ----------
 

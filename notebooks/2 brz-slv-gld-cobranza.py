@@ -15,12 +15,12 @@
 
 from datetime import datetime as dt
 from delta.tables import DeltaTable as Δ
-from pyspark.sql import functions as F, types as T, Window as W
-
-# COMMAND ----------
+from pyspark.sql import (functions as F, SparkSession, types as T, Window as W)
 
 from config import ConfigEnviron, ENV, SERVER, DBKS_TABLES
 from src.platform_resources import AzureResourcer
+
+spark = SparkSession.builder.getOrCreate()
 
 tbl_items = DBKS_TABLES[ENV]['items']
 
@@ -39,27 +39,28 @@ pms_location = DBKS_TABLES[ENV]['promises']
 
 def spk_sapdate(str_col, dt_type): 
     if dt_type == '/Date': 
-        dt_col = F.to_timestamp(F.regexp_extract(F.col(str_col), '\d+', 0)/1000)
+        dt_col = F.to_timestamp(F.regexp_extract(F.col(str_col), '\d+', 0)/1000)    #pylint: disable=anomalous-backslash-in-string
     elif dt_type == 'ymd': 
         dt_col = F.to_date(F.col(str_col), 'yyyyMMdd')
     return dt_col.alias(str_col)
 
 
-def segregate_lastNames(s, pos):
+def segregate_lastnames(s, pos):
     if len(s.split(' ')) > 1:
         return s.split(' ')[pos]
+    
+    if pos == 1:
+        return ''
     else:
-        if pos == 1:
-            return ''
-        else:
-            return s
-        
+        return s
+    
 
 def date_format(s):
     if s != '':
-        return dt.strptime(s, '%Y%m%d').date()
+        the_date = dt.strptime(s, '%Y%m%d').date()
     else:
-        return dt.strptime('20000101', '%Y%m%d').date()
+        the_date = dt.strptime('20000101', '%Y%m%d').date()
+    return the_date
 
     
 def write_dataframe(spk_df, tbl_loc, write_mode='overwrite'): 
@@ -70,7 +71,7 @@ def write_dataframe(spk_df, tbl_loc, write_mode='overwrite'):
     return None
       
     
-segregate_udf   = F.udf(segregate_lastNames, T.StringType())
+segregate_udf   = F.udf(segregate_lastnames, T.StringType())
 date_format_udf = F.udf(date_format, T.DateType())
 
 
@@ -138,7 +139,6 @@ if Δ.isDeltaTable(spark, slv_persons):
 else: 
     person_slv = person_set_0
 
-display(person_slv)
     
 
 
@@ -167,7 +167,6 @@ loan_contract_slv = (spark.read
     .withColumn('DaysToPayment', F.datediff(spk_sapdate('PaymentPlanStartDate', 'ymd'), F.current_date()))
     .dropDuplicates())
 
-display(loan_contract_slv)
 
 # COMMAND ----------
 
@@ -198,7 +197,6 @@ loan_balance_slv = (spark.read.format('delta')
     .agg(F.round(F.sum(F.col('Amount')), 2))
     .select(*fixed_cols, *code_select))
 
-display(loan_balance_slv)
 
 # COMMAND ----------
 
@@ -254,25 +252,27 @@ open_items_cols = {
     'monto_vencido'         : F.col('capital_vencido_monto') 
             + F.col('impuesto_vencido_monto') + F.col('comision_vencido_monto')}
 
+pre_open_cols = [{
+    'OpenItemsTS'   : F.to_date('OpenItemsTS', 'yyyy-MM-dd'),
+    'DueDate'   : F.to_date('DueDate', 'yyyyMMdd'),
+    'Amount'    : F.col('Amount').cast(T.DoubleType()),
+    'cleared'   : F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
+                   .cast(T.DoubleType()).fillna(0, subset=['cleared']),
+    'local/fgn' : F.when(F.col('Currency') == 'MXN', 'local')
+                   .when(F.col('Currency').isNotNull(), 'foreign')
+    }, {
+    'uncleared' : F.round(F.col('Amount') - F.col('cleared'), 2),
+    'recibible' : F.when(F.col('ReceivableType') == 511010, 'capital')  
+                   .when(F.col('ReceivableType').isin([511200, 990006]), 'comision')
+                   .when(F.col('ReceivableType').isin([511100, 991100, 990004]), 'impuesto'), 
+    'estatus_2' : F.when(F.col('StatusCategory') == 1, 'pagado')
+                   .when((F.col('DueDate') < F.col('OpenItemsTS')) 
+                        & F.col('StatusCategory').isin([2, 3]), 'vencido')
+}]
+
 pre_open_items = (spark.read.format('delta')
     .load(f"{abfss_brz}/{tbl_items['brz_loan_open_items'][1]}")
-    .withColumn('OpenItemsTS', F.to_date('OpenItemsTS', 'yyyy-MM-dd'))
-    .withColumn('DueDate',     F.to_date('DueDate',     'yyyyMMdd'))
-    .withColumn('Amount',      F.col('Amount').cast(T.DoubleType()))
-    # Aux 1
-    .withColumn('cleared',    F.regexp_extract('ReceivableDescription', r"Cleared: ([\d\.]+)", 1)
-                               .cast(T.DoubleType())).fillna(0, subset=['cleared'])
-    .withColumn('uncleared',  F.round(F.col('Amount') - F.col('cleared'), 2))
-    # Aux 2
-    .withColumn('recibible',  F.when(F.col('ReceivableType') == 511010, 'capital')  
-                               .when(F.col('ReceivableType').isin([511200, 990006]), 'comision')
-                               .when(F.col('ReceivableType').isin([511100, 991100, 990004]), 'impuesto')) 
-    .withColumn('estatus_2',  F.when(F.col('StatusCategory') == 1, 'pagado')
-                               .when((F.col('DueDate') < F.col('OpenItemsTS')) 
-                                    & F.col('StatusCategory').isin([2, 3]), 'vencido'))
-    .withColumn('local/fgn',  F.when(F.col('Currency') == 'MXN', 'local')
-                               .when(F.col('Currency').isNotNull(), 'foreign'))
-                 )
+    .with_column_plus(pre_open_cols))
 
 
 
