@@ -40,16 +40,16 @@ from config2 import app_agent, app_resourcer, DATA
 spark = SparkSession.builder.getOrCreate()
 dbks_secrets = DBUtils(spark).secrets
 
-data_paths  = DATA['paths']
-data_tables = DATA['tables']
+data_collections = DATA.get('paths').get('collections')
+
 
 stg_permissions = app_agent.prep_dbks_permissions(app_resourcer['storage'], 'gen2')
 app_resourcer.set_dbks_permissions(stg_permissions)
 
 abfss_brz = app_resourcer.get_resource_url('abfss', 'storage', 
-    container='bronze', blob_path=data_paths['collections']) 
+    container='bronze', blob_path=data_collections) 
 abfss_slv = app_resourcer.get_resource_url('abfss', 'storage', 
-    container='silver', blob_path=data_paths['collections'])     
+    container='silver', blob_path=data_collections)     
 
 # Para cambiar estos elementos, requerimos habilitar CRMSession en EpicPy. 
 secretter = ConfigEnviron(ENV, SERVER, spark)
@@ -62,8 +62,6 @@ def unnest(c, s):
     unn = (None if c == '' 
             else json.loads(c)[s])
     return unn
-
-udf_unnest = F.udf(unnest, T.IntegerType())
 
 def date_format(c):
     pattern1 = re.compile("^[0-9]+/[0-9]+/[0-9]+$")
@@ -81,6 +79,8 @@ def date_format(c):
     else:
         return None
 
+udf_unnest = F.udf(unnest, T.IntegerType())
+
 udf_date_format = F.udf(date_format, T.StringType())
 
 # COMMAND ----------
@@ -90,13 +90,11 @@ udf_date_format = F.udf(date_format, T.StringType())
 
 # COMMAND ----------
 
-promises_tbl = data_tables['brz_promises'][0]
-
-promises_df = (zendesker
+promises_df = (zendesker    # pylint: disable=invalid-name
     .get_promises()
     .drop(columns='external_id'))
 
-promises_spk = spark.createDataFrame(promises_df) # type: ignore
+promises_spk = spark.createDataFrame(promises_df)
 
 (promises_spk.write.mode('overwrite')
     .format('delta')

@@ -10,11 +10,9 @@
 
 # COMMAND ----------
 
-from importlib import reload
 from src.setup import dependencies as deps
 deps.from_reqsfile("../reqs_dbks.txt")
 deps.gh_epicpy("gh-1.6", "../user_databricks.yml", False, True)
-# GH_REF, REF_FILE, USER_FILE, V_TYPING
 
 # COMMAND ----------
 
