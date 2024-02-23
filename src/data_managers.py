@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as pd_DF
 from pyspark.sql import functions as F, types as T, Window as W     # pylint: disable=import-error
-from pytz import timezone
+    from pytz import timezone
 from toolz import (compose, compose_left, identity, juxt, pipe, 
     thread_first as thread, thread_last as thread2, valmap)
 from toolz.curried import map as map_z
@@ -69,9 +69,9 @@ class CyberData():
             ('LIQUIDADO','302') :  F.col('LifeCycleStatus') == '50', 
             ('undefined','---') :  None})
         usgaap = [
-    ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
-    ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_default_date')+90), 
-    ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
+        ((F.col('StageLevel') < 3) & (F.col('OverdueDays') == 0), F.lit(None)), 
+        ((F.col('StageLevel') < 3) & (F.col('OverdueDays') >  0), F.col('oldest_default_date')+90), 
+        ((F.col('StageLevel')== 3),   F.col('EvaluationDate')), 
             (None, F.lit(None))]
         loan_cols = OrderedDict({ 
             'ContractID'    : F.col('ID'), 
@@ -414,8 +414,9 @@ class CyberData():
     def set_defaults(self): 
         self.reports = {
             'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
-            'sap_estatus'   : ('C8BD1353',  'core_status'  ), 
-            'sap_pagos'     : ('C8BD1343',  'core_payments'), 
+            'sap_estatus'   : ('C8BD1343',  'core_status'  ), 
+            'sap_pagos'     : ('C8BD1353',  'core_payments'), 
+            ''
             'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
             'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
             'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
