@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as pd_DF
 from pyspark.sql import functions as F, types as T, Window as W     # pylint: disable=import-error
-    from pytz import timezone
+from pytz import timezone
 from toolz import (compose, compose_left, identity, juxt, pipe, 
     thread_first as thread, thread_last as thread2, valmap)
 from toolz.curried import map as map_z
