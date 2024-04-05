@@ -217,6 +217,9 @@ class CyberData():
         return x_df
 
     def _prep_txns_set(self, path):
+        # 92703 500021 500022 500023 500401 500402 500908 550002 550021 550022 
+        # 650710 650712 650713 650716 850003 850005 950401 950404
+        # 92704 92710 92711 92798 92799 
         txn_codes = [92703,  92800, 500027, 550021, 550022, 550023, 
             550024, 550403, 550908, 650404, 650710, 650712, 650713, 
             650716, 650717, 650718, 650719, 650720, 750001, 750025, 
@@ -230,11 +233,12 @@ class CyberData():
         x_df = (base_df
             .with_column_plus(with_rename)
             .filter_plus(
+                F.col('AccountProductID') == 'EPC_LA_PE1',
                 F.col('TransactionTypeCode').isin(txn_codes), 
                 F.col('ValueDate') == F.col('yesterday')))
         return x_df
 
-    def _prep_txns_grp(self, path): 
+    def _prep_txns_grp(self, path):
         pymt_codes = [550021, 550022, 550023, 550024, 550403, 550908]
 
         by_older = W.partitionBy('AccountID', 'is_payment').orderBy(F.col('ValueDate'))
