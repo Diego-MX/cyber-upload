@@ -145,6 +145,7 @@ class CyberData():
         return x_df
      
     def _prep_open_items_wide(self, path):
+        
         # Ya no se usa ITEMS_WIDE ... porque queries. 
         id_cols = ['ContractID', 'epic_date', 'ID']
         rec_types = ['511010', '511100', '511200', '990004', '991100', '990006'] 

@@ -47,7 +47,7 @@ dbutils = DBUtils(spark)
 
 # COMMAND ----------
 
-from epic_py.delta import EpicDataBuilder, F_latinize
+from epic_py.delta import EpicDataBuilder, F_latinize, column_name
 from epic_py.tools import msec_strftime, packed
 from src.data_managers import CyberData
 from src.utilities import tools
@@ -117,7 +117,7 @@ persons = cyber_central.prepare_source('person-set',
 
 the_txns = cyber_central.prepare_source('txns-set',
     path=f"{brz_path}/transaction-set/data")
-
+    
 txn_pmts = cyber_central.prepare_source('txns-grp',
     path=f"{brz_path}/transaction-set/data")
 
@@ -288,6 +288,9 @@ if TO_DISPLAY:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
 
+saldos_col = column_name(one_select)
+saldos_len = specs_df['width'].sum()
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -351,10 +354,6 @@ if TO_DISPLAY:
 
 # COMMAND ----------
 
-print(f"Missing columns are: {dumps2(missing_cols, indent=2)}")
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Exploración de archivos
 
@@ -370,3 +369,24 @@ file_infos = pipe(dbutils.fs.ls(a_dir),
 
 for ff in file_infos: 
     print(ff)
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ## Checks unitarios
+# MAGIC
+# MAGIC Por ejemplo, se reportó que algunos saldos vienen desfasados en el ancho fijo. 
+
+# COMMAND ----------
+
+import re
+
+precheck_1 = (gold_saldos
+    .withColumn('length', F.length(saldos_col))
+    .filter(F.col('length') != saldos_len)
+    .collect())
+
+if len(precheck_1) > 0: 
+    spark.DataFrame(precheck_1).display()
+    raise RuntimeError("Saldos tiene filas de longitud errónea.")
+
