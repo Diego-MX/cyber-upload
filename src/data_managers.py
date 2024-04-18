@@ -407,7 +407,8 @@ class CyberData():
     def save_task_3(self, task, gold_path, gold_table): 
         the_paths = self.save_task_paths(task, gold_path)
         print(the_paths['recent'])
-        write_opts = dict(tmp_dir=the_paths['now_dir'], quote="", 
+        write_opts = dict(tmp_dir=the_paths['now_dir'],
+            escapeQuotes=False,                           
             ignoreLeadingWhiteSpace=False, 
             ignoreTrailingWhiteSpace=False)
         gold_table.save_as_file(the_paths['recent'], header=False, **write_opts)
@@ -455,3 +456,4 @@ def pd_print(a_df: pd.DataFrame, **kwargs):
     with pd.option_context(*optns_ls):
         print(a_df)
     return
+
