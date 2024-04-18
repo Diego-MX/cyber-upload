@@ -379,8 +379,6 @@ for ff in file_infos:
 
 # COMMAND ----------
 
-import re
-
 precheck_1 = (gold_saldos
     .withColumn('length', F.length(saldos_col))
     .filter(F.col('length') != saldos_len)

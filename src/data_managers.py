@@ -224,10 +224,10 @@ class CyberData():
             650404, 650710, 650712, 650713, 650716, 650717, 650718, 650719, 650720, 
             750001, 750025, 850003, 850004, 850005, 850006, 850007, 958800]
         with_rename = {
-            'yesterday'         : F.current_date() - 1, 
-            'TransactionTypeTxt': F.col('TransactionTypeName') , 
-            'TransactionType'   : F.col('TransactionTypeCode'),  
-            'ContractID'        : F.col('AccountID')}
+            'yesterday'     : F.current_date() - 1,  
+            'ContractID'    : F.col('AccountID'), 
+            'TransactionType'   : F.col('TransactionTypeCode'), 
+            'TransactionTypeTxt': F.col('TransactionTypeName') }
         base_df = EpicDF(self.spark, path)
         x_df = (base_df
             .with_column_plus(with_rename)
@@ -407,7 +407,7 @@ class CyberData():
     def save_task_3(self, task, gold_path, gold_table): 
         the_paths = self.save_task_paths(task, gold_path)
         print(the_paths['recent'])
-        write_opts = dict(tmp_dir=the_paths['now_dir'], 
+        write_opts = dict(tmp_dir=the_paths['now_dir'], quote="", 
             ignoreLeadingWhiteSpace=False, 
             ignoreTrailingWhiteSpace=False)
         gold_table.save_as_file(the_paths['recent'], header=False, **write_opts)
@@ -419,7 +419,6 @@ class CyberData():
             'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
             'sap_estatus'   : ('C8BD1343',  'core_status'  ), 
             'sap_pagos'     : ('C8BD1353',  'core_payments'), 
-            ''
             'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
             'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
             'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
@@ -450,10 +449,7 @@ def pd_print(a_df: pd.DataFrame, **kwargs):
         'max_columns': None, 
         'width'      : 180}
     the_options.update(kwargs)
-    
-    # pipe(the_options.items(), 
-    #   z_keymap(add('display.')), 
-    #   concat)
+
     optns_ls = sum(([f"display.{kk}", vv] 
         for kk, vv in the_options.items()), start=[])
     with pd.option_context(*optns_ls):
