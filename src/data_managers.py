@@ -407,7 +407,8 @@ class CyberData():
     def save_task_3(self, task, gold_path, gold_table): 
         the_paths = self.save_task_paths(task, gold_path)
         print(the_paths['recent'])
-        write_opts = dict(tmp_dir=the_paths['now_dir'],
+        write_opts = dict(
+            tmp_dir=the_paths['now_dir'],
             escapeQuotes=False,                           
             ignoreLeadingWhiteSpace=False, 
             ignoreTrailingWhiteSpace=False)
