@@ -409,7 +409,7 @@ class CyberData():
         print(the_paths['recent'])
         write_opts = dict(
             tmp_dir=the_paths['now_dir'],
-            escapeQuotes=False,                           
+            delimiter="\t",                           
             ignoreLeadingWhiteSpace=False, 
             ignoreTrailingWhiteSpace=False)
         gold_table.save_as_file(the_paths['recent'], header=False, **write_opts)
