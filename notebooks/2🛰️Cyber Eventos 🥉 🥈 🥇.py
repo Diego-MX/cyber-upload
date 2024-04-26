@@ -288,7 +288,7 @@ if TO_DISPLAY:
     print(f"\tRows: {gold_saldos.count()}")
     gold_saldos.display()
 
-saldos_col = column_name(one_select)
+saldos_path = cyber_central.save_task_paths('sap_saldos', gold_path)['recent']
 saldos_len = specs_df['width'].sum()
 
 # COMMAND ----------
@@ -378,13 +378,11 @@ for ff in file_infos:
 # MAGIC Por ejemplo, se reportó que algunos saldos vienen desfasados en el ancho fijo. 
 
 # COMMAND ----------
-
-precheck_1 = (gold_saldos
-    .withColumn('length', F.length(saldos_col))
+precheck_1 = (spark.read.text(saldos_path)
+    .withColumn('length', F.length('value'))
     .filter(F.col('length') != saldos_len)
     .collect())
 
 if len(precheck_1) > 0: 
     spark.DataFrame(precheck_1).display()
     raise RuntimeError("Saldos tiene filas de longitud errónea.")
-
