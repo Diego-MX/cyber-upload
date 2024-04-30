@@ -419,8 +419,8 @@ class CyberData():
     def set_defaults(self): 
         self.reports = {
             'sap_saldos'    : ('C8BD1374',  'core_balance' ), 
-            'sap_estatus'   : ('C8BD1343',  'core_status'  ), 
-            'sap_pagos'     : ('C8BD1353',  'core_payments'), 
+            'sap_estatus'   : ('C8BD1353',  'core_status'  ), 
+            'sap_pagos'     : ('C8BD1343',  'core_payments'), 
             'fiserv_saldos' : ('C8BD10000', 'cms_balance'  ),
             'fiserv_estatus': ('C8BD10001', 'cms_status'   ), 
             'fiserv_pagos'  : ('C8BD10002', 'cms_payments' )}
