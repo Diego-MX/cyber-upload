@@ -13,7 +13,7 @@
 from importlib import reload
 from src.setup import pkg_epicpy; reload(pkg_epicpy)    # pylint: disable=multiple-statements
 pkg_epicpy.install_it(
-    epic_ref=None, 
+    epic_ref='1.8', 
     reqs="../reqs_dbks.txt",
     user_file="../user_databricks.yml")
 
@@ -41,7 +41,7 @@ from pathlib import Path
 import pandas as pd
 from pyspark.sql import functions as F, SparkSession
 from pyspark.dbutils import DBUtils   # pylint: disable=import-error,no-name-in-module
-from toolz import complement, compose_left, pipe
+from toolz import complement, compose_left
 from toolz.curried import map as map_z, valfilter, valmap
 
 spark = SparkSession.builder.getOrCreate()
@@ -54,7 +54,7 @@ import config2; reload(config2)
 
 from epic_py.delta import EpicDF, EpicDataBuilder
 from epic_py.partners.core import SAPSession
-from epic_py.tools import packed
+from epic_py.tools import packed, thread
 from src.data_managers import CyberData
 from src.utilities import tools
 
@@ -155,7 +155,7 @@ def _df_joiner(join_df) -> OrderedDict:
         map_z(ϱ('split', '=')), 
         map_z(packed(λ_col_alias)), 
         list)
-    joiner = pipe(join_df.itertuples(), 
+    joiner = thread(join_df.itertuples(), 
         map_z(σ('tabla', 'join_cols')), dict, 
         valfilter(complement(tools.is_na)), 
         valmap(splitter))
