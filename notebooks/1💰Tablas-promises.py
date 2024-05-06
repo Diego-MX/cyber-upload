@@ -18,7 +18,7 @@
 
 from src.setup import dependencies as deps
 deps.from_reqsfile('../reqs_dbks.txt')
-deps.gh_epicpy('gh-1.6', '../user_databricks.yml')
+deps.gh_epicpy('gh-1.8', '../user_databricks.yml')
 
 # COMMAND ----------
 

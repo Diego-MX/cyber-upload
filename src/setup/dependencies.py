@@ -14,7 +14,7 @@ has_yaml = 'yaml' in working_set.by_key
 
 REQS_FILE = '../reqs_dbks.txt'
 USER_FILE = '../user_databricks.yml'
-EPIC_REF  = 'gh-1.6' 
+EPIC_REF  = 'gh-1.8' 
 V_TYPING  = '4.7.1'
 
 

@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-epicpy_ref = 'gh-1.5' # 'v1.1.19'      # dev-diego
+epicpy_ref = 'gh-1.8' # 'v1.1.19'      # dev-diego
 # pylint: disable=wrong-import-position,wrong-import-order
 # pylint: disable=ungrouped-imports
 
