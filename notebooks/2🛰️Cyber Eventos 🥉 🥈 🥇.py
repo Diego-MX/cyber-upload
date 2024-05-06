@@ -39,7 +39,7 @@ import re
 import pandas as pd
 from pyspark.sql import functions as F, SparkSession    # pylint: disable=import-error
 from pyspark.dbutils import DBUtils     # pylint: disable=import-error,no-name-in-module
-from toolz import compose_left, pipe
+from toolz import compose_left
 from toolz.curried import map as map_z, valmap
 
 spark = SparkSession.builder.getOrCreate()
@@ -48,7 +48,7 @@ dbutils = DBUtils(spark)
 # COMMAND ----------
 
 from epic_py.delta import EpicDataBuilder, F_latinize, column_name
-from epic_py.tools import msec_strftime, packed
+from epic_py.tools import msec_strftime, packed, thread
 from src.data_managers import CyberData
 from src.utilities import tools
 
@@ -251,7 +251,7 @@ missing_cols = {}
 
 def one_column(names, header=True):
     an_alias = '~'.join(names) if header else 'one-fixed-width'
-    the_col = pipe(names,
+    the_col = thread(names,
         packed(F.concat),
         F_latinize,
         ϱ('alias', an_alias))
@@ -362,7 +362,7 @@ if TO_DISPLAY:
 a_dir = f"{gold_path}/recent"
 print(a_dir)
 
-file_infos = pipe(dbutils.fs.ls(a_dir), 
+file_infos = thread(dbutils.fs.ls(a_dir), 
     map_z(ɣ('name', 'modificationTime')), dict, 
     valmap(msec_strftime), ϱ('items'), 
     map_z(packed("\t{} → {}".format)))
@@ -384,5 +384,5 @@ precheck_1 = (spark.read.text(saldos_path)
     .collect())
 
 if len(precheck_1) > 0: 
-    spark.DataFrame(precheck_1).display()
+    spark.createDataFrame(precheck_1).display()
     raise RuntimeError("Saldos tiene filas de longitud errónea.")

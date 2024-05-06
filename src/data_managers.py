@@ -11,12 +11,11 @@ import pandas as pd
 from pandas import DataFrame as pd_DF
 from pyspark.sql import functions as F, types as T, Window as W     # pylint: disable=import-error
 from pytz import timezone
-from toolz import (compose, compose_left, identity, juxt, pipe, 
-    thread_first as thread, thread_last as thread2, valmap)
+from toolz import compose, compose_left, identity, juxt, valmap
 from toolz.curried import map as map_z
 
 from epic_py.delta import EpicDF, column_name, when_plus
-from epic_py.tools import packed, partial2
+from epic_py.tools import packed, partial2, thread
 
 item_namer = lambda names: compose(dict, partial2(zip, names, ...))
 # item_namer([nm_1, nm_2])(obj_1, obj_2) := {nm_1: obj_1, nm_2: obj_2}
@@ -86,7 +85,7 @@ class CyberData():
                         for kk, vv in status_dict.items()]), 
             'status_3'  : when_plus([(vv, kk[1]) 
                         for kk, vv in status_dict.items()])})
-        repay_df   = pipe(repay_dict.items(),
+        repay_df   = thread(repay_dict.items(),
             map_z(item_namer(['RepaymentFrequency', 'repay_freq'])),  
             self.spark.createDataFrame)
         x_df = (EpicDF(self.spark, path)   # type: ignore
@@ -108,7 +107,7 @@ class CyberData():
             'ID'         : F.col('ContractID'),
             'DueDateShift':F.to_date('DueDateShift', 'yyyyMMdd'), 
             'cleared'    : thread(F.col('ReceivableDescription'), 
-                    (F.regexp_extract, r"Cleared: ([\d\.]+)", 1), 
+                    (F.regexp_extract, ..., r"Cleared: ([\d\.]+)", 1), 
                     ϱ('cast', T.DecimalType(20, 2)), 
                     (F.coalesce, F.lit(0))),
             'is_default' : F.col('StatusCategory').isin(['2','3']),
@@ -118,8 +117,8 @@ class CyberData():
             'is_iva'     : F.col('ReceivableType') == '990004',
             },{
             'uncleared'  : F.col('Amount') - F.col('cleared'),
-            'dds_default': thread2(F.col('DueDateShift'), 
-                    (F.when, F.col('is_default') & F.col('is_capital')))
+            'dds_default': thread(F.col('DueDateShift'), 
+                    (F.when, F.col('is_default') & F.col('is_capital'), ...))
             },{
             'is_min_dds' : F.col('DueDateShift') == F.min('dds_default').over(w_duedate)
             }]
@@ -175,9 +174,9 @@ class CyberData():
                 'oldest_date' : F.col('DueDate'),           ## ya no
                 'oldest_uncleared' : F.col('uncleared'),    ## ya no
                 'oldest_eval_date' : F.col('DueDate') + 90, 
-                'overdue_days' : pipe(F.col('DueDate'),     ## ya no
-                    partial2(F.datediff, 'yesterday'), 
-                    partial2(F.coalesce, ..., F.lit(0)))}} 
+                'overdue_days' : thread(F.col('DueDate'),     ## ya no
+                    (F.datediff, 'yesterday', ...), 
+                    (F.coalesce, ..., F.lit(0)))}} 
         
         y_df = (EpicDF(self.spark, path)   # type: ignore
             .fillna(0, subset=rec_types)
@@ -200,14 +199,16 @@ class CyberData():
             'LastNameP' : F.col('LastName'),
             'LastNameM' : F.col('LastName2'), 
             'full_name' : F.concat_ws(' ', 'FirstName', 'MiddleName', 'LastName', 'LastName2'), 
-            'address2'  : F.concat_ws(' ', 'AddressStreet', 'AddressHouseID'), 
+            'address2'  : thread(F.col('AddressStreet'), 
+                (F.concat_ws, ' ', ..., F.col('AddressHouseID')), 
+                (F.regexp_replace, ..., r'[°]', '')), 
             'yesterday' : F.date_add(F.current_date(), -1)}
         states_str = [
             "AGU,1",  "BCN,2",  "BCS,3",  "CAM,4",  "COA,5",  "COL,6",  "CHH,8",  "CHP,7", 
             "CMX,9",  "DUR,10", "GUA,11", "GRO,12", "HID,13", "JAL,14", "MEX,15", "MIC,16", 
             "MOR,17", "NAY,18", "NLE,19", "OAX,20", "PUE,21", "QUE,22", "ROO,23", "SLP,24", 
             "SIN,25", "SON,26", "TAB,27", "TAM,28", "TLA,29", "VER,30", "YUC,31", "ZAC,32"]
-        states_df = pipe(states_str, 
+        states_df = thread(states_str, 
             map_z(ϱ('split', ',')), 
             map_z(item_namer(['AddressRegion', 'state_key'])), 
             self.spark.createDataFrame)
@@ -290,8 +291,8 @@ class CyberData():
                 packed(F.format_string), ɣ('c_format', 'nombre')),
             'int' : lambda rr: F.format_string(str(rr['c_format']), rr['nombre']), 
             'date': lambda rr: thread(F.col(rr['nombre']), 
-                (eq, self.na_types['date']), 
-                (F.when, F.lit('00000000')), 
+                (eq, ..., self.na_types['date']), 
+                (F.when, ..., F.lit('00000000')), 
                 ϱ('otherwise', F.date_format(rr['nombre'], 'MMddyyyy')))}
 
         def row_formatter(a_row): 
@@ -379,7 +380,7 @@ class CyberData():
             fix_vals = specs_dict['fix_vals']
         else: 
             one_true = compose_left(F.lit(True).alias, list)
-            readers = pipe(spec_joins, map_z(juxt(identity, one_true)), dict) 
+            readers = thread(spec_joins, map_z(juxt(identity, one_true)), dict) 
             fix_vals = []
         
         k_table = (lambda key: 
