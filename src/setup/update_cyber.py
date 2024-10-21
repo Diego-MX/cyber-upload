@@ -42,7 +42,7 @@ if __name__ == '__main__':
     from dotenv import load_dotenv
 
     load_dotenv(override=True)
-    from config import app_resourcer, SITE
+    from config2 import app_resourcer, SITE
 
     cyber_fields = SITE/"refs/catalogs/Cyber Specs.xlsm.lnk"
 
